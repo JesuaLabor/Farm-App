@@ -1,0 +1,84 @@
+package models
+
+import (
+	"time"
+
+	"go.mongodb.org/mongo-driver/v2/bson"
+)
+
+// Role represents the user's role in the system.
+type Role string
+
+const (
+	RoleFarmer   Role = "farmer"
+	RoleBuyer    Role = "buyer"
+	RoleSupplier Role = "supplier"
+	RoleExpert   Role = "expert"
+	RoleLGUStaff Role = "lgu_staff"
+)
+
+// ValidRoles is the set of all accepted role values.
+var ValidRoles = map[Role]bool{
+	RoleFarmer:   true,
+	RoleBuyer:    true,
+	RoleSupplier: true,
+	RoleExpert:   true,
+	RoleLGUStaff: true,
+}
+
+// IsValidRole checks whether a given role string is valid.
+func IsValidRole(r Role) bool {
+	return ValidRoles[r]
+}
+
+// User represents a user account in the system.
+type User struct {
+	ID        bson.ObjectID `bson:"_id,omitempty" json:"id"`
+	Email     string        `bson:"email"         json:"email"`
+	Password  string        `bson:"password"      json:"-"`
+	Role      Role          `bson:"role"          json:"role"`
+	FirstName string        `bson:"first_name"    json:"firstName"`
+	LastName  string        `bson:"last_name"     json:"lastName"`
+	Phone     string        `bson:"phone,omitempty"    json:"phone,omitempty"`
+	Region    string        `bson:"region,omitempty"   json:"region,omitempty"`
+	Address   string        `bson:"address,omitempty"  json:"address,omitempty"`
+	PhotoURL   string        `bson:"photo_url,omitempty" json:"photoUrl,omitempty"`
+	IsVerified bool          `bson:"is_verified"         json:"isVerified"`
+	CreatedAt  time.Time     `bson:"created_at"          json:"createdAt"`
+	UpdatedAt  time.Time     `bson:"updated_at"          json:"updatedAt"`
+}
+
+// RegisterRequest is the JSON body for POST /api/auth/register.
+type RegisterRequest struct {
+	Email     string `json:"email"`
+	Password  string `json:"password"`
+	Role      Role   `json:"role"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+}
+
+// LoginRequest is the JSON body for POST /api/auth/login.
+type LoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+// AuthResponse is returned after successful login or registration.
+type AuthResponse struct {
+	Token string `json:"token"`
+	User  User   `json:"user"`
+}
+
+// UpdateProfileRequest is the JSON body for PUT /api/users/me.
+type UpdateProfileRequest struct {
+	FirstName *string `json:"firstName,omitempty"`
+	LastName  *string `json:"lastName,omitempty"`
+	Phone     *string `json:"phone,omitempty"`
+	Region    *string `json:"region,omitempty"`
+	Address   *string `json:"address,omitempty"`
+}
+
+// ErrorResponse is a standard error payload.
+type ErrorResponse struct {
+	Error string `json:"error"`
+}

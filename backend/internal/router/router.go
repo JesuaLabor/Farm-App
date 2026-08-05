@@ -1,0 +1,164 @@
+package router
+
+import (
+	"net/http"
+
+	"github.com/agriconnect/backend/internal/handler"
+	"github.com/agriconnect/backend/internal/middleware"
+	"github.com/agriconnect/backend/internal/models"
+	"github.com/go-chi/chi/v5"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
+)
+
+// New creates and configures the application router with all routes and middleware.
+func New(
+	authHandler *handler.AuthHandler,
+	userHandler *handler.UserHandler,
+	produceHandler *handler.ProduceHandler,
+	supplyHandler *handler.SupplyHandler,
+	priceHandler *handler.PriceHandler,
+	financialHandler *handler.FinancialHandler,
+	programHandler *handler.ProgramHandler,
+	communityHandler *handler.CommunityHandler,
+	analyticsHandler *handler.AnalyticsHandler,
+	jwtSecret string,
+	uploadDir string,
+) http.Handler {
+	r := chi.NewRouter()
+
+	// Global middleware
+	r.Use(chimiddleware.Logger)
+	r.Use(chimiddleware.Recoverer)
+	r.Use(chimiddleware.RequestID)
+	r.Use(chimiddleware.RealIP)
+	r.Use(middleware.CORS())
+
+	// Health check
+	r.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	// Public auth routes
+	r.Route("/api/auth", func(r chi.Router) {
+		r.Post("/register", authHandler.Register)
+		r.Post("/login", authHandler.Login)
+	})
+
+	// User routes
+	r.Route("/api/users", func(r chi.Router) {
+		r.Use(middleware.JWTAuth(jwtSecret))
+
+		r.Get("/me", userHandler.GetProfile)
+		r.Put("/me", userHandler.UpdateProfile)
+		r.Put("/me/photo", userHandler.UploadPhoto)
+	})
+
+	// Produce Marketplace routes
+	r.Route("/api/produce", func(r chi.Router) {
+		r.Get("/listings", produceHandler.ListListings)
+		r.Get("/listings/{id}", produceHandler.GetListingByID)
+
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.JWTAuth(jwtSecret))
+
+			r.With(middleware.RequireRole(models.RoleFarmer)).Post("/listings", produceHandler.CreateListing)
+			r.With(middleware.RequireRole(models.RoleFarmer)).Put("/listings/{id}", produceHandler.UpdateListing)
+			r.With(middleware.RequireRole(models.RoleFarmer)).Delete("/listings/{id}", produceHandler.DeleteListing)
+
+			r.With(middleware.RequireRole(models.RoleBuyer)).Post("/transactions", produceHandler.InitiateTransaction)
+
+			r.Get("/transactions", produceHandler.ListTransactions)
+			r.Put("/transactions/{id}/status", produceHandler.UpdateTransactionStatus)
+		})
+	})
+
+	// Agri-Supply Store routes
+	r.Route("/api/supply", func(r chi.Router) {
+		r.Get("/products", supplyHandler.ListProducts)
+		r.Get("/products/{id}", supplyHandler.GetProductByID)
+
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.JWTAuth(jwtSecret))
+
+			r.With(middleware.RequireRole(models.RoleSupplier)).Post("/products", supplyHandler.CreateProduct)
+			r.With(middleware.RequireRole(models.RoleSupplier)).Put("/products/{id}", supplyHandler.UpdateProduct)
+			r.With(middleware.RequireRole(models.RoleSupplier)).Delete("/products/{id}", supplyHandler.DeleteProduct)
+
+			r.With(middleware.RequireRole(models.RoleFarmer)).Post("/orders", supplyHandler.CreateOrder)
+
+			r.Get("/orders", supplyHandler.ListOrders)
+			r.Put("/orders/{id}/status", supplyHandler.UpdateOrderStatus)
+		})
+	})
+
+	// Market Price Monitoring routes
+	r.Route("/api/market-prices", func(r chi.Router) {
+		r.Get("/", priceHandler.ListHistory)
+		r.Get("/latest", priceHandler.GetLatestPrice)
+
+		// LGU staff / Expert / Admin role can record daily crop prices
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.JWTAuth(jwtSecret))
+			r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleExpert)).Post("/", priceHandler.CreateRecord)
+		})
+	})
+
+	// Farm Income & Expense Tracker routes
+	r.Route("/api/finances", func(r chi.Router) {
+		r.Use(middleware.JWTAuth(jwtSecret))
+		r.Use(middleware.RequireRole(models.RoleFarmer))
+
+		r.Get("/entries", financialHandler.ListEntries)
+		r.Post("/entries", financialHandler.CreateEntry)
+		r.Delete("/entries/{id}", financialHandler.DeleteEntry)
+		r.Get("/summary", financialHandler.GetSummary)
+	})
+
+	// Government Program Application & Tracking routes
+	r.Route("/api/programs", func(r chi.Router) {
+		r.Get("/", programHandler.ListPrograms)
+		r.Get("/{id}", programHandler.GetProgramByID)
+
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.JWTAuth(jwtSecret))
+
+			// Farmer endpoints
+			r.With(middleware.RequireRole(models.RoleFarmer)).Post("/{id}/applications", programHandler.SubmitApplication)
+			r.With(middleware.RequireRole(models.RoleFarmer)).Get("/applications/my", programHandler.ListApplicationsByFarmer)
+
+			// LGU / Admin endpoints
+			r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleExpert)).Post("/", programHandler.CreateProgram)
+			r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleExpert)).Put("/{id}/status", programHandler.UpdateProgramStatus)
+			r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleExpert)).Get("/{id}/applications", programHandler.ListApplicationsByProgram)
+			r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleExpert)).Put("/applications/{appId}/status", programHandler.ReviewApplication)
+		})
+	})
+
+	// Community Hub routes
+	r.Route("/api/community", func(r chi.Router) {
+		r.Get("/posts", communityHandler.ListPosts)
+		r.Get("/posts/{id}", communityHandler.GetPostByID)
+		r.Get("/posts/{id}/comments", communityHandler.ListCommentsByPost)
+
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.JWTAuth(jwtSecret))
+
+			r.Post("/posts", communityHandler.CreatePost)
+			r.Post("/posts/{id}/upvote", communityHandler.ToggleUpvote)
+			r.Post("/posts/{id}/comments", communityHandler.CreateComment)
+		})
+	})
+
+	// LGU Regional Monitoring Dashboard routes
+	r.Route("/api/lgu", func(r chi.Router) {
+		r.Use(middleware.JWTAuth(jwtSecret))
+		r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleExpert)).Get("/dashboard", analyticsHandler.GetLGUDashboard)
+	})
+
+	// Serve uploaded files
+	fileServer := http.StripPrefix("/uploads/", http.FileServer(http.Dir(uploadDir)))
+	r.Handle("/uploads/*", fileServer)
+
+	return r
+}

@@ -1,0 +1,87 @@
+package handler
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"github.com/agriconnect/backend/internal/middleware"
+	"github.com/agriconnect/backend/internal/models"
+	"github.com/agriconnect/backend/internal/service"
+)
+
+// UserHandler handles user profile endpoints.
+type UserHandler struct {
+	userService *service.UserService
+}
+
+// NewUserHandler creates a new UserHandler.
+func NewUserHandler(userService *service.UserService) *UserHandler {
+	return &UserHandler{userService: userService}
+}
+
+// GetProfile handles GET /api/users/me.
+func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	user, err := h.userService.GetProfile(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user)
+}
+
+// UpdateProfile handles PUT /api/users/me.
+func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req models.UpdateProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	user, err := h.userService.UpdateProfile(r.Context(), userID, req)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update profile")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user)
+}
+
+// UploadPhoto handles PUT /api/users/me/photo.
+func (h *UserHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	// Limit upload size to 5MB
+	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
+
+	file, header, err := r.FormFile("photo")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "photo file is required (max 5MB)")
+		return
+	}
+	defer file.Close()
+
+	user, err := h.userService.UploadPhoto(r.Context(), userID, header.Filename, file)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to upload photo")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user)
+}
