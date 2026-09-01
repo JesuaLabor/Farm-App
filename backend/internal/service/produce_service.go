@@ -14,12 +14,14 @@ import (
 type ProduceService struct {
 	produceRepo *repository.ProduceRepository
 	userRepo    *repository.UserRepository
+	notifRepo   *repository.NotificationRepository
 }
 
-func NewProduceService(produceRepo *repository.ProduceRepository, userRepo *repository.UserRepository) *ProduceService {
+func NewProduceService(produceRepo *repository.ProduceRepository, userRepo *repository.UserRepository, notifRepo *repository.NotificationRepository) *ProduceService {
 	return &ProduceService{
 		produceRepo: produceRepo,
 		userRepo:    userRepo,
+		notifRepo:   notifRepo,
 	}
 }
 
@@ -206,6 +208,17 @@ func (s *ProduceService) InitiateTransaction(ctx context.Context, buyerID string
 
 	if err := s.produceRepo.CreateTransaction(ctx, tx); err != nil {
 		return nil, err
+	}
+
+	// Notify the farmer about the buyer inquiry
+	if s.notifRepo != nil {
+		_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
+			UserID:  listing.FarmerID,
+			Title:   "🌾 New Produce Purchase Inquiry",
+			Message: fmt.Sprintf("%s sent an inquiry for %.2f %s of %s", tx.BuyerName, tx.Quantity, listing.Unit, listing.CropName),
+			Type:    models.NotifTypeProduceInquiry,
+			Link:    "/produce/transactions",
+		})
 	}
 
 	return tx, nil

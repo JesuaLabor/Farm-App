@@ -49,17 +49,19 @@ func main() {
 	programRepo := repository.NewProgramRepository(db)
 	communityRepo := repository.NewCommunityRepository(db)
 	analyticsRepo := repository.NewAnalyticsRepository(db)
+	notifRepo := repository.NewNotificationRepository(db)
 
 	// Services
 	authService := service.NewAuthService(userRepo, cfg.JWTSecret, cfg.JWTExpiryHrs)
 	userService := service.NewUserService(userRepo, cfg.UploadDir)
-	produceService := service.NewProduceService(produceRepo, userRepo)
-	supplyService := service.NewSupplyService(supplyRepo, userRepo)
+	produceService := service.NewProduceService(produceRepo, userRepo, notifRepo)
+	supplyService := service.NewSupplyService(supplyRepo, userRepo, notifRepo)
 	priceService := service.NewPriceService(priceRepo, userRepo)
 	financialService := service.NewFinancialService(financialRepo)
 	programService := service.NewProgramService(programRepo, userRepo)
-	communityService := service.NewCommunityService(communityRepo, userRepo)
+	communityService := service.NewCommunityService(communityRepo, userRepo, notifRepo)
 	analyticsService := service.NewAnalyticsService(analyticsRepo)
+	notifService := service.NewNotificationService(notifRepo)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authService)
@@ -71,6 +73,7 @@ func main() {
 	programHandler := handler.NewProgramHandler(programService)
 	communityHandler := handler.NewCommunityHandler(communityService)
 	analyticsHandler := handler.NewAnalyticsHandler(analyticsService)
+	notifHandler := handler.NewNotificationHandler(notifService)
 
 	// Build router
 	r := router.New(
@@ -83,6 +86,7 @@ func main() {
 		programHandler,
 		communityHandler,
 		analyticsHandler,
+		notifHandler,
 		cfg.JWTSecret,
 		cfg.UploadDir,
 	)

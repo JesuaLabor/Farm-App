@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api';
 import type { Role } from '../types/auth';
 import { Spinner } from '../components/Spinner';
+import { NotificationBell } from '../components/NotificationBell';
 
 export const DashboardScreen: React.FC = () => {
   const { user, logout } = useAuth();
@@ -49,9 +50,12 @@ export const DashboardScreen: React.FC = () => {
             <div className="dash-logo-badge">🌾</div>
             <span className="dash-app-name">AgriConnect</span>
           </div>
-          <button className="dash-avatar-btn" onClick={() => navigate('/profile')}>
-            {initials}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <NotificationBell />
+            <button className="dash-avatar-btn" onClick={() => navigate('/profile')}>
+              {initials}
+            </button>
+          </div>
         </div>
 
         <div className="role-chip">

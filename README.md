@@ -8,7 +8,7 @@ A full-stack agricultural platform connecting farmers, buyers, suppliers, expert
 |-------|------------|
 | Backend | Go 1.26 · Chi router · MongoDB 8 |
 | Web | React 18 · Vite · TypeScript · Outfit font |
-| Mobile | React Native 0.76 · Expo 52 |
+| Mobile | React 18 · Vite · TypeScript PWA (Workbox) |
 | Auth | JWT (Bearer tokens) · bcrypt |
 | Shared | TypeScript API client (`packages/api-client`) |
 
@@ -111,30 +111,20 @@ The web app proxies API calls to `localhost:8080`. Make sure the backend is runn
 
 ---
 
-### 3. Mobile App (Expo Go on iOS / Android)
-
-**First time — set your machine's LAN IP in `mobile/src/api/index.ts`:**
-
-```ts
-// Replace with your actual LAN IP (run: ip addr show | grep 'inet ')
-const API_URL =
-  Platform.OS === 'android'
-    ? 'http://10.0.2.2:8080'         // Android emulator
-    : 'http://192.168.x.x:8080';     // iOS physical device — your LAN IP
-```
+### 3. Mobile PWA (Progressive Web App)
 
 **Install and start:**
 ```bash
 cd mobile
 npm install
-npx expo start
+npm run dev
+# → http://localhost:5174
 ```
 
 **Open on your phone:**
-1. Install **Expo Go** from the App Store (iOS) or Play Store (Android)
-2. Make sure your phone and computer are on the **same Wi-Fi**
-3. iOS: Open the iPhone Camera app and scan the QR code → tap "Open in Expo Go"
-4. Android: Open Expo Go → tap "Scan QR code"
+1. Make sure your phone and computer are on the **same Wi-Fi** network.
+2. Open Chrome (Android) or Safari (iOS) and navigate to `http://<YOUR_LAN_IP>:5174`.
+3. Tap **"Add to Home Screen"** or **"Install App"** to install AgriConnect as a standalone mobile application.
 
 ---
 

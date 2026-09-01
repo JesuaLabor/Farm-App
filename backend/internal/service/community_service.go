@@ -11,14 +11,16 @@ import (
 )
 
 type CommunityService struct {
-	commRepo *repository.CommunityRepository
-	userRepo *repository.UserRepository
+	commRepo  *repository.CommunityRepository
+	userRepo  *repository.UserRepository
+	notifRepo *repository.NotificationRepository
 }
 
-func NewCommunityService(commRepo *repository.CommunityRepository, userRepo *repository.UserRepository) *CommunityService {
+func NewCommunityService(commRepo *repository.CommunityRepository, userRepo *repository.UserRepository, notifRepo *repository.NotificationRepository) *CommunityService {
 	return &CommunityService{
-		commRepo: commRepo,
-		userRepo: userRepo,
+		commRepo:  commRepo,
+		userRepo:  userRepo,
+		notifRepo: notifRepo,
 	}
 }
 
@@ -122,6 +124,21 @@ func (s *CommunityService) CreateComment(ctx context.Context, authorID string, p
 	if err := s.commRepo.CreateComment(ctx, comment); err != nil {
 		return nil, err
 	}
+
+	// Trigger notification to the post author if commenter is someone else
+	if s.notifRepo != nil {
+		post, err := s.commRepo.GetPostByID(ctx, pOID, authorID)
+		if err == nil && post.AuthorID != aOID {
+			_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
+				UserID:  post.AuthorID,
+				Title:   "💬 New Comment on Your Post",
+				Message: fmt.Sprintf("%s commented: \"%s\"", comment.AuthorName, req.Body),
+				Type:    models.NotifTypeCommunityReply,
+				Link:    fmt.Sprintf("/community/post/%s", postIDStr),
+			})
+		}
+	}
+
 	return comment, nil
 }
 

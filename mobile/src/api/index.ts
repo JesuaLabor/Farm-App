@@ -138,4 +138,20 @@ export const api = {
     const res = await apiClient.post('/api/financial/entries', payload);
     return res.data;
   },
+  listNotifications: async () => {
+    const res = await apiClient.get('/api/notifications');
+    return res.data;
+  },
+  getUnreadNotifCount: async () => {
+    const res = await apiClient.get<{ unreadCount: number }>('/api/notifications/unread-count');
+    return res.data.unreadCount;
+  },
+  markNotifAsRead: async (id: string) => {
+    const res = await apiClient.put(`/api/notifications/${id}/read`);
+    return res.data;
+  },
+  markAllNotifsAsRead: async () => {
+    const res = await apiClient.put('/api/notifications/read-all');
+    return res.data;
+  },
 };

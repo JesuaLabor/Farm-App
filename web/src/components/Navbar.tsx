@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { Role } from '../types/auth';
+import { NotificationBell } from './NotificationBell';
 
 const roleLabels: Record<Role, { label: string }> = {
   farmer:   { label: 'Farmer' },
@@ -216,6 +217,9 @@ export const Navbar: React.FC = () => {
               flexShrink: 0,
             }}
           >
+            {/* Notification Bell */}
+            <NotificationBell />
+
             {/* Cart Icon — shown for farmer and buyer roles only */}
             {(user.role === 'farmer' || user.role === 'buyer') && (
               <CartIcon />

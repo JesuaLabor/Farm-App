@@ -21,6 +21,7 @@ func New(
 	programHandler *handler.ProgramHandler,
 	communityHandler *handler.CommunityHandler,
 	analyticsHandler *handler.AnalyticsHandler,
+	notifHandler *handler.NotificationHandler,
 	jwtSecret string,
 	uploadDir string,
 ) http.Handler {
@@ -43,6 +44,16 @@ func New(
 	r.Route("/api/auth", func(r chi.Router) {
 		r.Post("/register", authHandler.Register)
 		r.Post("/login", authHandler.Login)
+	})
+
+	// Notification routes
+	r.Route("/api/notifications", func(r chi.Router) {
+		r.Use(middleware.JWTAuth(jwtSecret))
+
+		r.Get("/", notifHandler.ListNotifications)
+		r.Get("/unread-count", notifHandler.GetUnreadCount)
+		r.Put("/{id}/read", notifHandler.MarkAsRead)
+		r.Put("/read-all", notifHandler.MarkAllAsRead)
 	})
 
 	// User routes

@@ -13,12 +13,14 @@ import (
 type SupplyService struct {
 	supplyRepo *repository.SupplyRepository
 	userRepo   *repository.UserRepository
+	notifRepo  *repository.NotificationRepository
 }
 
-func NewSupplyService(supplyRepo *repository.SupplyRepository, userRepo *repository.UserRepository) *SupplyService {
+func NewSupplyService(supplyRepo *repository.SupplyRepository, userRepo *repository.UserRepository, notifRepo *repository.NotificationRepository) *SupplyService {
 	return &SupplyService{
 		supplyRepo: supplyRepo,
 		userRepo:   userRepo,
+		notifRepo:  notifRepo,
 	}
 }
 
@@ -227,6 +229,17 @@ func (s *SupplyService) CreateOrder(ctx context.Context, buyerID string, req mod
 		return nil, err
 	}
 
+	// Trigger Notification to Supplier
+	if s.notifRepo != nil {
+		_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
+			UserID:  supplierID,
+			Title:   "📦 New Supply Order",
+			Message: fmt.Sprintf("%s placed an order for %d item(s) totaling ₱%.2f", order.BuyerName, len(items), totalAmount),
+			Type:    models.NotifTypeOrderStatus,
+			Link:    "/supply/orders",
+		})
+	}
+
 	return order, nil
 }
 
@@ -255,12 +268,22 @@ func (s *SupplyService) UpdateOrderStatus(ctx context.Context, userID string, or
 		return nil, err
 	}
 
-	return s.supplyRepo.GetOrderByID(ctx, oOID)
+	updated, err := s.supplyRepo.GetOrderByID(ctx, oOID)
+	if err == nil && s.notifRepo != nil {
+		// Notify buyer about status change
+		_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
+			UserID:  updated.BuyerID,
+			Title:   "🚚 Order Status Updated",
+			Message: fmt.Sprintf("Your supply order from %s is now %s", updated.SupplierName, status),
+			Type:    models.NotifTypeOrderStatus,
+			Link:    "/supply/orders",
+		})
+	}
+
+	return updated, err
 }
 
 // UpdatePaymentStatus updates the payment status of a supply order.
-// For COD orders, the supplier calls this to confirm cash was received on delivery.
-// For online payments, the gateway webhook will call this via a dedicated handler.
 func (s *SupplyService) UpdatePaymentStatus(ctx context.Context, userID string, orderID string, req models.UpdatePaymentStatusRequest) (*models.SupplyOrder, error) {
 	oOID, err := bson.ObjectIDFromHex(orderID)
 	if err != nil {
@@ -272,7 +295,6 @@ func (s *SupplyService) UpdatePaymentStatus(ctx context.Context, userID string, 
 		return nil, err
 	}
 
-	// Only the supplier or the buyer of the order may change payment status.
 	if order.SupplierID.Hex() != userID && order.BuyerID.Hex() != userID {
 		return nil, errors.New("unauthorized to update payment status for this order")
 	}
@@ -281,5 +303,17 @@ func (s *SupplyService) UpdatePaymentStatus(ctx context.Context, userID string, 
 		return nil, err
 	}
 
-	return s.supplyRepo.GetOrderByID(ctx, oOID)
+	updated, err := s.supplyRepo.GetOrderByID(ctx, oOID)
+	if err == nil && s.notifRepo != nil {
+		// Notify buyer about payment status change
+		_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
+			UserID:  updated.BuyerID,
+			Title:   "💵 Payment Confirmed",
+			Message: fmt.Sprintf("Payment status for order from %s has been updated to %s", updated.SupplierName, req.PaymentStatus),
+			Type:    models.NotifTypePaymentStatus,
+			Link:    "/supply/orders",
+		})
+	}
+
+	return updated, err
 }

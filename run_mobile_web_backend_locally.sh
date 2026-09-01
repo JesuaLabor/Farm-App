@@ -165,6 +165,9 @@ else
   export API_URL="http://${LOCAL_IP}:8080"
 fi
 
+# Write VITE_API_URL to mobile/.env
+echo "VITE_API_URL=$API_URL" > "$PROJECT_ROOT/mobile/.env"
+
 # ------------------------------------------------------------------------------
 # 5. Start Web App (Vite React)
 # ------------------------------------------------------------------------------
@@ -178,28 +181,27 @@ PIDS+=("$WEB_PID")
 sleep 2
 
 # ------------------------------------------------------------------------------
-# 6. Start Mobile App (Expo) — API_URL env var is already exported
+# 6. Start Mobile App (Vite PWA)
 # ------------------------------------------------------------------------------
-echo -e "${BLUE}[5/5] Starting Mobile App (Expo SDK 54)...${NC}\n"
+echo -e "${BLUE}[5/5] Starting Mobile PWA (Vite React)...${NC}\n"
 
 echo -e "${CYAN}----------------------------------------------------------------------${NC}"
 echo -e "${GREEN}✨ ALL SERVICES LAUNCHED SUCCESSFULLY! ✨${NC}"
 echo -e "${CYAN}----------------------------------------------------------------------${NC}"
 echo -e " 🟢 ${MAGENTA}Backend API:${NC}  http://localhost:8080  |  http://${LOCAL_IP}:8080"
 if [ -n "$TUNNEL_URL" ]; then
-  echo -e " 🔗 ${MAGENTA}Tunnel URL:${NC}   ${YELLOW}${TUNNEL_URL}${GREEN}  ← Expo Go uses this${NC}"
+  echo -e " 🔗 ${MAGENTA}Tunnel URL:${NC}   ${YELLOW}${TUNNEL_URL}${GREEN}  ← Remote access${NC}"
 else
   echo -e " 📡 ${MAGENTA}Mobile API:${NC}   ${YELLOW}http://${LOCAL_IP}:8080${NC}  ← Phone must be on same Wi-Fi"
 fi
 echo -e " 🌐 ${MAGENTA}Web App:${NC}      http://localhost:5173"
-echo -e " 📱 ${MAGENTA}Mobile App:${NC}   Expo Metro Bundler starting below..."
+echo -e " 📱 ${MAGENTA}Mobile PWA:${NC}   http://localhost:5174  |  http://${LOCAL_IP}:5174"
 echo -e "${CYAN}----------------------------------------------------------------------${NC}"
 echo -e "${YELLOW}Press [Ctrl + C] to stop all services.${NC}\n"
 
 (
   cd "$PROJECT_ROOT/mobile"
-  # API_URL is passed to app.config.js → Constants.expoConfig.extra.apiUrl
-  API_URL="$API_URL" npx expo start --clear
+  VITE_API_URL="$API_URL" npm run dev
 ) &
 MOBILE_PID=$!
 PIDS+=("$MOBILE_PID")
