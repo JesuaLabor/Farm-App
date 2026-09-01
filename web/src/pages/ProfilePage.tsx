@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Navbar } from '../components/Navbar';
 import { api } from '../api';
+import { supplyApi } from '../api/supply';
+import type { SupplyOrder, PaymentMethod, PaymentStatus } from '../types/supply';
 
 const philippineRegions = [
   'NCR - National Capital Region',
@@ -31,6 +33,31 @@ const roleLabelMap: Record<string, string> = {
   lgu_staff: 'LGU Officer',
 };
 
+type PurchaseTab = 'to_ship' | 'to_receive' | 'completed' | 'cancelled' | 'refunded';
+
+const purchaseTabs: { key: PurchaseTab; label: string; icon: string }[] = [
+  { key: 'to_ship',    label: 'To Ship',         icon: '📦' },
+  { key: 'to_receive', label: 'To Receive',      icon: '🚚' },
+  { key: 'completed',  label: 'Completed',       icon: '✅' },
+  { key: 'cancelled',  label: 'Cancelled',       icon: '❌' },
+  { key: 'refunded',   label: 'Return / Refund', icon: '↩️' },
+];
+
+const paymentMethodLabels: Record<PaymentMethod, { label: string; icon: string }> = {
+  cod:           { label: 'Cash on Delivery', icon: '💵' },
+  gcash:         { label: 'GCash',            icon: '📱' },
+  maya:          { label: 'Maya',             icon: '💜' },
+  bank_transfer: { label: 'Bank Transfer',    icon: '🏦' },
+  card:          { label: 'Card',             icon: '💳' },
+};
+
+const paymentStatusBadges: Record<PaymentStatus, { label: string; bg: string; color: string; icon: string }> = {
+  pending_payment: { label: 'AWAITING PAYMENT', bg: '#fef9c3', color: '#92400e', icon: '⏳' },
+  paid:            { label: 'PAID',             bg: '#dcfce7', color: '#166534', icon: '✅' },
+  failed:          { label: 'PAYMENT FAILED',   bg: '#fee2e2', color: '#991b1b', icon: '❌' },
+  refunded:        { label: 'REFUNDED',         bg: '#f1f5f9', color: '#475569', icon: '↩️' },
+};
+
 export const ProfilePage: React.FC = () => {
   const { user, refreshProfile } = useAuth();
 
@@ -43,6 +70,29 @@ export const ProfilePage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Purchases state
+  const [orders, setOrders] = useState<SupplyOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<PurchaseTab>('to_ship');
+
+  useEffect(() => {
+    if (user && (user.role === 'farmer' || user.role === 'buyer')) {
+      fetchOrders();
+    }
+  }, [user]);
+
+  const fetchOrders = async () => {
+    setOrdersLoading(true);
+    try {
+      const data = await supplyApi.listOrders();
+      setOrders(data);
+    } catch (err) {
+      console.error('Failed to load orders for profile:', err);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
 
   if (!user) return null;
 
@@ -80,18 +130,32 @@ export const ProfilePage: React.FC = () => {
     }
   };
 
+  // Filter orders by tab
+  const getOrdersForTab = (tab: PurchaseTab) => {
+    return orders.filter((o) => {
+      if (tab === 'refunded') return o.paymentStatus === 'refunded';
+      if (tab === 'to_ship') return o.status === 'pending' || o.status === 'processing';
+      if (tab === 'to_receive') return o.status === 'shipped_ready';
+      if (tab === 'completed') return o.status === 'completed' && o.paymentStatus !== 'refunded';
+      if (tab === 'cancelled') return o.status === 'cancelled' && o.paymentStatus !== 'refunded';
+      return false;
+    });
+  };
+
+  const currentTabOrders = getOrdersForTab(activeTab);
+
   return (
     <div className="page-root">
       <Navbar />
 
-      <main className="page-main" style={{ maxWidth: '800px' }}>
+      <main className="page-main" style={{ maxWidth: '850px' }}>
         {/* ── Page Header ─────────────────────────────────────── */}
         <div className="page-header-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '20px' }}>
           <div>
             <span className="page-header-label">Account settings</span>
             <h1 className="page-header-title">Personal profile</h1>
             <p className="page-header-sub">
-              Manage your profile details, contact information, and regional location.
+              Manage your profile details, contact information, and view your purchase history.
             </p>
           </div>
         </div>
@@ -170,6 +234,140 @@ export const ProfilePage: React.FC = () => {
               )}
             </div>
           </div>
+
+          {/* ── My Purchases Section (for Farmer / Buyer) ────── */}
+          {(user.role === 'farmer' || user.role === 'buyer') && (
+            <div className="card-elevated">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 className="text-title" style={{ margin: 0 }}>
+                  🛍️ My Purchases
+                </h3>
+                <a href="/supply/orders" style={{ fontSize: '13px', color: '#ca8a04', fontWeight: 700, textDecoration: 'none' }}>
+                  View All Orders →
+                </a>
+              </div>
+
+              {/* Tabs */}
+              <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', overflowX: 'auto' }}>
+                {purchaseTabs.map((tab) => {
+                  const count = getOrdersForTab(tab.key).length;
+                  const isActive = activeTab === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 14px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        backgroundColor: isActive ? '#fef9c3' : '#f8fafc',
+                        color: isActive ? '#854d0e' : '#64748b',
+                        fontWeight: isActive ? 700 : 600,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <span>{tab.icon}</span>
+                      <span>{tab.label}</span>
+                      {count > 0 && (
+                        <span style={{
+                          backgroundColor: isActive ? '#ca8a04' : '#cbd5e1',
+                          color: '#fff',
+                          fontSize: '10px',
+                          fontWeight: 800,
+                          padding: '1px 6px',
+                          borderRadius: '10px',
+                          lineHeight: 1,
+                        }}>
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Tab Content */}
+              <div style={{ marginTop: '16px' }}>
+                {ordersLoading ? (
+                  <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
+                    Loading purchases…
+                  </div>
+                ) : currentTabOrders.length === 0 ? (
+                  <div style={{ padding: '32px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                    <div style={{ fontSize: '32px', marginBottom: '8px' }}>🛒</div>
+                    <div style={{ fontSize: '14px', fontWeight: 600 }}>No orders in "{purchaseTabs.find(t => t.key === activeTab)?.label}"</div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {currentTabOrders.map((order) => {
+                      const payMethod = paymentMethodLabels[order.paymentMethod] ?? { label: order.paymentMethod, icon: '💳' };
+                      const payBadge = paymentStatusBadges[order.paymentStatus] ?? paymentStatusBadges['pending_payment'];
+
+                      return (
+                        <div
+                          key={order.id}
+                          style={{
+                            padding: '14px 16px',
+                            borderRadius: '12px',
+                            border: '1px solid #e2e8f0',
+                            backgroundColor: '#fff',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            <div>
+                              <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>
+                                Order #{order.id.slice(-6).toUpperCase()}
+                              </span>
+                              <span style={{ fontSize: '12px', color: '#64748b', marginLeft: '8px' }}>
+                                · Supplier: {order.supplierName}
+                              </span>
+                            </div>
+                            <span style={{
+                              fontSize: '11px',
+                              fontWeight: 800,
+                              padding: '2px 8px',
+                              borderRadius: '8px',
+                              backgroundColor: payBadge.bg,
+                              color: payBadge.color,
+                            }}>
+                              {payBadge.icon} {payBadge.label}
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: '13px', color: '#475569', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '8px' }}>
+                            {order.items.map((i, idx) => (
+                              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>{i.quantity} × {i.productName}</span>
+                                <span style={{ fontWeight: 600 }}>₱{(i.quantity * i.pricePerItem).toLocaleString()}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+                            <span style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              {payMethod.icon} {payMethod.label} · 🚚 {order.deliveryMethod}
+                            </span>
+                            <span style={{ fontSize: '15px', fontWeight: 800, color: '#ca8a04' }}>
+                              Total: ₱{order.totalAmount.toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Details Form Card */}
           <div className="card-elevated">

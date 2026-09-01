@@ -120,6 +120,8 @@ export const SupplyStorePage: React.FC = () => {
 
     localStorage.setItem('agriconnect_cart', JSON.stringify(items));
     updateCartCount();
+    // Notify the Navbar CartIcon to refresh its badge
+    window.dispatchEvent(new Event('cart-updated'));
     setFeedback(`Added ${addQty} × ${addingProduct.name} to cart!`);
     setTimeout(() => {
       setAddingProduct(null);

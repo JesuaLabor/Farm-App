@@ -216,6 +216,11 @@ export const Navbar: React.FC = () => {
               flexShrink: 0,
             }}
           >
+            {/* Cart Icon — shown for farmer and buyer roles only */}
+            {(user.role === 'farmer' || user.role === 'buyer') && (
+              <CartIcon />
+            )}
+
             <Link
               to="/profile"
               style={{
@@ -307,5 +312,147 @@ export const Navbar: React.FC = () => {
         )}
       </nav>
     </header>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// CartIcon — reads item count from localStorage and stays in sync via a custom
+// 'cart-updated' browser event fired whenever the cart is modified.
+// ---------------------------------------------------------------------------
+
+function getCartCount(): number {
+  try {
+    const raw = localStorage.getItem('agriconnect_cart');
+    if (!raw) return 0;
+    const items: { quantity: number }[] = JSON.parse(raw);
+    return items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+  } catch {
+    return 0;
+  }
+}
+
+const CartIcon: React.FC = () => {
+  const [count, setCount] = React.useState<number>(getCartCount);
+  const [pulse, setPulse] = React.useState(false);
+
+  React.useEffect(() => {
+    // Sync on localStorage changes from other tabs
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'agriconnect_cart') {
+        setCount(getCartCount());
+        triggerPulse();
+      }
+    };
+
+    // Sync on same-tab cart updates via custom event
+    const onCartUpdated = () => {
+      setCount(getCartCount());
+      triggerPulse();
+    };
+
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('cart-updated', onCartUpdated);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('cart-updated', onCartUpdated);
+    };
+  }, []);
+
+  const triggerPulse = () => {
+    setPulse(true);
+    setTimeout(() => setPulse(false), 400);
+  };
+
+  return (
+    <>
+      {/* Inline keyframe styles for the pulse animation */}
+      <style>{`
+        @keyframes cart-pop {
+          0%   { transform: scale(1); }
+          40%  { transform: scale(1.35); }
+          100% { transform: scale(1); }
+        }
+        .cart-badge-pulse {
+          animation: cart-pop 0.4s cubic-bezier(.36,.07,.19,.97);
+        }
+      `}</style>
+
+      <Link
+        to="/supply/cart"
+        id="navbar-cart-btn"
+        aria-label={`Shopping cart, ${count} item${count !== 1 ? 's' : ''}`}
+        style={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '38px',
+          height: '38px',
+          borderRadius: '10px',
+          background: count > 0 ? 'var(--color-accent-subtle, #fef9c3)' : 'var(--gray-100)',
+          border: count > 0 ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
+          color: count > 0 ? 'var(--color-accent)' : 'var(--color-text-muted)',
+          textDecoration: 'none',
+          transition: 'background 0.2s, border-color 0.2s, box-shadow 0.2s',
+          boxShadow: count > 0 ? '0 2px 8px rgba(202,138,4,0.18)' : 'none',
+          flexShrink: 0,
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 14px rgba(202,138,4,0.28)';
+          (e.currentTarget as HTMLElement).style.background = '#fef9c3';
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLElement).style.boxShadow = count > 0 ? '0 2px 8px rgba(202,138,4,0.18)' : 'none';
+          (e.currentTarget as HTMLElement).style.background = count > 0 ? 'var(--color-accent-subtle, #fef9c3)' : 'var(--gray-100)';
+        }}
+      >
+        {/* Cart SVG icon */}
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="9" cy="21" r="1" />
+          <circle cx="20" cy="21" r="1" />
+          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+        </svg>
+
+        {/* Item count badge */}
+        {count > 0 && (
+          <span
+            className={pulse ? 'cart-badge-pulse' : ''}
+            aria-live="polite"
+            style={{
+              position: 'absolute',
+              top: '-6px',
+              right: '-6px',
+              minWidth: '18px',
+              height: '18px',
+              padding: '0 4px',
+              borderRadius: '9px',
+              backgroundColor: 'var(--color-accent)',
+              color: '#fff',
+              fontSize: '10px',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              lineHeight: 1,
+              border: '2px solid #fff',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
+              letterSpacing: '-0.3px',
+            }}
+          >
+            {count > 99 ? '99+' : count}
+          </span>
+        )}
+      </Link>
+    </>
   );
 };

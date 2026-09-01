@@ -5,6 +5,7 @@ import type {
   SupplyOrder,
   SupplyOrderStatus,
   SupplyProduct,
+  UpdatePaymentStatusPayload,
 } from '../types/supply';
 
 export interface SupplyFilterOptions {
@@ -56,6 +57,16 @@ export const supplyApi = {
 
   updateOrderStatus: async (id: string, status: SupplyOrderStatus): Promise<SupplyOrder> => {
     const res = await apiClient.put<SupplyOrder>(`/api/supply/orders/${id}/status`, { status });
+    return res.data;
+  },
+
+  /**
+   * updatePaymentStatus — confirms/updates the payment state of a supply order.
+   * Suppliers call this for COD (cash collected on delivery).
+   * Future: online payment gateway webhook will also call this.
+   */
+  updatePaymentStatus: async (id: string, payload: UpdatePaymentStatusPayload): Promise<SupplyOrder> => {
+    const res = await apiClient.put<SupplyOrder>(`/api/supply/orders/${id}/payment-status`, payload);
     return res.data;
   },
 };
