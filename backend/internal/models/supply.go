@@ -9,11 +9,11 @@ import (
 type SupplyCategory string
 
 const (
-	SupplyFertilizer          SupplyCategory = "fertilizer"
-	SupplyPesticideHerbicide  SupplyCategory = "pesticide_herbicide_fungicide"
-	SupplySeedsSeedlings      SupplyCategory = "seeds_seedlings"
-	SupplyTools               SupplyCategory = "tools"
-	SupplyPPE                 SupplyCategory = "ppe"
+	SupplyFertilizer         SupplyCategory = "fertilizer"
+	SupplyPesticideHerbicide SupplyCategory = "pesticide_herbicide_fungicide"
+	SupplySeedsSeedlings     SupplyCategory = "seeds_seedlings"
+	SupplyTools              SupplyCategory = "tools"
+	SupplyPPE                SupplyCategory = "ppe"
 )
 
 type SupplyOrderStatus string
@@ -31,6 +31,36 @@ type DeliveryMethod string
 const (
 	DeliveryShip   DeliveryMethod = "delivery"
 	DeliveryPickup DeliveryMethod = "pickup"
+)
+
+// PaymentMethod is the mode of payment chosen by the buyer at checkout.
+type PaymentMethod string
+
+const (
+	// PaymentCOD — Cash on Delivery. Payment is collected by the supplier/rider upon delivery.
+	PaymentCOD PaymentMethod = "cod"
+	// PaymentGCash — GCash e-wallet (Philippines). Processed via PayMongo (future integration).
+	PaymentGCash PaymentMethod = "gcash"
+	// PaymentMaya — Maya (formerly PayMaya) e-wallet (Philippines). Via PayMongo (future).
+	PaymentMaya PaymentMethod = "maya"
+	// PaymentBankTransfer — Online bank transfer / InstaPay / PESONet. Via Dragonpay (future).
+	PaymentBankTransfer PaymentMethod = "bank_transfer"
+	// PaymentCard — Credit or debit card (Visa/Mastercard). Via PayMongo (future).
+	PaymentCard PaymentMethod = "card"
+)
+
+// PaymentStatus tracks the lifecycle of the payment for an order.
+type PaymentStatus string
+
+const (
+	// PaymentStatusPending — Payment not yet received (default for COD and newly placed orders).
+	PaymentStatusPending PaymentStatus = "pending_payment"
+	// PaymentStatusPaid — Payment confirmed (COD: marked by supplier; online: via gateway webhook).
+	PaymentStatusPaid PaymentStatus = "paid"
+	// PaymentStatusFailed — Online payment attempt failed or was rejected.
+	PaymentStatusFailed PaymentStatus = "failed"
+	// PaymentStatusRefunded — Payment was refunded to the buyer.
+	PaymentStatusRefunded PaymentStatus = "refunded"
 )
 
 // SupplyProduct represents an agricultural input item listed by a supplier.
@@ -92,6 +122,10 @@ type SupplyOrder struct {
 	DeliveryMethod  DeliveryMethod    `bson:"delivery_method"      json:"deliveryMethod"`
 	DeliveryAddress string            `bson:"delivery_address,omitempty" json:"deliveryAddress,omitempty"`
 	Status          SupplyOrderStatus `bson:"status"               json:"status"`
+	// Payment fields
+	PaymentMethod   PaymentMethod     `bson:"payment_method"       json:"paymentMethod"`
+	PaymentStatus   PaymentStatus     `bson:"payment_status"       json:"paymentStatus"`
+	PaymentNote     string            `bson:"payment_note,omitempty" json:"paymentNote,omitempty"` // e.g. reference number for online payments
 	CreatedAt       time.Time         `bson:"created_at"           json:"createdAt"`
 	UpdatedAt       time.Time         `bson:"updated_at"           json:"updatedAt"`
 }
@@ -107,9 +141,18 @@ type CreateSupplyOrderRequest struct {
 	Items           []CreateOrderItemRequest `json:"items"`
 	DeliveryMethod  DeliveryMethod           `json:"deliveryMethod"`
 	DeliveryAddress string                   `json:"deliveryAddress,omitempty"`
+	// PaymentMethod defaults to "cod" if omitted.
+	PaymentMethod   PaymentMethod            `json:"paymentMethod"`
 }
 
-// UpdateSupplyOrderStatusRequest updates an order's status.
+// UpdateSupplyOrderStatusRequest updates an order's fulfillment status.
 type UpdateSupplyOrderStatusRequest struct {
 	Status SupplyOrderStatus `json:"status"`
+}
+
+// UpdatePaymentStatusRequest lets a supplier confirm COD payment receipt
+// or lets the system update online payment status after gateway webhook.
+type UpdatePaymentStatusRequest struct {
+	PaymentStatus PaymentStatus `json:"paymentStatus"`
+	PaymentNote   string        `json:"paymentNote,omitempty"`
 }

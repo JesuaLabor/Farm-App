@@ -89,6 +89,8 @@ func New(
 
 			r.Get("/orders", supplyHandler.ListOrders)
 			r.Put("/orders/{id}/status", supplyHandler.UpdateOrderStatus)
+			// Payment status: supplier confirms COD receipt; future: gateway webhook for online payments.
+			r.Put("/orders/{id}/payment-status", supplyHandler.UpdatePaymentStatus)
 		})
 	})
 

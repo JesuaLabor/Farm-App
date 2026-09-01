@@ -210,6 +210,17 @@ func (s *SupplyService) CreateOrder(ctx context.Context, buyerID string, req mod
 		DeliveryMethod:  req.DeliveryMethod,
 		DeliveryAddress: req.DeliveryAddress,
 		Status:          models.SupplyOrderPending,
+		// Default payment method to COD if the client omits it.
+		PaymentMethod: func() models.PaymentMethod {
+			if req.PaymentMethod == "" {
+				return models.PaymentCOD
+			}
+			return req.PaymentMethod
+		}(),
+		// All orders start as unpaid regardless of method.
+		// COD: supplier marks paid on delivery.
+		// Online: payment gateway webhook will flip this to "paid".
+		PaymentStatus: models.PaymentStatusPending,
 	}
 
 	if err := s.supplyRepo.CreateOrder(ctx, order); err != nil {
@@ -224,7 +235,7 @@ func (s *SupplyService) ListOrders(ctx context.Context, userID string, role stri
 	return s.supplyRepo.ListOrders(ctx, userID, role)
 }
 
-// UpdateOrderStatus updates supply order status.
+// UpdateOrderStatus updates supply order fulfillment status.
 func (s *SupplyService) UpdateOrderStatus(ctx context.Context, userID string, orderID string, status models.SupplyOrderStatus) (*models.SupplyOrder, error) {
 	oOID, err := bson.ObjectIDFromHex(orderID)
 	if err != nil {
@@ -241,6 +252,32 @@ func (s *SupplyService) UpdateOrderStatus(ctx context.Context, userID string, or
 	}
 
 	if err := s.supplyRepo.UpdateOrderStatus(ctx, oOID, status); err != nil {
+		return nil, err
+	}
+
+	return s.supplyRepo.GetOrderByID(ctx, oOID)
+}
+
+// UpdatePaymentStatus updates the payment status of a supply order.
+// For COD orders, the supplier calls this to confirm cash was received on delivery.
+// For online payments, the gateway webhook will call this via a dedicated handler.
+func (s *SupplyService) UpdatePaymentStatus(ctx context.Context, userID string, orderID string, req models.UpdatePaymentStatusRequest) (*models.SupplyOrder, error) {
+	oOID, err := bson.ObjectIDFromHex(orderID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid order ID: %w", err)
+	}
+
+	order, err := s.supplyRepo.GetOrderByID(ctx, oOID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Only the supplier or the buyer of the order may change payment status.
+	if order.SupplierID.Hex() != userID && order.BuyerID.Hex() != userID {
+		return nil, errors.New("unauthorized to update payment status for this order")
+	}
+
+	if err := s.supplyRepo.UpdatePaymentStatus(ctx, oOID, req.PaymentStatus, req.PaymentNote); err != nil {
 		return nil, err
 	}
 

@@ -157,3 +157,30 @@ func (h *SupplyHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request
 
 	writeJSON(w, http.StatusOK, order)
 }
+
+// UpdatePaymentStatus handles PUT /api/supply/orders/{id}/payment-status.
+// Suppliers call this to confirm COD cash has been received upon delivery.
+// Future: a payment gateway webhook handler will also call this for online payments.
+func (h *SupplyHandler) UpdatePaymentStatus(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	orderID := chi.URLParam(r, "id")
+
+	var req models.UpdatePaymentStatusRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.PaymentStatus == "" {
+		writeError(w, http.StatusBadRequest, "paymentStatus is required")
+		return
+	}
+
+	order, err := h.supplyService.UpdatePaymentStatus(r.Context(), userID, orderID, req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, order)
+}

@@ -239,3 +239,23 @@ func (r *SupplyRepository) UpdateOrderStatus(ctx context.Context, orderID bson.O
 	}
 	return nil
 }
+
+// UpdatePaymentStatus updates the payment_status (and optional note) of a supply order.
+// Called by the supplier to confirm COD receipt, or by the payment gateway webhook for online payments.
+func (r *SupplyRepository) UpdatePaymentStatus(ctx context.Context, orderID bson.ObjectID, status models.PaymentStatus, note string) error {
+	fields := bson.M{
+		"payment_status": status,
+		"updated_at":     time.Now(),
+	}
+	if note != "" {
+		fields["payment_note"] = note
+	}
+	res, err := r.ordersColl.UpdateByID(ctx, orderID, bson.M{"$set": fields})
+	if err != nil {
+		return fmt.Errorf("update payment status: %w", err)
+	}
+	if res.MatchedCount == 0 {
+		return ErrOrderNotFound
+	}
+	return nil
+}
