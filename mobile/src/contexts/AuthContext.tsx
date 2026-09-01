@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, LoginPayload, RegisterPayload } from '../types/auth';
-import { api, setMobileToken } from '../api';
+import { api, setToken } from '../api';
+
+const TOKEN_KEY = 'agriconnect_token';
 
 interface AuthContextType {
   user: User | null;
@@ -16,37 +18,61 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [token, setTokenState] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true); // true until we check localStorage
+
+  // On mount, restore token from localStorage and re-fetch profile
+  useEffect(() => {
+    const stored = localStorage.getItem(TOKEN_KEY);
+    if (stored) {
+      setToken(stored);
+      setTokenState(stored);
+      api.getProfile()
+        .then((profile) => setUser(profile))
+        .catch(() => {
+          // Token expired or invalid — clear it
+          localStorage.removeItem(TOKEN_KEY);
+          setToken(null);
+          setTokenState(null);
+        })
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const persistToken = (t: string) => {
+    localStorage.setItem(TOKEN_KEY, t);
+    setToken(t);
+    setTokenState(t);
+  };
 
   const fetchProfile = async () => {
     try {
       const profile = await api.getProfile();
       setUser(profile);
-    } catch (err) {
-      console.error('Failed to fetch profile:', err);
+    } catch {
       logout();
     }
   };
 
   const handleLogin = async (payload: LoginPayload) => {
     const res = await api.login(payload);
-    setToken(res.token);
+    persistToken(res.token);
     setUser(res.user);
-    setMobileToken(res.token);
   };
 
   const handleRegister = async (payload: RegisterPayload) => {
     const res = await api.register(payload);
-    setToken(res.token);
+    persistToken(res.token);
     setUser(res.user);
-    setMobileToken(res.token);
   };
 
   const logout = () => {
+    localStorage.removeItem(TOKEN_KEY);
     setToken(null);
+    setTokenState(null);
     setUser(null);
-    setMobileToken(null);
   };
 
   return (
@@ -67,9 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 };
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
+  return ctx;
 };

@@ -1,26 +1,38 @@
-import React, { useState } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  StatusBar,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api';
-import { colors, green, gray, earth, radius, spacing, fontSize, fontWeight, shadows } from '../theme';
+import type { SupplyOrder, PaymentMethod, PaymentStatus } from '../types/app';
+import { Spinner } from '../components/Spinner';
 
-interface ProfileScreenProps {
-  onBack: () => void;
-}
+type PurchaseTab = 'to_ship' | 'to_receive' | 'completed' | 'cancelled' | 'refunded';
 
-export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onBack }) => {
+const purchaseTabs: { key: PurchaseTab; label: string; icon: string }[] = [
+  { key: 'to_ship',    label: 'To Ship',         icon: '📦' },
+  { key: 'to_receive', label: 'To Receive',      icon: '🚚' },
+  { key: 'completed',  label: 'Completed',       icon: '✅' },
+  { key: 'cancelled',  label: 'Cancelled',       icon: '❌' },
+  { key: 'refunded',   label: 'Return/Refund',   icon: '↩️' },
+];
+
+const paymentMethodLabels: Record<PaymentMethod, { label: string; icon: string }> = {
+  cod:           { label: 'COD',            icon: '💵' },
+  gcash:         { label: 'GCash',          icon: '📱' },
+  maya:          { label: 'Maya',           icon: '💜' },
+  bank_transfer: { label: 'Bank Transfer',  icon: '🏦' },
+  card:          { label: 'Card',           icon: '💳' },
+};
+
+const paymentStatusBadges: Record<PaymentStatus, { label: string; bg: string; color: string }> = {
+  pending_payment: { label: 'UNPAID',   bg: '#fef9c3', color: '#92400e' },
+  paid:            { label: 'PAID',     bg: '#dcfce7', color: '#166534' },
+  failed:          { label: 'FAILED',   bg: '#fee2e2', color: '#991b1b' },
+  refunded:        { label: 'REFUNDED', bg: '#f1f5f9', color: '#475569' },
+};
+
+export const ProfileScreen: React.FC = () => {
   const { user, refreshProfile } = useAuth();
+  const navigate = useNavigate();
 
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
@@ -31,7 +43,29 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onBack }) => {
   const [saving, setSaving] = useState(false);
   const [msgType, setMsgType] = useState<'success' | 'error' | null>(null);
   const [msgText, setMsgText] = useState('');
-  const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  // Purchases
+  const [orders, setOrders] = useState<SupplyOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<PurchaseTab>('to_ship');
+
+  useEffect(() => {
+    if (user && (user.role === 'farmer' || user.role === 'buyer')) {
+      fetchOrders();
+    }
+  }, [user]);
+
+  const fetchOrders = async () => {
+    setOrdersLoading(true);
+    try {
+      const data = await api.listSupplyOrders();
+      setOrders(data);
+    } catch {
+      console.error('Failed to load orders for mobile profile');
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
 
   if (!user) return null;
 
@@ -45,7 +79,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onBack }) => {
     lgu_staff: 'LGU Staff',
   };
 
-  const handleSave = async () => {
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSaving(true);
     setMsgType(null);
     setMsgText('');
@@ -62,330 +97,270 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onBack }) => {
     }
   };
 
+  // Filter orders by tab
+  const getOrdersForTab = (tab: PurchaseTab) => {
+    return orders.filter((o) => {
+      if (tab === 'refunded') return o.paymentStatus === 'refunded';
+      if (tab === 'to_ship') return o.status === 'pending' || o.status === 'processing';
+      if (tab === 'to_receive') return o.status === 'shipped_ready';
+      if (tab === 'completed') return o.status === 'completed' && o.paymentStatus !== 'refunded';
+      if (tab === 'cancelled') return o.status === 'cancelled' && o.paymentStatus !== 'refunded';
+      return false;
+    });
+  };
+
+  const currentTabOrders = getOrdersForTab(activeTab);
+
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        style={styles.root}
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <StatusBar barStyle="light-content" backgroundColor={green[700]} />
+    <div>
+      {/* ── Top Bar ─────────────────────────────────────────── */}
+      <div className="top-bar">
+        <button className="back-btn" onClick={() => navigate('/dashboard')}>
+          <span>←</span> Dashboard
+        </button>
+        <div className="top-bar-title">My Profile</div>
+        <div style={{ width: 70 }} />
+      </div>
 
-      {/* ── Top Bar ─────────────────────────────────────── */}
-      <View style={styles.topBar}>
-        <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.75}>
-          <Text style={styles.backIcon}>←</Text>
-          <Text style={styles.backLabel}>Dashboard</Text>
-        </TouchableOpacity>
-        <Text style={styles.topTitle}>My profile</Text>
-        <View style={{ width: 80 }} />
-      </View>
+      {/* ── Avatar Section ──────────────────────────────────── */}
+      <div className="avatar-section">
+        <div className="avatar-squircle">{initials}</div>
+        <div className="display-name">{user.firstName} {user.lastName}</div>
+        <div className="display-email">{user.email}</div>
+        <div className="role-tag">
+          <div className="role-tag-dot" />
+          <span className="role-tag-text">{roleLabelMap[user.role] ?? user.role}</span>
+        </div>
+      </div>
 
-      {/* ── Avatar Card ─────────────────────────────────── */}
-      <View style={styles.avatarSection}>
-        <View style={styles.avatarSquircle}>
-          <Text style={styles.avatarInitials}>{initials}</Text>
-        </View>
-        <Text style={styles.displayName}>{user.firstName} {user.lastName}</Text>
-        <Text style={styles.displayEmail}>{user.email}</Text>
-        <View style={styles.roleTag}>
-          <View style={styles.roleTagDot} />
-          <Text style={styles.roleTagText}>{roleLabelMap[user.role] ?? user.role}</Text>
-        </View>
-      </View>
+      {/* ── My Purchases Section (Shopee/Lazada style for Mobile) ── */}
+      {(user.role === 'farmer' || user.role === 'buyer') && (
+        <div className="form-card" style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div className="form-card-title" style={{ margin: 0 }}>🛍️ My Purchases</div>
+            <button
+              onClick={() => navigate('/supply')}
+              style={{ border: 'none', background: 'none', color: '#ca8a04', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+            >
+              Shop Supply →
+            </button>
+          </div>
 
-      {/* ── Form Card ───────────────────────────────────── */}
-      <View style={styles.formCard}>
-        <Text style={styles.formTitle}>Personal information</Text>
+          {/* Quick-action tiles (Shopee style icon bar) */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(5, 1fr)',
+            gap: 4,
+            padding: '10px 0',
+            borderBottom: '1px solid #f1f5f9',
+            marginBottom: 12,
+          }}>
+            {purchaseTabs.map((tab) => {
+              const count = getOrdersForTab(tab.key).length;
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    padding: '4px 0',
+                  }}
+                >
+                  <div style={{
+                    fontSize: 22,
+                    marginBottom: 4,
+                    filter: isActive ? 'drop-shadow(0 2px 4px rgba(202,138,4,0.3))' : 'none',
+                    transform: isActive ? 'scale(1.15)' : 'none',
+                    transition: 'all 0.15s ease',
+                  }}>
+                    {tab.icon}
+                  </div>
+                  <span style={{
+                    fontSize: 10,
+                    fontWeight: isActive ? 800 : 600,
+                    color: isActive ? '#ca8a04' : '#64748b',
+                    textAlign: 'center',
+                    lineHeight: 1.1,
+                  }}>
+                    {tab.label}
+                  </span>
+                  {count > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      top: -2,
+                      right: 4,
+                      backgroundColor: '#ef4444',
+                      color: '#fff',
+                      fontSize: 9,
+                      fontWeight: 800,
+                      borderRadius: 10,
+                      minWidth: 15,
+                      height: 15,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0 3px',
+                      border: '1.5px solid #fff',
+                    }}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
 
-        <View style={styles.nameRow}>
-          <View style={[styles.field, { flex: 1, marginRight: spacing[2] }]}>
-            <Text style={styles.label}>First name</Text>
-            <TextInput
-              style={[styles.input, focusedField === 'first' && styles.inputFocused]}
+          {/* Selected Tab Order List */}
+          <div>
+            {ordersLoading ? (
+              <div style={{ textAlign: 'center', padding: '16px 0', color: '#94a3b8', fontSize: 12 }}>
+                <Spinner size={18} />
+              </div>
+            ) : currentTabOrders.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: '#94a3b8', fontSize: 12 }}>
+                No orders in "{purchaseTabs.find(t => t.key === activeTab)?.label}"
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {currentTabOrders.map((order) => {
+                  const payMethod = paymentMethodLabels[order.paymentMethod] ?? { label: order.paymentMethod, icon: '💳' };
+                  const payBadge = paymentStatusBadges[order.paymentStatus] ?? paymentStatusBadges['pending_payment'];
+
+                  return (
+                    <div
+                      key={order.id}
+                      style={{
+                        padding: 12,
+                        borderRadius: 10,
+                        backgroundColor: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        fontSize: 12,
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <span style={{ fontWeight: 800, color: '#0f172a' }}>
+                          Order #{order.id.slice(-6).toUpperCase()}
+                        </span>
+                        <span style={{
+                          fontSize: 9,
+                          fontWeight: 800,
+                          padding: '2px 6px',
+                          borderRadius: 6,
+                          backgroundColor: payBadge.bg,
+                          color: payBadge.color,
+                        }}>
+                          {payBadge.label}
+                        </span>
+                      </div>
+
+                      <div style={{ color: '#64748b', marginBottom: 6 }}>
+                        Supplier: {order.supplierName}
+                      </div>
+
+                      <div style={{ backgroundColor: '#fff', padding: '6px 8px', borderRadius: 6, marginBottom: 8 }}>
+                        {order.items.map((item, idx) => (
+                          <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', color: '#334155' }}>
+                            <span>{item.quantity}× {item.productName}</span>
+                            <span style={{ fontWeight: 600 }}>₱{(item.quantity * item.pricePerItem).toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#64748b', fontSize: 11 }}>
+                          {payMethod.icon} {payMethod.label} · 🚚 {order.deliveryMethod}
+                        </span>
+                        <span style={{ fontWeight: 800, color: '#ca8a04', fontSize: 14 }}>
+                          ₱{order.totalAmount.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Form Card ───────────────────────────────────────── */}
+      <form className="form-card" onSubmit={handleSave}>
+        <div className="form-card-title">Personal information</div>
+
+        <div className="field-row">
+          <div className="field">
+            <label className="label" htmlFor="prof-first">First name</label>
+            <input
+              id="prof-first"
+              className="input"
+              type="text"
               value={firstName}
-              onChangeText={setFirstName}
-              onFocus={() => setFocusedField('first')}
-              onBlur={() => setFocusedField(null)}
+              onChange={(e) => setFirstName(e.target.value)}
             />
-          </View>
-          <View style={[styles.field, { flex: 1 }]}>
-            <Text style={styles.label}>Last name</Text>
-            <TextInput
-              style={[styles.input, focusedField === 'last' && styles.inputFocused]}
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="prof-last">Last name</label>
+            <input
+              id="prof-last"
+              className="input"
+              type="text"
               value={lastName}
-              onChangeText={setLastName}
-              onFocus={() => setFocusedField('last')}
-              onBlur={() => setFocusedField(null)}
+              onChange={(e) => setLastName(e.target.value)}
             />
-          </View>
-        </View>
+          </div>
+        </div>
 
-        <View style={styles.field}>
-          <Text style={styles.label}>Phone number</Text>
-          <TextInput
-            style={[styles.input, focusedField === 'phone' && styles.inputFocused]}
+        <div className="field">
+          <label className="label" htmlFor="prof-phone">Phone number</label>
+          <input
+            id="prof-phone"
+            className="input"
+            type="tel"
             value={phone}
-            onChangeText={setPhone}
+            onChange={(e) => setPhone(e.target.value)}
             placeholder="+63 917 123 4567"
-            placeholderTextColor={gray[400]}
-            keyboardType="phone-pad"
-            onFocus={() => setFocusedField('phone')}
-            onBlur={() => setFocusedField(null)}
           />
-        </View>
+        </div>
 
-        <View style={styles.field}>
-          <Text style={styles.label}>Region / Province</Text>
-          <TextInput
-            style={[styles.input, focusedField === 'region' && styles.inputFocused]}
+        <div className="field">
+          <label className="label" htmlFor="prof-region">Region / Province</label>
+          <input
+            id="prof-region"
+            className="input"
+            type="text"
             value={region}
-            onChangeText={setRegion}
+            onChange={(e) => setRegion(e.target.value)}
             placeholder="Region III - Central Luzon"
-            placeholderTextColor={gray[400]}
-            onFocus={() => setFocusedField('region')}
-            onBlur={() => setFocusedField(null)}
           />
-        </View>
+        </div>
 
-        <View style={styles.field}>
-          <Text style={styles.label}>Address</Text>
-          <TextInput
-            style={[styles.input, styles.inputMulti, focusedField === 'address' && styles.inputFocused]}
+        <div className="field">
+          <label className="label" htmlFor="prof-address">Address</label>
+          <textarea
+            id="prof-address"
+            className="input input-textarea"
             value={address}
-            onChangeText={setAddress}
+            onChange={(e) => setAddress(e.target.value)}
             placeholder="Street, Barangay, City, Province"
-            placeholderTextColor={gray[400]}
-            multiline
-            numberOfLines={3}
-            onFocus={() => setFocusedField('address')}
-            onBlur={() => setFocusedField(null)}
+            rows={3}
           />
-        </View>
+        </div>
 
-        {/* Feedback inline */}
-        {msgType === 'success' && (
-          <View style={styles.successBox}>
-            <Text style={styles.successText}>{msgText}</Text>
-          </View>
-        )}
-        {msgType === 'error' && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{msgText}</Text>
-          </View>
-        )}
+        {msgType === 'success' && <div className="success-box">{msgText}</div>}
+        {msgType === 'error' && <div className="error-box">{msgText}</div>}
 
-        <TouchableOpacity
-          style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
-          onPress={handleSave}
-          disabled={saving}
-          activeOpacity={0.82}
-        >
-          {saving ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.saveBtnText}>Save changes</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        <button className="btn btn-primary" type="submit" disabled={saving}>
+          {saving ? <Spinner size={20} /> : 'Save changes'}
+        </button>
+      </form>
+    </div>
   );
 };
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  scroll: {
-    flexGrow: 1,
-    paddingBottom: spacing[10],
-  },
-
-  // ── Top Bar ───────────────────────────────────────────
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing[10] + 4,
-    paddingBottom: spacing[4],
-    paddingHorizontal: spacing[4],
-    backgroundColor: green[700],
-  },
-  backBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[1],
-    width: 80,
-  },
-  backIcon: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: fontSize.md,
-  },
-  backLabel: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.semibold,
-  },
-  topTitle: {
-    color: '#fff',
-    fontSize: fontSize.base,
-    fontWeight: fontWeight.bold,
-    letterSpacing: -0.2,
-  },
-
-  // ── Avatar Section ────────────────────────────────────
-  avatarSection: {
-    backgroundColor: green[700],
-    alignItems: 'center',
-    paddingBottom: spacing[7],
-    paddingHorizontal: spacing[5],
-  },
-  avatarSquircle: {
-    width: 80,
-    height: 80,
-    borderRadius: radius.lg,        // squircle shape
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing[3],
-  },
-  avatarInitials: {
-    color: '#fff',
-    fontSize: fontSize['3xl'],
-    fontWeight: fontWeight.extrabold,
-  },
-  displayName: {
-    color: '#fff',
-    fontSize: fontSize.xl,
-    fontWeight: fontWeight.extrabold,
-    letterSpacing: -0.3,
-    marginBottom: 2,
-  },
-  displayEmail: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: fontSize.sm,
-    marginBottom: spacing[3],
-  },
-  roleTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: radius.xs,
-    paddingHorizontal: spacing[3],
-    paddingVertical: 4,
-    gap: spacing[1] + 2,
-  },
-  roleTagDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#6ee7b7',
-  },
-  roleTagText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.semibold,
-    letterSpacing: 0.3,
-  },
-
-  // ── Form Card ─────────────────────────────────────────
-  formCard: {
-    backgroundColor: colors.surface,
-    marginHorizontal: spacing[4],
-    marginTop: -spacing[2],
-    borderRadius: radius.xl,
-    padding: spacing[5],
-    ...shadows.md,
-  },
-  formTitle: {
-    fontSize: fontSize.base,
-    fontWeight: fontWeight.bold,
-    color: colors.text,
-    marginBottom: spacing[4],
-  },
-
-  nameRow: {
-    flexDirection: 'row',
-  },
-  field: {
-    marginBottom: spacing[4],
-  },
-  label: {
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.semibold,
-    color: gray[600],
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginBottom: spacing[1] + 2,
-  },
-  input: {
-    backgroundColor: earth[100],
-    borderWidth: 1.5,
-    borderColor: gray[200],
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[3],
-    fontSize: fontSize.base,
-    color: colors.text,
-  },
-  inputMulti: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  inputFocused: {
-    borderColor: colors.accent,
-    backgroundColor: colors.surface,
-  },
-
-  // ── Feedback ──────────────────────────────────────────
-  successBox: {
-    backgroundColor: colors.successBg,
-    borderRadius: radius.sm,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.success,
-    padding: spacing[3],
-    marginBottom: spacing[4],
-  },
-  successText: {
-    color: colors.success,
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.medium,
-  },
-  errorBox: {
-    backgroundColor: colors.errorBg,
-    borderRadius: radius.sm,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.error,
-    padding: spacing[3],
-    marginBottom: spacing[4],
-  },
-  errorText: {
-    color: colors.error,
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.medium,
-  },
-
-  // ── Save Button ───────────────────────────────────────
-  saveBtn: {
-    backgroundColor: colors.accent,
-    borderRadius: radius.sm,
-    paddingVertical: spacing[4],
-    alignItems: 'center',
-    ...shadows.sm,
-  },
-  saveBtnDisabled: {
-    opacity: 0.68,
-  },
-  saveBtnText: {
-    color: '#fff',
-    fontSize: fontSize.base,
-    fontWeight: fontWeight.bold,
-    letterSpacing: 0.2,
-  },
-});

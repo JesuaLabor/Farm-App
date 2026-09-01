@@ -47,6 +47,61 @@ export interface SupplyProduct {
   createdAt: string;
 }
 
+/**
+ * Payment method chosen at checkout.
+ * - cod: Cash on Delivery (default, delivery only)
+ * - gcash / maya / bank_transfer / card: online (future PayMongo/Dragonpay)
+ */
+export type PaymentMethod = 'cod' | 'gcash' | 'maya' | 'bank_transfer' | 'card';
+
+/**
+ * Payment lifecycle status.
+ * - pending_payment: default for all new orders
+ * - paid: confirmed (COD by supplier, online by gateway webhook)
+ * - failed: online payment declined
+ * - refunded: payment reversed
+ */
+export type PaymentStatus = 'pending_payment' | 'paid' | 'failed' | 'refunded';
+
+export type SupplyOrderStatus = 'pending' | 'processing' | 'shipped_ready' | 'completed' | 'cancelled';
+
+export interface SupplyOrderItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  pricePerItem: number;
+}
+
+export interface SupplyOrder {
+  id: string;
+  buyerId: string;
+  buyerName: string;
+  supplierId: string;
+  supplierName: string;
+  items: SupplyOrderItem[];
+  totalAmount: number;
+  deliveryMethod: 'delivery' | 'pickup';
+  deliveryAddress?: string;
+  status: SupplyOrderStatus;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  paymentNote?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSupplyOrderPayload {
+  items: { productId: string; quantity: number }[];
+  deliveryMethod: 'delivery' | 'pickup';
+  deliveryAddress?: string;
+  paymentMethod: PaymentMethod;
+}
+
+export interface UpdatePaymentStatusPayload {
+  paymentStatus: PaymentStatus;
+  paymentNote?: string;
+}
+
 export interface PriceRecord {
   id: string;
   commodity: string;
@@ -54,7 +109,7 @@ export interface PriceRecord {
   region: string;
   price: number;
   unit: string;
-  change: string; // 'up' | 'down' | 'same'
+  change: string;
   updatedAt: string;
 }
 

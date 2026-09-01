@@ -1,31 +1,19 @@
 import axios from 'axios';
-import { Platform } from 'react-native';
-import Constants from 'expo-constants';
 import type { AuthResponse, LoginPayload, RegisterPayload, UpdateProfilePayload, User } from '../types/auth';
+import type { CreateSupplyOrderPayload, SupplyOrder, UpdatePaymentStatusPayload } from '../types/app';
 
-// API_URL is injected at launch time by run_mobile_web_backend_locally.sh
-// via the API_URL env variable → app.config.js → Constants.expoConfig.extra.apiUrl
-// This makes the app work on physical devices without any manual IP changes.
-const extra = (Constants.expoConfig?.extra ?? (Constants as any).manifest?.extra ?? {}) as Record<string, string>;
-const injectedUrl: string | undefined = extra.apiUrl;
-
-const getFallbackUrl = (): string => {
-  // Android emulator: 10.0.2.2 maps to the host machine's localhost
-  if (Platform.OS === 'android') return 'http://10.0.2.2:8080';
-  // Physical iOS/Android on same Wi-Fi — use LAN IP
-  return 'http://192.168.100.164:8080';
-};
-
-const API_URL = injectedUrl || getFallbackUrl();
-console.log('[AgriConnect Mobile] API Base URL:', API_URL);
+// API_URL is set via VITE_API_URL env variable (written to .env by launch script).
+// Falls back to the LAN IP if not configured.
+const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.100.164:8080';
+console.log('[AgriConnect PWA] API Base URL:', API_URL);
 
 let userToken: string | null = null;
 
-export const setMobileToken = (token: string | null) => {
+export const setToken = (token: string | null) => {
   userToken = token;
 };
 
-export const getMobileToken = () => userToken;
+export const getToken = () => userToken;
 
 export const apiClient = axios.create({
   baseURL: API_URL,
@@ -45,12 +33,12 @@ apiClient.interceptors.request.use((config) => {
 export const api = {
   register: async (payload: RegisterPayload): Promise<AuthResponse> => {
     const res = await apiClient.post<AuthResponse>('/api/auth/register', payload);
-    setMobileToken(res.data.token);
+    setToken(res.data.token);
     return res.data;
   },
   login: async (payload: LoginPayload): Promise<AuthResponse> => {
     const res = await apiClient.post<AuthResponse>('/api/auth/login', payload);
-    setMobileToken(res.data.token);
+    setToken(res.data.token);
     return res.data;
   },
   getProfile: async (): Promise<User> => {
@@ -61,28 +49,19 @@ export const api = {
     const res = await apiClient.put<User>('/api/users/me', payload);
     return res.data;
   },
-  uploadPhoto: async (fileUri: string): Promise<User> => {
+  uploadPhoto: async (file: File): Promise<User> => {
     const formData = new FormData();
-    const filename = fileUri.split('/').pop() || 'photo.jpg';
-
-    formData.append('photo', {
-      uri: fileUri,
-      name: filename,
-      type: 'image/jpeg',
-    } as any);
-
+    formData.append('photo', file);
     const res = await apiClient.put<User>('/api/users/me/photo', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return res.data;
   },
-  // Produce Marketplace
   listProduce: async (cropName?: string, category?: string) => {
-    let url = '/api/produce/listings';
     const params: string[] = [];
     if (cropName) params.push(`cropName=${encodeURIComponent(cropName)}`);
     if (category && category !== 'All') params.push(`category=${encodeURIComponent(category)}`);
-    if (params.length > 0) url += `?${params.join('&')}`;
+    const url = params.length ? `/api/produce/listings?${params.join('&')}` : '/api/produce/listings';
     const res = await apiClient.get(url);
     return res.data;
   },
@@ -94,7 +73,6 @@ export const api = {
     const res = await apiClient.post('/api/produce/transactions', payload);
     return res.data;
   },
-  // Agri-Supply Store
   listSupply: async (category?: string) => {
     const url = category && category !== 'All' ? `/api/supply/products?category=${encodeURIComponent(category)}` : '/api/supply/products';
     const res = await apiClient.get(url);
@@ -104,7 +82,24 @@ export const api = {
     const res = await apiClient.post('/api/supply/products', payload);
     return res.data;
   },
-  // Community Forum
+  /** Place a supply order from the mobile PWA checkout flow. */
+  createSupplyOrder: async (payload: CreateSupplyOrderPayload): Promise<SupplyOrder> => {
+    const res = await apiClient.post<SupplyOrder>('/api/supply/orders', payload);
+    return res.data;
+  },
+  /** List supply orders for the current user (farmer sees their own; supplier sees orders for their products). */
+  listSupplyOrders: async (): Promise<SupplyOrder[]> => {
+    const res = await apiClient.get<SupplyOrder[]>('/api/supply/orders');
+    return res.data;
+  },
+  /**
+   * Update payment status — used by suppliers to confirm COD cash receipt on delivery.
+   * In the future, online payment gateway webhooks will also call this via the backend.
+   */
+  updatePaymentStatus: async (orderId: string, payload: UpdatePaymentStatusPayload): Promise<SupplyOrder> => {
+    const res = await apiClient.put<SupplyOrder>(`/api/supply/orders/${orderId}/payment-status`, payload);
+    return res.data;
+  },
   listCommunityPosts: async (category?: string) => {
     const url = category && category !== 'all' ? `/api/community/posts?category=${encodeURIComponent(category)}` : '/api/community/posts';
     const res = await apiClient.get(url);
@@ -118,7 +113,6 @@ export const api = {
     const res = await apiClient.post(`/api/community/posts/${postId}/upvote`);
     return res.data;
   },
-  // Market Prices
   listPrices: async (region?: string) => {
     const url = region && region !== 'All Regions' ? `/api/prices?region=${encodeURIComponent(region)}` : '/api/prices';
     const res = await apiClient.get(url);
@@ -128,7 +122,6 @@ export const api = {
     const res = await apiClient.post('/api/prices', payload);
     return res.data;
   },
-  // Government Programs
   listPrograms: async () => {
     const res = await apiClient.get('/api/programs');
     return res.data;
@@ -137,7 +130,6 @@ export const api = {
     const res = await apiClient.post('/api/programs', payload);
     return res.data;
   },
-  // Farm Financial Tracker
   listFinancialEntries: async () => {
     const res = await apiClient.get('/api/financial/entries');
     return res.data;
