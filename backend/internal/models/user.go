@@ -10,20 +10,29 @@ import (
 type Role string
 
 const (
-	RoleFarmer   Role = "farmer"
-	RoleBuyer    Role = "buyer"
-	RoleSupplier Role = "supplier"
-	RoleExpert   Role = "expert"
-	RoleLGUStaff Role = "lgu_staff"
+	RoleFarmer     Role = "farmer"
+	RoleBuyer      Role = "buyer"
+	RoleSupplier   Role = "supplier"
+	RoleExpert     Role = "expert"
+	RoleLGUStaff   Role = "lgu_staff"
+	RoleSuperAdmin Role = "super_admin"
+)
+
+// User account approval status constants.
+const (
+	StatusPending  = "pending"
+	StatusApproved = "approved"
+	StatusRejected = "rejected"
 )
 
 // ValidRoles is the set of all accepted role values.
 var ValidRoles = map[Role]bool{
-	RoleFarmer:   true,
-	RoleBuyer:    true,
-	RoleSupplier: true,
-	RoleExpert:   true,
-	RoleLGUStaff: true,
+	RoleFarmer:     true,
+	RoleBuyer:      true,
+	RoleSupplier:   true,
+	RoleExpert:     true,
+	RoleLGUStaff:   true,
+	RoleSuperAdmin: true,
 }
 
 // IsValidRole checks whether a given role string is valid.
@@ -33,28 +42,36 @@ func IsValidRole(r Role) bool {
 
 // User represents a user account in the system.
 type User struct {
-	ID        bson.ObjectID `bson:"_id,omitempty" json:"id"`
-	Email     string        `bson:"email"         json:"email"`
-	Password  string        `bson:"password"      json:"-"`
-	Role      Role          `bson:"role"          json:"role"`
-	FirstName string        `bson:"first_name"    json:"firstName"`
-	LastName  string        `bson:"last_name"     json:"lastName"`
-	Phone     string        `bson:"phone,omitempty"    json:"phone,omitempty"`
-	Region    string        `bson:"region,omitempty"   json:"region,omitempty"`
-	Address   string        `bson:"address,omitempty"  json:"address,omitempty"`
-	PhotoURL   string        `bson:"photo_url,omitempty" json:"photoUrl,omitempty"`
-	IsVerified bool          `bson:"is_verified"         json:"isVerified"`
-	CreatedAt  time.Time     `bson:"created_at"          json:"createdAt"`
-	UpdatedAt  time.Time     `bson:"updated_at"          json:"updatedAt"`
+	ID           bson.ObjectID `bson:"_id,omitempty" json:"id"`
+	Email        string        `bson:"email"         json:"email"`
+	Password     string        `bson:"password"      json:"-"`
+	Role         Role          `bson:"role"          json:"role"`
+	FirstName    string        `bson:"first_name"    json:"firstName"`
+	LastName     string        `bson:"last_name"     json:"lastName"`
+	Phone        string        `bson:"phone,omitempty"        json:"phone,omitempty"`
+	Region       string        `bson:"region,omitempty"       json:"region,omitempty"`
+	Province     string        `bson:"province,omitempty"     json:"province,omitempty"`
+	Municipality string        `bson:"municipality,omitempty" json:"municipality,omitempty"`
+	Barangay     string        `bson:"barangay,omitempty"     json:"barangay,omitempty"`
+	Address      string        `bson:"address,omitempty"      json:"address,omitempty"`
+	PhotoURL     string        `bson:"photo_url,omitempty"     json:"photoUrl,omitempty"`
+	IsVerified   bool          `bson:"is_verified"             json:"isVerified"`
+	Status       string        `bson:"status"                  json:"status"`
+	CreatedAt    time.Time     `bson:"created_at"              json:"createdAt"`
+	UpdatedAt    time.Time     `bson:"updated_at"              json:"updatedAt"`
 }
 
 // RegisterRequest is the JSON body for POST /api/auth/register.
 type RegisterRequest struct {
-	Email     string `json:"email"`
-	Password  string `json:"password"`
-	Role      Role   `json:"role"`
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
+	Email        string `json:"email"`
+	Password     string `json:"password"`
+	Role         Role   `json:"role"`
+	FirstName    string `json:"firstName"`
+	LastName     string `json:"lastName"`
+	Region       string `json:"region,omitempty"`
+	Province     string `json:"province,omitempty"`
+	Municipality string `json:"municipality,omitempty"`
+	Barangay     string `json:"barangay,omitempty"`
 }
 
 // LoginRequest is the JSON body for POST /api/auth/login.
@@ -71,11 +88,14 @@ type AuthResponse struct {
 
 // UpdateProfileRequest is the JSON body for PUT /api/users/me.
 type UpdateProfileRequest struct {
-	FirstName *string `json:"firstName,omitempty"`
-	LastName  *string `json:"lastName,omitempty"`
-	Phone     *string `json:"phone,omitempty"`
-	Region    *string `json:"region,omitempty"`
-	Address   *string `json:"address,omitempty"`
+	FirstName    *string `json:"firstName,omitempty"`
+	LastName     *string `json:"lastName,omitempty"`
+	Phone        *string `json:"phone,omitempty"`
+	Region       *string `json:"region,omitempty"`
+	Province     *string `json:"province,omitempty"`
+	Municipality *string `json:"municipality,omitempty"`
+	Barangay     *string `json:"barangay,omitempty"`
+	Address      *string `json:"address,omitempty"`
 }
 
 // ErrorResponse is a standard error payload.

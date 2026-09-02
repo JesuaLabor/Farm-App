@@ -5,11 +5,12 @@ import type { Role } from '../types/auth';
 import { NotificationBell } from './NotificationBell';
 
 const roleLabels: Record<Role, { label: string }> = {
-  farmer:   { label: 'Farmer' },
-  buyer:    { label: 'Buyer' },
-  supplier: { label: 'Supplier' },
-  expert:   { label: 'Agri Expert' },
-  lgu_staff:{ label: 'LGU Staff' },
+  farmer:      { label: 'Farmer' },
+  buyer:       { label: 'Buyer' },
+  supplier:    { label: 'Supplier' },
+  expert:      { label: 'Agri Expert' },
+  lgu_staff:   { label: 'LGU Staff' },
+  super_admin: { label: 'Super Admin' },
 };
 
 export const Navbar: React.FC = () => {
@@ -181,9 +182,15 @@ export const Navbar: React.FC = () => {
               </>
             )}
 
-            {(user.role === 'lgu_staff' || user.role === 'expert') && (
+            {user.role === 'lgu_staff' && (
               <>
                 <div className="divider" aria-hidden="true" />
+                <NavLink
+                  to="/lgu/approvals"
+                  className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                >
+                  User Approvals
+                </NavLink>
                 <NavLink
                   to="/market-prices/manage"
                   className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
@@ -201,6 +208,42 @@ export const Navbar: React.FC = () => {
                   className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
                 >
                   LGU Dashboard
+                </NavLink>
+              </>
+            )}
+
+            {user.role === 'expert' && (
+              <>
+                <div className="divider" aria-hidden="true" />
+                <NavLink
+                  to="/market-prices/manage"
+                  className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                >
+                  Record Prices
+                </NavLink>
+                <NavLink
+                  to="/programs/manage"
+                  className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                >
+                  Manage Programs
+                </NavLink>
+              </>
+            )}
+
+            {user.role === 'super_admin' && (
+              <>
+                <div className="divider" aria-hidden="true" />
+                <NavLink
+                  to="/admin/approvals"
+                  className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                >
+                  LGU Approvals
+                </NavLink>
+                <NavLink
+                  to="/lgu/dashboard"
+                  className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                >
+                  Analytics Dashboard
                 </NavLink>
               </>
             )}

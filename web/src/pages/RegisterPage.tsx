@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { Role } from '../types/auth';
 
+import { LocationSelector } from '../components/LocationSelector';
+
 const rolesList: { role: Role; title: string; desc: string; icon: string }[] = [
   { role: 'farmer',   title: 'Farmer',    desc: 'Sell produce and access live market rates',       icon: '🧑‍🌾' },
   { role: 'buyer',    title: 'Buyer',     desc: 'Source fresh crops and livestock directly',        icon: '📦' },
@@ -19,10 +21,15 @@ export const RegisterPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [region, setRegion] = useState('Region III - Central Luzon');
+  const [province, setProvince] = useState('Bulacan');
+  const [municipality, setMunicipality] = useState('Malolos City');
+  const [barangay, setBarangay] = useState('Santo Rosario (Poblacion)');
   const [role, setRole] = useState<Role>('farmer');
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [submittedPending, setSubmittedPending] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,8 +43,12 @@ export const RegisterPage: React.FC = () => {
     setLoading(true);
 
     try {
-      await register({ email, password, role, firstName, lastName });
-      navigate('/dashboard');
+      const res = await register({ email, password, role, firstName, lastName, region, province, municipality, barangay });
+      if (res.token) {
+        navigate('/dashboard');
+      } else {
+        setSubmittedPending(true);
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Registration failed. Please try again.');
     } finally {
@@ -46,6 +57,53 @@ export const RegisterPage: React.FC = () => {
   };
 
   const selectedRole = rolesList.find((r) => r.role === role);
+
+  if (submittedPending) {
+    const approverText = role === 'lgu_staff' ? 'Super Admin' : `LGU Staff of ${region}`;
+
+    return (
+      <div
+        className="gradient-bg"
+        style={{
+          minHeight: '100dvh',
+          padding: '48px 20px',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <div
+          className="glass-panel animate-fade-in"
+          style={{
+            width: '100%',
+            maxWidth: '520px',
+            borderRadius: 'var(--radius-xl)',
+            padding: '44px',
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+          <h2 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text)', marginBottom: '12px' }}>
+            Registration Submitted!
+          </h2>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '15px', lineHeight: 1.6, marginBottom: '24px' }}>
+            Your account as <strong style={{ color: 'var(--color-text)' }}>{selectedRole?.title}</strong> for <strong style={{ color: 'var(--color-text)' }}>Brgy. {barangay}, {municipality}, {province} ({region})</strong> has been registered.
+            <br />
+            <br />
+            It is currently <span style={{ color: '#d97706', fontWeight: 700 }}>Pending Approval</span> by the <strong>{approverText}</strong>. You will be able to log in once your account has been reviewed and approved.
+          </p>
+
+          <button
+            type="button"
+            className="btn btn-primary btn-lg btn-full"
+            onClick={() => navigate('/login')}
+          >
+            Go to Sign In
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -228,6 +286,25 @@ export const RegisterPage: React.FC = () => {
                 className="form-input"
               />
             </div>
+          </div>
+
+          {/* Cascading Philippine Location Dropdowns */}
+          <div style={{ marginBottom: '18px', padding: '16px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '12px' }}>
+              📍 Account LGU Jurisdiction
+            </div>
+            <LocationSelector
+              region={region}
+              province={province}
+              municipality={municipality}
+              barangay={barangay}
+              onChange={(r, p, m, b) => {
+                setRegion(r);
+                setProvince(p);
+                setMunicipality(m);
+                setBarangay(b);
+              }}
+            />
           </div>
 
           <div className="form-group" style={{ marginBottom: '14px' }}>

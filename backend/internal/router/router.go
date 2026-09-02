@@ -22,6 +22,7 @@ func New(
 	communityHandler *handler.CommunityHandler,
 	analyticsHandler *handler.AnalyticsHandler,
 	notifHandler *handler.NotificationHandler,
+	adminHandler *handler.AdminHandler,
 	jwtSecret string,
 	uploadDir string,
 ) http.Handler {
@@ -44,6 +45,16 @@ func New(
 	r.Route("/api/auth", func(r chi.Router) {
 		r.Post("/register", authHandler.Register)
 		r.Post("/login", authHandler.Login)
+	})
+
+	// Admin / LGU account management routes
+	r.Route("/api/admin", func(r chi.Router) {
+		r.Use(middleware.JWTAuth(jwtSecret))
+		r.Use(middleware.RequireRole(models.RoleSuperAdmin, models.RoleLGUStaff))
+
+		r.Get("/users", adminHandler.ListUsers)
+		r.Put("/users/{id}/approve", adminHandler.ApproveUser)
+		r.Put("/users/{id}/reject", adminHandler.RejectUser)
 	})
 
 	// Notification routes

@@ -99,3 +99,32 @@ func (r *UserRepository) Update(ctx context.Context, id bson.ObjectID, update bs
 	}
 	return nil
 }
+
+// FindUsers returns users matching a BSON filter query, sorted by created_at descending.
+func (r *UserRepository) FindUsers(ctx context.Context, filter bson.M) ([]models.User, error) {
+	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}})
+	cursor, err := r.coll.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, fmt.Errorf("find users: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var users []models.User
+	if err := cursor.All(ctx, &users); err != nil {
+		return nil, fmt.Errorf("decode users: %w", err)
+	}
+	if users == nil {
+		users = []models.User{}
+	}
+	return users, nil
+}
+
+// UpdateStatus updates the status and is_verified fields for a user.
+func (r *UserRepository) UpdateStatus(ctx context.Context, id bson.ObjectID, status string) error {
+	isVerified := status == models.StatusApproved
+	return r.Update(ctx, id, bson.M{
+		"status":      status,
+		"is_verified": isVerified,
+	})
+}
+

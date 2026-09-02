@@ -21,6 +21,8 @@ import { ManageGovernmentProgramsPage } from './pages/ManageGovernmentProgramsPa
 import { CommunityHubPage } from './pages/CommunityHubPage';
 import { CommunityPostDetailPage } from './pages/CommunityPostDetailPage';
 import { LGUDashboardPage } from './pages/LGUDashboardPage';
+import { SuperAdminApprovalsPage } from './pages/SuperAdminApprovalsPage';
+import { LGUAccountApprovalsPage } from './pages/LGUAccountApprovalsPage';
 
 export const App: React.FC = () => {
   return (
@@ -176,6 +178,24 @@ export const App: React.FC = () => {
             element={
               <ProtectedRoute>
                 <LGUDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Super Admin & LGU Account Approvals */}
+          <Route
+            path="/admin/approvals"
+            element={
+              <ProtectedRoute>
+                <SuperAdminApprovalsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/lgu/approvals"
+            element={
+              <ProtectedRoute>
+                <LGUAccountApprovalsPage />
               </ProtectedRoute>
             }
           />

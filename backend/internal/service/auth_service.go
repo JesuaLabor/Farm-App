@@ -28,7 +28,7 @@ func NewAuthService(repo *repository.UserRepository, jwtSecret string, jwtExpiry
 	}
 }
 
-// Register creates a new user account and returns a JWT.
+// Register creates a new user account and returns an AuthResponse.
 func (s *AuthService) Register(ctx context.Context, req models.RegisterRequest) (*models.AuthResponse, error) {
 	// Validate inputs
 	if req.Email == "" {
@@ -44,6 +44,14 @@ func (s *AuthService) Register(ctx context.Context, req models.RegisterRequest) 
 		return nil, errors.New("first name and last name are required")
 	}
 
+	// Determine status and verification
+	status := models.StatusPending
+	isVerified := false
+	if req.Role == models.RoleSuperAdmin {
+		status = models.StatusApproved
+		isVerified = true
+	}
+
 	// Hash password
 	hashed, err := HashPassword(req.Password)
 	if err != nil {
@@ -51,11 +59,17 @@ func (s *AuthService) Register(ctx context.Context, req models.RegisterRequest) 
 	}
 
 	user := &models.User{
-		Email:     req.Email,
-		Password:  hashed,
-		Role:      req.Role,
-		FirstName: req.FirstName,
-		LastName:  req.LastName,
+		Email:        req.Email,
+		Password:     hashed,
+		Role:         req.Role,
+		FirstName:    req.FirstName,
+		LastName:     req.LastName,
+		Region:       req.Region,
+		Province:     req.Province,
+		Municipality: req.Municipality,
+		Barangay:     req.Barangay,
+		Status:       status,
+		IsVerified:   isVerified,
 	}
 
 	if err := s.repo.Create(ctx, user); err != nil {
@@ -71,6 +85,11 @@ func (s *AuthService) Register(ctx context.Context, req models.RegisterRequest) 
 		return nil, err
 	}
 
+	// If pending approval, return response without token
+	if created.Status != models.StatusApproved {
+		return &models.AuthResponse{Token: "", User: *created}, nil
+	}
+
 	token, err := s.GenerateToken(created.ID.Hex(), string(created.Role))
 	if err != nil {
 		return nil, err
@@ -79,7 +98,7 @@ func (s *AuthService) Register(ctx context.Context, req models.RegisterRequest) 
 	return &models.AuthResponse{Token: token, User: *created}, nil
 }
 
-// Login authenticates a user and returns a JWT.
+// Login authenticates a user and returns a JWT if approved.
 func (s *AuthService) Login(ctx context.Context, req models.LoginRequest) (*models.AuthResponse, error) {
 	if req.Email == "" || req.Password == "" {
 		return nil, errors.New("email and password are required")
@@ -97,12 +116,57 @@ func (s *AuthService) Login(ctx context.Context, req models.LoginRequest) (*mode
 		return nil, errors.New("invalid email or password")
 	}
 
+	// Check status
+	if user.Status == models.StatusPending {
+		if user.Role == models.RoleLGUStaff {
+			return nil, errors.New("Your LGU Staff account is pending approval by the Super Admin.")
+		}
+		return nil, errors.New("Your account is pending approval by your LGU Staff.")
+	}
+
+	if user.Status == models.StatusRejected {
+		return nil, errors.New("Your account registration request has been rejected.")
+	}
+
 	token, err := s.GenerateToken(user.ID.Hex(), string(user.Role))
 	if err != nil {
 		return nil, err
 	}
 
 	return &models.AuthResponse{Token: token, User: *user}, nil
+}
+
+// SeedSuperAdmin creates a default Super Admin account if no Super Admin exists.
+func (s *AuthService) SeedSuperAdmin(ctx context.Context) error {
+	existing, err := s.repo.FindByEmail(ctx, "superadmin@agriconnect.gov.ph")
+	if err == nil && existing != nil {
+		return nil
+	}
+
+	hashed, err := HashPassword("SuperAdmin123!")
+	if err != nil {
+		return fmt.Errorf("seed super admin hash: %w", err)
+	}
+
+	admin := &models.User{
+		Email:      "superadmin@agriconnect.gov.ph",
+		Password:   hashed,
+		Role:       models.RoleSuperAdmin,
+		FirstName:  "Super",
+		LastName:   "Admin",
+		Region:     "Central Office",
+		Status:     models.StatusApproved,
+		IsVerified: true,
+	}
+
+	if err := s.repo.Create(ctx, admin); err != nil {
+		if errors.Is(err, repository.ErrDuplicateEmail) {
+			return nil
+		}
+		return fmt.Errorf("seed super admin insert: %w", err)
+	}
+
+	return nil
 }
 
 // GenerateToken creates a signed JWT with user claims.

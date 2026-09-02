@@ -7,7 +7,7 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   login: (payload: LoginPayload) => Promise<void>;
-  register: (payload: RegisterPayload) => Promise<void>;
+  register: (payload: RegisterPayload) => Promise<{ token: string; user: User }>;
   logout: () => void;
   refreshProfile: () => Promise<void>;
 }
@@ -51,9 +51,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleRegister = async (payload: RegisterPayload) => {
     const res = await api.register(payload);
-    localStorage.setItem('agriconnect_token', res.token);
-    setToken(res.token);
-    setUser(res.user);
+    if (res.token) {
+      localStorage.setItem('agriconnect_token', res.token);
+      setToken(res.token);
+      setUser(res.user);
+    }
+    return res;
   };
 
   const handleLogout = () => {

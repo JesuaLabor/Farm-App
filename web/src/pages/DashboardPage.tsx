@@ -83,6 +83,12 @@ const roleFeatures: Record<Role, FeatureCard[]> = {
   ],
   lgu_staff: [
     {
+      title: 'User Approvals',
+      description: 'Review and approve farmer, buyer, supplier, and expert accounts for your LGU.',
+      icon: '👥',
+      href: '/lgu/approvals',
+    },
+    {
       title: 'Regional analytics',
       description: 'Monitor harvest yields, food security metrics, and commodity trends.',
       icon: '🗺️',
@@ -101,14 +107,35 @@ const roleFeatures: Record<Role, FeatureCard[]> = {
       href: '/market-prices/manage',
     },
   ],
+  super_admin: [
+    {
+      title: 'LGU Staff Approvals',
+      description: 'Approve or reject LGU Staff accounts across all Philippine regions.',
+      icon: '👑',
+      href: '/admin/approvals',
+    },
+    {
+      title: 'Regional Analytics',
+      description: 'System-wide monitoring of agricultural activity and price trends.',
+      icon: '📊',
+      href: '/lgu/dashboard',
+    },
+    {
+      title: 'Community Forum',
+      description: 'View community discussions and system announcements.',
+      icon: '💬',
+      href: '/community',
+    },
+  ],
 };
 
 const roleDisplayName: Record<Role, string> = {
-  farmer:   'Farmer',
-  buyer:    'Buyer',
-  supplier: 'Supplier',
-  expert:   'Agricultural Expert',
-  lgu_staff:'LGU Staff',
+  farmer:      'Farmer',
+  buyer:       'Buyer',
+  supplier:    'Supplier',
+  expert:      'Agricultural Expert',
+  lgu_staff:   'LGU Staff',
+  super_admin: 'Super Admin',
 };
 
 export const DashboardPage: React.FC = () => {

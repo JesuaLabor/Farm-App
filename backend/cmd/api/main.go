@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -54,6 +55,7 @@ func main() {
 	// Services
 	authService := service.NewAuthService(userRepo, cfg.JWTSecret, cfg.JWTExpiryHrs)
 	userService := service.NewUserService(userRepo, cfg.UploadDir)
+	adminService := service.NewAdminService(userRepo)
 	produceService := service.NewProduceService(produceRepo, userRepo, notifRepo)
 	supplyService := service.NewSupplyService(supplyRepo, userRepo, notifRepo)
 	priceService := service.NewPriceService(priceRepo, userRepo)
@@ -63,9 +65,17 @@ func main() {
 	analyticsService := service.NewAnalyticsService(analyticsRepo)
 	notifService := service.NewNotificationService(notifRepo)
 
+	// Seed Super Admin user if not exists
+	if err := authService.SeedSuperAdmin(context.Background()); err != nil {
+		log.Printf("⚠️ Warning: Failed to seed Super Admin: %v\n", err)
+	} else {
+		log.Println("👑 Super Admin account initialized (superadmin@agriconnect.gov.ph)")
+	}
+
 	// Handlers
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userService)
+	adminHandler := handler.NewAdminHandler(adminService)
 	produceHandler := handler.NewProduceHandler(produceService)
 	supplyHandler := handler.NewSupplyHandler(supplyService)
 	priceHandler := handler.NewPriceHandler(priceService)
@@ -87,6 +97,7 @@ func main() {
 		communityHandler,
 		analyticsHandler,
 		notifHandler,
+		adminHandler,
 		cfg.JWTSecret,
 		cfg.UploadDir,
 	)

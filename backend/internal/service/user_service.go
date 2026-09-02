@@ -56,6 +56,15 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID string, req mode
 	if req.Region != nil {
 		update["region"] = *req.Region
 	}
+	if req.Province != nil {
+		update["province"] = *req.Province
+	}
+	if req.Municipality != nil {
+		update["municipality"] = *req.Municipality
+	}
+	if req.Barangay != nil {
+		update["barangay"] = *req.Barangay
+	}
 	if req.Address != nil {
 		update["address"] = *req.Address
 	}

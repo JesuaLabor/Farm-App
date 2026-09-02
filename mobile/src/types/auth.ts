@@ -1,4 +1,4 @@
-export type Role = 'farmer' | 'buyer' | 'supplier' | 'expert' | 'lgu_staff';
+export type Role = 'farmer' | 'buyer' | 'supplier' | 'expert' | 'lgu_staff' | 'super_admin';
 
 export interface User {
   id: string;
@@ -8,8 +8,12 @@ export interface User {
   lastName: string;
   phone?: string;
   region?: string;
+  province?: string;
+  municipality?: string;
+  barangay?: string;
   address?: string;
   photoUrl?: string;
+  status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
   updatedAt: string;
 }
@@ -25,6 +29,10 @@ export interface RegisterPayload {
   role: Role;
   firstName: string;
   lastName: string;
+  region?: string;
+  province?: string;
+  municipality?: string;
+  barangay?: string;
 }
 
 export interface LoginPayload {
