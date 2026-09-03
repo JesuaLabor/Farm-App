@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Navbar } from '../components/Navbar';
 import { priceApi } from '../api/price';
+import { useAuth } from '../contexts/AuthContext';
 
 const cropsList = ['Yellow Corn', 'White Corn', 'Palay (Paddy Rice)', 'Milled Rice (Regular)', 'Red Onion', 'Garlic', 'Tomato', 'Eggplant', 'Cabbage', 'Banana (Lakatan)'];
 const categories = ['Grains & Cereals', 'Vegetables', 'Fruits', 'Root Crops', 'Livestock'];
@@ -24,12 +25,21 @@ const philippineRegions = [
 ];
 
 export const ManageMarketPricesPage: React.FC = () => {
+  const { user } = useAuth();
+  const isLguStaff = user?.role === 'lgu_staff';
+
+  // Pre-fill region from the logged-in user's profile
+  const userRegion = user?.region || philippineRegions[0];
+  const defaultMarketLocation = user?.municipality
+    ? `${user.municipality} Agri-Trading Post`
+    : 'Central Trading Post';
+
   const [cropName, setCropName] = useState(cropsList[0]);
   const [category, setCategory] = useState(categories[0]);
   const [unit, setUnit] = useState('kg');
   const [price, setPrice] = useState<number>(25);
-  const [region, setRegion] = useState(philippineRegions[0]);
-  const [marketLocation, setMarketLocation] = useState('Central Trading Post');
+  const [region, setRegion] = useState(userRegion);
+  const [marketLocation, setMarketLocation] = useState(defaultMarketLocation);
   const [recordedAt, setRecordedAt] = useState(new Date().toISOString().split('T')[0]);
   const [source, setSource] = useState('DA-AMAS / Municipal Agriculture Office');
 
@@ -113,10 +123,34 @@ export const ManageMarketPricesPage: React.FC = () => {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>Region</label>
-                <select value={region} onChange={(e) => setRegion(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#fff' }}>
-                  {philippineRegions.map((r) => <option key={r} value={r}>{r}</option>)}
-                </select>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>
+                  Region
+                  {isLguStaff && (
+                    <span style={{
+                      marginLeft: '8px', fontSize: '11px', fontWeight: 600,
+                      color: '#176B3A', background: '#EAF6EE',
+                      padding: '2px 8px', borderRadius: '20px',
+                      border: '1px solid rgba(23,107,58,0.2)',
+                    }}>
+                      📍 Your Jurisdiction
+                    </span>
+                  )}
+                </label>
+                {isLguStaff ? (
+                  // LGU Staff: locked to their own region — cannot record prices for other regions
+                  <div style={{
+                    width: '100%', padding: '10px 12px', borderRadius: '8px',
+                    border: '1.5px solid #C8EDD6', backgroundColor: '#F6FCF8',
+                    fontSize: '14px', color: '#176B3A', fontWeight: 700,
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                  }}>
+                    🗺️ {region}
+                  </div>
+                ) : (
+                  <select value={region} onChange={(e) => setRegion(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#fff' }}>
+                    {philippineRegions.map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                )}
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>Market / Trading Location</label>
@@ -129,7 +163,7 @@ export const ManageMarketPricesPage: React.FC = () => {
               <input type="text" required value={source} onChange={(e) => setSource(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
             </div>
 
-            <button type="submit" disabled={saving} style={{ width: '100%', padding: '14px', borderRadius: '12px', backgroundColor: '#16a34a', color: '#fff', fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+            <button type="submit" disabled={saving} style={{ width: '100%', padding: '14px', borderRadius: '12px', backgroundColor: '#176B3A', color: '#fff', fontWeight: 700, border: 'none', cursor: 'pointer' }}>
               {saving ? 'Recording Price...' : 'Submit Price Record'}
             </button>
           </form>
