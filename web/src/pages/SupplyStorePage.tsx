@@ -1,27 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Navbar } from '../components/Navbar';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supplyApi } from '../api/supply';
 import type { SupplyProduct } from '../types/supply';
 
 const categories: { key: string; label: string; icon: string }[] = [
-  { key: 'all',                            label: 'All inputs',         icon: '🏪' },
-  { key: 'fertilizer',                     label: 'Fertilizers',        icon: '🌱' },
-  { key: 'pesticide_herbicide_fungicide', label: 'Crop protection',    icon: '🧪' },
-  { key: 'seeds_seedlings',                label: 'Seeds & seedlings',  icon: '🌽' },
-  { key: 'tools',                          label: 'Tools & machinery',  icon: '🔧' },
-  { key: 'ppe',                            label: 'Safety PPE',         icon: '🥽' },
+  { key: 'all',                            label: 'All Inputs',        icon: '🏪' },
+  { key: 'fertilizer',                     label: 'Fertilizers',       icon: '🌱' },
+  { key: 'pesticide_herbicide_fungicide', label: 'Crop Protection',  icon: '🧪' },
+  { key: 'seeds_seedlings',                label: 'Seeds & Seedlings', icon: '🌽' },
+  { key: 'tools',                          label: 'Tools & Machinery', icon: '🔧' },
+  { key: 'ppe',                            label: 'Safety PPE',        icon: '🥽' },
 ];
 
 const categoryImages: Record<string, string> = {
-  fertilizer:                     'https://picsum.photos/seed/fertilizer/640/360',
-  pesticide_herbicide_fungicide: 'https://picsum.photos/seed/pesticide/640/360',
-  seeds_seedlings:                'https://picsum.photos/seed/seeds/640/360',
-  tools:                          'https://picsum.photos/seed/machinery/640/360',
-  ppe:                            'https://picsum.photos/seed/safety/640/360',
+  fertilizer:                     'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=600&q=80',
+  pesticide_herbicide_fungicide: 'https://images.unsplash.com/photo-1595974482597-4b8da8879bc5?auto=format&fit=crop&w=600&q=80',
+  seeds_seedlings:                'https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?auto=format&fit=crop&w=600&q=80',
+  tools:                          'https://images.unsplash.com/photo-1589923188900-85dae523342b?auto=format&fit=crop&w=600&q=80',
+  ppe:                            'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80',
 };
 
 export const SupplyStorePage: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [products, setProducts] = useState<SupplyProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,248 +121,340 @@ export const SupplyStorePage: React.FC = () => {
 
     localStorage.setItem('agriconnect_cart', JSON.stringify(items));
     updateCartCount();
-    // Notify the Navbar CartIcon to refresh its badge
     window.dispatchEvent(new Event('cart-updated'));
-    setFeedback(`Added ${addQty} × ${addingProduct.name} to cart!`);
+    setFeedback(`✓ Added ${addQty} × ${addingProduct.name} to cart!`);
     setTimeout(() => {
       setAddingProduct(null);
       setFeedback(null);
-    }, 1500);
+    }, 1800);
   };
 
   return (
-    <div className="page-root">
-      <Navbar />
+    <div className="app-container" style={{ paddingBottom: '40px' }}>
+      {/* ─── Back Button & Header ─── */}
+      <div style={{ marginBottom: '24px' }}>
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="btn btn-secondary"
+          style={{ marginBottom: '16px', fontSize: '17px' }}
+        >
+          ← Back to Dashboard
+        </button>
 
-      <main className="page-main">
-        {/* ── Page Header Banner ──────────────────────────────── */}
-        <div className="page-header-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
-            <span className="page-header-label">Agri-supply store</span>
-            <h1 className="page-header-title">Quality agricultural inputs &amp; equipment</h1>
-            <p className="page-header-sub">
-              Certified fertilizers, seeds, crop protection, and machinery directly from verified suppliers.
+            <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27' }}>
+              Agri-Supply Store
+            </h1>
+            <p style={{ fontSize: '20px', color: '#525450', marginTop: '4px' }}>
+              Order certified fertilizers, hybrid seeds, crop protection, and machinery directly from verified suppliers.
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '14px' }}>
             {user?.role === 'supplier' && (
-              <button className="btn btn--inverse" onClick={() => setShowAddModal(true)}>
-                + Add supply product
+              <button className="btn btn-primary btn-large" onClick={() => setShowAddModal(true)}>
+                + Add Supply Product
               </button>
             )}
-            <a href="/supply/cart" className="btn btn--inverse" style={{ textDecoration: 'none' }}>
-              🛒 Cart ({cartCount})
-            </a>
+            <button
+              onClick={() => navigate('/supply/cart')}
+              className="btn btn-accent btn-large"
+              style={{ fontSize: '18px' }}
+            >
+              🛒 View Cart ({cartCount})
+            </button>
           </div>
         </div>
+      </div>
 
-        {/* ── Category Pill Tabs ───────────────────────────────── */}
-        <div className="pill-tabs-row">
-          {categories.map((cat) => (
-            <button
-              key={cat.key}
-              onClick={() => setActiveCategory(cat.key)}
-              className={`pill-tab${activeCategory === cat.key ? ' pill-tab--active' : ''}`}
-            >
-              <span>{cat.icon}</span>
-              {cat.label}
-            </button>
+      {/* ─── Feedback Toast ─── */}
+      {feedback && (
+        <div
+          style={{
+            padding: '20px 24px',
+            background: '#EAF6EE',
+            border: '3px solid #176B3A',
+            borderRadius: '18px',
+            color: '#176B3A',
+            fontWeight: 800,
+            fontSize: '20px',
+            marginBottom: '28px',
+          }}
+        >
+          {feedback}
+        </div>
+      )}
+
+      {/* ─── Search Field & Category Pills ─── */}
+      <div className="card" style={{ padding: '24px', marginBottom: '32px' }}>
+        {/* Search Field */}
+        <div style={{ marginBottom: '20px' }}>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search for fertilizers, seeds, machinery, tools..."
+            aria-label="Search supply store"
+            className="form-input"
+            style={{ fontSize: '18px', minHeight: '56px' }}
+          />
+        </div>
+
+        {/* Category Pills */}
+        <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
+          {categories.map((cat) => {
+            const isSelected = activeCategory === cat.key;
+            return (
+              <button
+                key={cat.key}
+                onClick={() => setActiveCategory(cat.key)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '12px 24px',
+                  borderRadius: '30px',
+                  border: `2.5px solid ${isSelected ? '#176B3A' : '#D8D6CF'}`,
+                  background: isSelected ? '#176B3A' : '#FFFFFF',
+                  color: isSelected ? '#FFFFFF' : '#1A1C1A',
+                  fontWeight: 800,
+                  fontSize: '18px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <span style={{ fontSize: '22px' }}>{cat.icon}</span>
+                <span>{cat.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ─── Products Grid ─── */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '60px', fontSize: '20px', color: '#525450', fontWeight: 700 }}>
+          Loading certified supply products…
+        </div>
+      ) : products.length === 0 ? (
+        <div className="card" style={{ padding: '60px', textAlign: 'center' }}>
+          <div style={{ fontSize: '64px', marginBottom: '12px' }}>🚜</div>
+          <h2 style={{ fontSize: '28px', fontWeight: 800, color: '#0E4A27', marginBottom: '8px' }}>
+            No products found in this category
+          </h2>
+          <p style={{ fontSize: '20px', color: '#525450', marginBottom: '24px' }}>
+            Try searching for another product or select "All Inputs".
+          </p>
+          <button onClick={() => setActiveCategory('all')} className="btn btn-primary btn-large">
+            Show All Supply Inputs
+          </button>
+        </div>
+      ) : (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: '28px',
+          }}
+        >
+          {products.map((item) => (
+            <div key={item.id} className="card card-interactive" style={{ padding: '0', overflow: 'hidden' }}>
+              <div style={{ position: 'relative', height: '200px', background: '#EAF6EE' }}>
+                <img
+                  src={categoryImages[item.category] ?? 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=600&q=80'}
+                  alt={item.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+                <div style={{ position: 'absolute', top: '12px', right: '12px' }}>
+                  <span className="badge badge-verified" style={{ background: '#FFFFFF', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                    ✓ Verified Supplier
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ padding: '24px' }}>
+                <div style={{ fontSize: '15px', color: '#525450', fontWeight: 700, marginBottom: '6px' }}>
+                  Supplier: {item.supplierName}
+                </div>
+
+                <h3 style={{ fontSize: '22px', fontWeight: 800, color: '#1A1C1A', marginBottom: '8px' }}>
+                  {item.name}
+                </h3>
+
+                <p style={{ fontSize: '16px', color: '#525450', marginBottom: '14px', lineHeight: 1.5 }}>
+                  {item.description}
+                </p>
+
+                <div style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27', marginBottom: '8px' }}>
+                  ₱{item.price.toLocaleString()} <span style={{ fontSize: '16px', color: '#525450', fontWeight: 600 }}>/ {item.unit}</span>
+                </div>
+
+                <div style={{ fontSize: '16px', color: item.stockQuantity > 0 ? '#1E7E45' : '#BA3C3C', fontWeight: 800, marginBottom: '20px' }}>
+                  {item.stockQuantity > 0 ? `✓ In Stock (${item.stockQuantity} ${item.unit}s available)` : '✕ Out of Stock'}
+                </div>
+
+                <button
+                  onClick={() => {
+                    setAddingProduct(item);
+                    setAddQty(1);
+                  }}
+                  disabled={item.stockQuantity <= 0}
+                  className="btn btn-primary btn-full btn-large"
+                >
+                  🛒 Add to Cart
+                </button>
+              </div>
+            </div>
           ))}
         </div>
+      )}
 
-        {/* ── Filter Bar ───────────────────────────────────────── */}
-        <div className="filter-bar">
-          <div className="filter-field" style={{ maxWidth: '400px' }}>
-            <label className="filter-label">Search supply store</label>
-            <input
-              className="form-input"
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Fertilizers, seeds, machinery…"
-            />
-          </div>
-        </div>
-
-        {/* ── Products Grid ────────────────────────────────────── */}
-        {loading ? (
-          <div className="listings-skeleton">
-            {[1, 2, 3, 4].map((n) => (
-              <div key={n} className="skeleton-card">
-                <div className="skeleton-img" />
-                <div className="skeleton-body">
-                  <div className="skeleton-line skeleton-line--short" />
-                  <div className="skeleton-line" />
-                  <div className="skeleton-line skeleton-line--med" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : products.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-state__icon">🚜</div>
-            <h3 className="empty-state__title">No products found</h3>
-            <p className="empty-state__desc">Try adjusting your search query or category filter.</p>
-          </div>
-        ) : (
-          <div className="listings-grid">
-            {products.map((item) => (
-              <div key={item.id} className="listing-card">
-                <div className="listing-card__img">
-                  <img
-                    src={categoryImages[item.category] ?? 'https://picsum.photos/seed/agrisupply/640/360'}
-                    alt={item.name}
-                  />
-                  <span className="listing-card__category-badge">{item.category.replace('_', ' ')}</span>
-                </div>
-
-                <div className="listing-card__body">
-                  <div className="listing-card__meta">
-                    <span className="listing-card__farmer">by {item.supplierName}</span>
-                    {item.isVerified && (
-                      <span className="badge badge-green">✓ Verified</span>
-                    )}
-                  </div>
-
-                  <h3 className="listing-card__name">{item.name}</h3>
-                  <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '14px', lineHeight: 1.5, flex: 1 }}>
-                    {item.description}
-                  </p>
-
-                  <div className="listing-card__price">
-                    <span className="listing-card__price-value">₱{item.price.toLocaleString()}</span>
-                    <span className="listing-card__price-unit"> / {item.unit}</span>
-                  </div>
-
-                  <p className="listing-card__stock" style={{ color: item.stockQuantity > 0 ? 'var(--green-600)' : 'var(--color-error)', fontWeight: 700 }}>
-                    {item.stockQuantity > 0 ? `In Stock (${item.stockQuantity} ${item.unit}s)` : 'Out of Stock'}
-                  </p>
-
-                  <button
-                    onClick={() => {
-                      setAddingProduct(item);
-                      setAddQty(1);
-                    }}
-                    disabled={item.stockQuantity <= 0}
-                    className="btn btn--primary btn--full"
-                  >
-                    Add to cart
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </main>
-
-      {/* ── Add to Cart Modal ───────────────────────────────────── */}
+      {/* ─── Add to Cart Modal ─── */}
       {addingProduct && (
         <div className="modal-backdrop" onClick={() => setAddingProduct(null)}>
-          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <p className="modal-header__sub">Agri-supply store</p>
-                <h2 className="modal-header__title">Add to cart</h2>
-              </div>
-              <button className="modal-close" onClick={() => setAddingProduct(null)}>✕</button>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27' }}>
+                Add to Cart
+              </h2>
+              <button onClick={() => setAddingProduct(null)} style={{ background: '#F8F7F3', border: 'none', fontSize: '24px', cursor: 'pointer', width: '42px', height: '42px', borderRadius: '50%' }}>✕</button>
             </div>
 
-            {feedback && (
-              <div className="feedback-box feedback-box--success">{feedback}</div>
-            )}
-
-            <div className="modal-details">
-              <div className="modal-detail-row">
-                <span>Product</span>
-                <strong>{addingProduct.name}</strong>
+            <div style={{ padding: '20px', borderRadius: '16px', background: '#EAF6EE', border: '2px solid #176B3A', marginBottom: '24px' }}>
+              <div style={{ fontSize: '22px', fontWeight: 800, color: '#0E4A27' }}>
+                {addingProduct.name}
               </div>
-              <div className="modal-detail-row">
-                <span>Supplier</span>
-                <strong>{addingProduct.supplierName}</strong>
-              </div>
-              <div className="modal-detail-row">
-                <span>Price</span>
-                <strong className="modal-detail--accent">₱{addingProduct.price.toLocaleString()} / {addingProduct.unit}</strong>
+              <div style={{ fontSize: '20px', fontWeight: 800, color: '#176B3A', marginTop: '4px' }}>
+                ₱{addingProduct.price.toLocaleString()} per {addingProduct.unit}
               </div>
             </div>
 
-            <div className="form-field">
-              <label className="form-label">Quantity</label>
+            <div className="form-group" style={{ marginBottom: '28px' }}>
+              <label className="form-label">Quantity to Order ({addingProduct.unit}):</label>
               <input
-                className="form-input"
                 type="number"
+                value={addQty}
+                onChange={(e) => setAddQty(Math.max(1, Number(e.target.value)))}
                 min="1"
                 max={addingProduct.stockQuantity}
-                value={addQty}
-                onChange={(e) => setAddQty(Number(e.target.value))}
+                className="form-input"
+                style={{ fontSize: '22px', fontWeight: 800 }}
               />
             </div>
 
-            <div className="modal-total">
-              <span>Total amount</span>
-              <span className="modal-total__value">₱{(addQty * addingProduct.price).toLocaleString()}</span>
+            <div style={{ display: 'flex', gap: '14px' }}>
+              <button onClick={() => setAddingProduct(null)} className="btn btn-secondary btn-large" style={{ flex: 1 }}>
+                Cancel
+              </button>
+              <button onClick={handleAddToCart} className="btn btn-primary btn-large" style={{ flex: 2 }}>
+                Confirm Add to Cart →
+              </button>
             </div>
-
-            <button
-              onClick={handleAddToCart}
-              className="btn btn--primary btn--full"
-            >
-              Confirm add to cart
-            </button>
           </div>
         </div>
       )}
-      {/* ── Supplier Add Product Modal ──────────────────────────── */}
+
+      {/* ─── Supplier Add Product Modal ─── */}
       {showAddModal && (
         <div className="modal-backdrop" onClick={() => setShowAddModal(false)}>
-          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <p className="modal-header__sub">Supplier portal</p>
-                <h2 className="modal-header__title">Add product to store catalog</h2>
-              </div>
-              <button className="modal-close" onClick={() => setShowAddModal(false)}>✕</button>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27' }}>
+                Add Supply Product
+              </h2>
+              <button onClick={() => setShowAddModal(false)} style={{ background: '#F8F7F3', border: 'none', fontSize: '24px', cursor: 'pointer' }}>✕</button>
             </div>
 
             <form onSubmit={handleCreateProduct}>
-              <div className="form-field">
-                <label className="form-label">Product Name *</label>
-                <input className="form-input" type="text" required value={prodName} onChange={(e) => setProdName(e.target.value)} placeholder="e.g. Urea Fertilizer 46-0-0, Corn Seeds" />
+              <div className="form-group">
+                <label className="form-label">Product Name</label>
+                <input
+                  type="text"
+                  required
+                  value={prodName}
+                  onChange={(e) => setProdName(e.target.value)}
+                  placeholder="e.g. Complete Fertilizer 14-14-14"
+                  className="form-input"
+                  style={{ fontSize: '18px' }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Category</label>
+                <select
+                  value={prodCategory}
+                  onChange={(e) => setProdCategory(e.target.value)}
+                  className="form-input"
+                  style={{ fontSize: '18px' }}
+                >
+                  <option value="fertilizer">Fertilizers</option>
+                  <option value="pesticide_herbicide_fungicide">Crop Protection</option>
+                  <option value="seeds_seedlings">Seeds & Seedlings</option>
+                  <option value="tools">Tools & Machinery</option>
+                  <option value="ppe">Safety PPE</option>
+                </select>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="form-field">
-                  <label className="form-label">Category</label>
-                  <select className="form-input" value={prodCategory} onChange={(e) => setProdCategory(e.target.value)}>
-                    {categories.filter(c => c.key !== 'all').map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
-                  </select>
+                <div className="form-group">
+                  <label className="form-label">Price (₱)</label>
+                  <input
+                    type="number"
+                    required
+                    value={prodPrice}
+                    onChange={(e) => setProdPrice(Number(e.target.value))}
+                    className="form-input"
+                    style={{ fontSize: '18px' }}
+                  />
                 </div>
-                <div className="form-field">
-                  <label className="form-label">Stock Quantity *</label>
-                  <input className="form-input" type="number" required min="1" value={prodStock} onChange={(e) => setProdStock(Number(e.target.value))} />
-                </div>
-              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="form-field">
-                  <label className="form-label">Price (₱) *</label>
-                  <input className="form-input" type="number" required min="1" value={prodPrice} onChange={(e) => setProdPrice(Number(e.target.value))} />
-                </div>
-                <div className="form-field">
+                <div className="form-group">
                   <label className="form-label">Unit</label>
-                  <input className="form-input" type="text" required value={prodUnit} onChange={(e) => setProdUnit(e.target.value)} placeholder="50kg bag, bottle, set" />
+                  <input
+                    type="text"
+                    required
+                    value={prodUnit}
+                    onChange={(e) => setProdUnit(e.target.value)}
+                    placeholder="e.g. 50kg bag"
+                    className="form-input"
+                    style={{ fontSize: '18px' }}
+                  />
                 </div>
               </div>
 
-              <div className="form-field">
-                <label className="form-label">Description</label>
-                <textarea className="form-input form-textarea" rows={3} value={prodDesc} onChange={(e) => setProdDesc(e.target.value)} placeholder="Product specs, usage guidelines, certification details..." />
+              <div className="form-group">
+                <label className="form-label">Available Stock Quantity</label>
+                <input
+                  type="number"
+                  required
+                  value={prodStock}
+                  onChange={(e) => setProdStock(Number(e.target.value))}
+                  className="form-input"
+                  style={{ fontSize: '18px' }}
+                />
               </div>
 
-              <button type="submit" disabled={submittingProd} className="btn btn--primary btn--full">
-                {submittingProd ? 'Publishing…' : 'Publish supply product'}
-              </button>
+              <div className="form-group" style={{ marginBottom: '24px' }}>
+                <label className="form-label">Description</label>
+                <textarea
+                  value={prodDesc}
+                  onChange={(e) => setProdDesc(e.target.value)}
+                  placeholder="Describe your agricultural supply product..."
+                  className="form-input"
+                  rows={3}
+                  style={{ fontSize: '18px' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '14px' }}>
+                <button type="button" onClick={() => setShowAddModal(false)} className="btn btn-secondary btn-large" style={{ flex: 1 }}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={submittingProd} className="btn btn-primary btn-large" style={{ flex: 2 }}>
+                  {submittingProd ? 'Saving…' : 'Publish Product →'}
+                </button>
+              </div>
             </form>
           </div>
         </div>

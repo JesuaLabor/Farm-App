@@ -13,6 +13,9 @@ interface LocationSelectorProps {
   barangay: string;
   onChange: (region: string, province: string, municipality: string, barangay: string) => void;
   disabled?: boolean;
+  layout?: 'stacked' | 'grid';
+  showNumbers?: boolean;
+  fontSize?: string;
 }
 
 export const LocationSelector: React.FC<LocationSelectorProps> = ({
@@ -22,6 +25,9 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
   barangay,
   onChange,
   disabled = false,
+  layout = 'stacked',
+  showNumbers = true,
+  fontSize,
 }) => {
   const regions = getRegions();
   const currentRegion = regions.includes(region) ? region : regions[0];
@@ -79,18 +85,36 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
     }
   }, []);
 
+  const isGrid = layout === 'grid';
+  const inputStyle: React.CSSProperties = fontSize ? { fontSize } : {};
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+    <div
+      style={
+        isGrid
+          ? {
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: '16px',
+            }
+          : {
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+            }
+      }
+    >
       {/* 1. Region Dropdown */}
       <div className="form-group">
         <label htmlFor="select-region" className="form-label">
-          1. Region
+          {showNumbers ? '1. Region' : 'Region'}
         </label>
         <select
           id="select-region"
           className="form-input"
           value={currentRegion}
           disabled={disabled}
+          style={inputStyle}
           onChange={(e) => handleRegionChange(e.target.value)}
         >
           {regions.map((r) => (
@@ -104,13 +128,14 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
       {/* 2. Province Dropdown */}
       <div className="form-group">
         <label htmlFor="select-province" className="form-label">
-          2. Province
+          {showNumbers ? '2. Province' : 'Province'}
         </label>
         <select
           id="select-province"
           className="form-input"
           value={currentProvince}
           disabled={disabled || provinces.length === 0}
+          style={inputStyle}
           onChange={(e) => handleProvinceChange(e.target.value)}
         >
           {provinces.map((p) => (
@@ -124,13 +149,14 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
       {/* 3. Municipality / City Dropdown */}
       <div className="form-group">
         <label htmlFor="select-municipality" className="form-label">
-          3. Municipality / City
+          {showNumbers ? '3. Municipality / City' : 'Municipality / City'}
         </label>
         <select
           id="select-municipality"
           className="form-input"
           value={currentMunicipality}
           disabled={disabled || municipalities.length === 0}
+          style={inputStyle}
           onChange={(e) => handleMunicipalityChange(e.target.value)}
         >
           {municipalities.map((m) => (
@@ -144,13 +170,14 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
       {/* 4. Barangay Dropdown */}
       <div className="form-group">
         <label htmlFor="select-barangay" className="form-label">
-          4. Barangay
+          {showNumbers ? '4. Barangay' : 'Barangay'}
         </label>
         <select
           id="select-barangay"
           className="form-input"
           value={currentBarangay}
           disabled={disabled || barangays.length === 0}
+          style={inputStyle}
           onChange={(e) => handleBarangayChange(e.target.value)}
         >
           {barangays.map((b) => (

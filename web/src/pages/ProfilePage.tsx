@@ -1,36 +1,19 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Navbar } from '../components/Navbar';
 import { api } from '../api';
 import { supplyApi } from '../api/supply';
 import type { SupplyOrder, PaymentMethod, PaymentStatus } from '../types/supply';
 
-const philippineRegions = [
-  'NCR - National Capital Region',
-  'CAR - Cordillera Administrative Region',
-  'Region I - Ilocos Region',
-  'Region II - Cagayan Valley',
-  'Region III - Central Luzon',
-  'Region IV-A - CALABARZON',
-  'MIMAROPA Region',
-  'Region V - Bicol Region',
-  'Region VI - Western Visayas',
-  'Region VII - Central Visayas',
-  'Region VIII - Eastern Visayas',
-  'Region IX - Zamboanga Peninsula',
-  'Region X - Northern Mindanao',
-  'Region XI - Davao Region',
-  'Region XII - SOCCSKSARGEN',
-  'Region XIII - Caraga',
-  'BARMM - Bangsamoro Autonomous Region',
-];
+import { LocationSelector } from '../components/LocationSelector';
 
 const roleLabelMap: Record<string, string> = {
-  farmer:    'Farmer Producer',
-  buyer:     'Wholesale Buyer',
-  supplier:  'Agri Supplier',
-  expert:    'Agronomist Expert',
-  lgu_staff: 'LGU Officer',
+  farmer:      'Farmer Producer',
+  buyer:       'Wholesale Buyer',
+  supplier:    'Agri Supplier',
+  expert:      'Agronomist Expert',
+  lgu_staff:   'LGU Officer',
+  super_admin: 'Super Administrator',
 };
 
 type PurchaseTab = 'to_ship' | 'to_receive' | 'completed' | 'cancelled' | 'refunded';
@@ -48,24 +31,41 @@ const paymentMethodLabels: Record<PaymentMethod, { label: string; icon: string }
   gcash:         { label: 'GCash',            icon: '📱' },
   maya:          { label: 'Maya',             icon: '💜' },
   bank_transfer: { label: 'Bank Transfer',    icon: '🏦' },
-  card:          { label: 'Card',             icon: '💳' },
+  card:          { label: 'Card Payment',     icon: '💳' },
 };
 
-const paymentStatusBadges: Record<PaymentStatus, { label: string; bg: string; color: string; icon: string }> = {
-  pending_payment: { label: 'AWAITING PAYMENT', bg: '#fef9c3', color: '#92400e', icon: '⏳' },
-  paid:            { label: 'PAID',             bg: '#dcfce7', color: '#166534', icon: '✅' },
-  failed:          { label: 'PAYMENT FAILED',   bg: '#fee2e2', color: '#991b1b', icon: '❌' },
-  refunded:        { label: 'REFUNDED',         bg: '#f1f5f9', color: '#475569', icon: '↩️' },
+const paymentStatusBadges: Record<PaymentStatus, { label: string; badgeClass: string; icon: string }> = {
+  pending_payment: { label: '⏳ Awaiting Payment', badgeClass: 'badge-warning', icon: '⏳' },
+  paid:            { label: '✅ Payment Completed', badgeClass: 'badge-success', icon: '✅' },
+  failed:          { label: '❌ Payment Failed',   badgeClass: 'badge-danger',  icon: '❌' },
+  refunded:        { label: '↩️ Payment Refunded', badgeClass: 'badge-info',    icon: '↩️' },
 };
 
 export const ProfilePage: React.FC = () => {
   const { user, refreshProfile } = useAuth();
+  const navigate = useNavigate();
 
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [region, setRegion] = useState(user?.region || '');
+  const [province, setProvince] = useState(user?.province || '');
+  const [municipality, setMunicipality] = useState(user?.municipality || '');
+  const [barangay, setBarangay] = useState(user?.barangay || '');
   const [address, setAddress] = useState(user?.address || '');
+
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.firstName || '');
+      setLastName(user.lastName || '');
+      setPhone(user.phone || '');
+      setRegion(user.region || '');
+      setProvince(user.province || '');
+      setMunicipality(user.municipality || '');
+      setBarangay(user.barangay || '');
+      setAddress(user.address || '');
+    }
+  }, [user]);
 
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -102,9 +102,18 @@ export const ProfilePage: React.FC = () => {
     setMessage(null);
 
     try {
-      await api.updateProfile({ firstName, lastName, phone, region, address });
+      await api.updateProfile({
+        firstName,
+        lastName,
+        phone,
+        region,
+        province,
+        municipality,
+        barangay,
+        address,
+      });
       await refreshProfile();
-      setMessage({ type: 'success', text: 'Profile updated successfully.' });
+      setMessage({ type: 'success', text: '✓ Profile updated successfully!' });
     } catch (err: any) {
       setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to update profile.' });
     } finally {
@@ -122,7 +131,7 @@ export const ProfilePage: React.FC = () => {
     try {
       await api.uploadPhoto(file);
       await refreshProfile();
-      setMessage({ type: 'success', text: 'Profile photo updated successfully.' });
+      setMessage({ type: 'success', text: '✓ Profile photo updated!' });
     } catch (err: any) {
       setMessage({ type: 'error', text: err.response?.data?.error || 'Photo upload failed.' });
     } finally {
@@ -145,309 +154,419 @@ export const ProfilePage: React.FC = () => {
   const currentTabOrders = getOrdersForTab(activeTab);
 
   return (
-    <div className="page-root">
-      <Navbar />
+    <div className="app-container" style={{ paddingBottom: '40px' }}>
+      {/* ─── Back Button & Header ─── */}
+      <div style={{ marginBottom: '28px' }}>
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="btn btn-secondary"
+          style={{ marginBottom: '16px', fontSize: '17px' }}
+        >
+          ← Back to Dashboard
+        </button>
 
-      <main className="page-main" style={{ maxWidth: '850px' }}>
-        {/* ── Page Header ─────────────────────────────────────── */}
-        <div className="page-header-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '20px' }}>
+        <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27' }}>
+          My Account & Profile
+        </h1>
+        <p style={{ fontSize: '20px', color: '#525450', marginTop: '4px' }}>
+          Manage your contact information, farm location, and view your supply purchases.
+        </p>
+      </div>
+
+      {/* ─── Feedback Toast Alert ─── */}
+      {message && (
+        <div
+          style={{
+            padding: '20px 24px',
+            background: message.type === 'success' ? '#EAF6EE' : '#FDF2F2',
+            border: `3px solid ${message.type === 'success' ? '#176B3A' : '#BA3C3C'}`,
+            borderRadius: '18px',
+            color: message.type === 'success' ? '#176B3A' : '#BA3C3C',
+            fontWeight: 800,
+            fontSize: '20px',
+            marginBottom: '28px',
+          }}
+        >
+          {message.text}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        {/* ─── Avatar & User Card ─── */}
+        <div className="card" style={{ padding: '28px', display: 'flex', alignItems: 'center', gap: '28px', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative' }}>
+            <div
+              style={{
+                width: '100px',
+                height: '100px',
+                borderRadius: '50%',
+                backgroundColor: '#176B3A',
+                color: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '40px',
+                fontWeight: 800,
+                overflow: 'hidden',
+                boxShadow: '0 4px 14px rgba(23, 107, 58, 0.25)',
+              }}
+            >
+              {user.photoUrl ? (
+                <img src={`http://localhost:8080${user.photoUrl}`} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                user.firstName[0]?.toUpperCase()
+              )}
+            </div>
+
+            <label
+              style={{
+                position: 'absolute',
+                bottom: '0px',
+                right: '0px',
+                backgroundColor: '#0E4A27',
+                color: '#FFFFFF',
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontSize: '18px',
+                border: '3px solid #FFFFFF',
+              }}
+              title="Upload photo"
+            >
+              📷
+              <input type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} disabled={uploading} />
+            </label>
+          </div>
+
           <div>
-            <span className="page-header-label">Account settings</span>
-            <h1 className="page-header-title">Personal profile</h1>
-            <p className="page-header-sub">
-              Manage your profile details, contact information, and view your purchase history.
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <h2 style={{ fontSize: '28px', fontWeight: 800, color: '#1A1C1A', margin: 0 }}>
+                {user.firstName} {user.lastName}
+              </h2>
+              <span
+                className={`badge ${
+                  user.role === 'super_admin' || user.status === 'approved'
+                    ? 'badge-verified'
+                    : user.status === 'rejected'
+                    ? 'badge-danger'
+                    : 'badge-warning'
+                }`}
+                style={{ fontSize: '16px' }}
+              >
+                {user.role === 'super_admin'
+                  ? '🛡️ Verified Administrator'
+                  : user.status === 'rejected'
+                  ? '❌ Rejected Account'
+                  : user.status === 'pending'
+                  ? '⏳ Pending Verification'
+                  : user.role === 'lgu_staff'
+                  ? '🏛️ Verified LGU Officer'
+                  : user.role === 'supplier'
+                  ? '🚜 Verified Agri-Supplier'
+                  : user.role === 'expert'
+                  ? '🎓 Verified Agronomist Expert'
+                  : user.role === 'buyer'
+                  ? '📦 Verified Wholesale Buyer'
+                  : '🧑‍🌾 Verified Farmer'}
+              </span>
+            </div>
+
+            <p style={{ color: '#525450', fontSize: '18px', margin: '6px 0 8px 0', fontWeight: 600 }}>
+              📧 {user.email} {user.phone ? `• 📞 ${user.phone}` : ''}
             </p>
+
+            {(user.barangay || user.municipality || user.province || user.region) && (
+              <p style={{ color: '#0E4A27', fontSize: '16px', margin: '0 0 12px 0', fontWeight: 700 }}>
+                📍 {[user.barangay ? `Brgy. ${user.barangay}` : '', user.municipality, user.province, user.region].filter(Boolean).join(', ')}
+              </p>
+            )}
+
+            <span className="badge badge-info" style={{ fontSize: '16px' }}>
+              🌾 {roleLabelMap[user.role] ?? user.role}
+            </span>
+
+            {uploading && (
+              <span style={{ fontSize: '16px', color: '#176B3A', marginLeft: '12px', fontWeight: 800 }}>
+                Uploading photo…
+              </span>
+            )}
           </div>
         </div>
 
-        {message && (
-          <div className={`feedback-box feedback-box--${message.type}`}>
-            {message.text}
-          </div>
-        )}
-
-        <div style={{ display: 'grid', gap: '24px' }}>
-          {/* Avatar & Role Header Card */}
-          <div className="card-elevated" style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative' }}>
-              <div
-                style={{
-                  width: '90px',
-                  height: '90px',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'var(--color-accent)',
-                  color: '#fff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '32px',
-                  fontWeight: 800,
-                  overflow: 'hidden',
-                  boxShadow: 'var(--shadow-sm)',
-                }}
+        {/* ─── My Purchases Section ─── */}
+        {(user.role === 'farmer' || user.role === 'buyer') && (
+          <div className="card" style={{ padding: '28px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+              <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
+                🛍️ My Supply Purchases
+              </h2>
+              <button
+                onClick={() => navigate('/supply/orders')}
+                className="btn btn-secondary"
+                style={{ fontSize: '16px' }}
               >
-                {user.photoUrl ? (
-                  <img src={`http://localhost:8080${user.photoUrl}`} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  user.firstName[0]?.toUpperCase()
-                )}
-              </div>
-
-              <label
-                style={{
-                  position: 'absolute',
-                  bottom: '-4px',
-                  right: '-4px',
-                  backgroundColor: 'var(--green-700)',
-                  color: '#fff',
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: 'var(--radius-xs)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-                }}
-                title="Upload photo"
-              >
-                📷
-                <input type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} disabled={uploading} />
-              </label>
+                View All Orders →
+              </button>
             </div>
 
-            <div>
-              <h2 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-text)', margin: 0 }}>
-                {user.firstName} {user.lastName}
-              </h2>
-              <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', margin: '2px 0 10px 0' }}>
-                {user.email}
-              </p>
-              <span className="badge badge-green">
-                {roleLabelMap[user.role] ?? user.role}
-              </span>
-              {uploading && (
-                <span style={{ fontSize: '13px', color: 'var(--color-accent)', marginLeft: '12px', fontWeight: 600 }}>
-                  Uploading photo…
-                </span>
+            {/* Purchase Tabs */}
+            <div style={{ display: 'flex', gap: '12px', borderBottom: '2px solid #E4E2DC', paddingBottom: '16px', overflowX: 'auto' }}>
+              {purchaseTabs.map((tab) => {
+                const count = getOrdersForTab(tab.key).length;
+                const isActive = activeTab === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '12px 20px',
+                      borderRadius: '30px',
+                      border: `2.5px solid ${isActive ? '#176B3A' : '#D8D6CF'}`,
+                      background: isActive ? '#176B3A' : '#FFFFFF',
+                      color: isActive ? '#FFFFFF' : '#1A1C1A',
+                      fontWeight: 800,
+                      fontSize: '17px',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <span style={{ fontSize: '20px' }}>{tab.icon}</span>
+                    <span>{tab.label}</span>
+                    {count > 0 && (
+                      <span
+                        style={{
+                          backgroundColor: isActive ? '#FFFFFF' : '#176B3A',
+                          color: isActive ? '#176B3A' : '#FFFFFF',
+                          fontSize: '14px',
+                          fontWeight: 800,
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                        }}
+                      >
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Tab Orders Content */}
+            <div style={{ marginTop: '24px' }}>
+              {ordersLoading ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: '#525450', fontSize: '18px', fontWeight: 600 }}>
+                  Loading your supply orders…
+                </div>
+              ) : currentTabOrders.length === 0 ? (
+                <div style={{ padding: '40px 16px', textAlign: 'center', color: '#525450' }}>
+                  <div style={{ fontSize: '56px', marginBottom: '12px' }}>🛒</div>
+                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#0E4A27' }}>
+                    No supply orders in "{purchaseTabs.find((t) => t.key === activeTab)?.label}"
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {currentTabOrders.map((order) => {
+                    const payMethod = paymentMethodLabels[order.paymentMethod] ?? { label: order.paymentMethod, icon: '💳' };
+                    const payBadge = paymentStatusBadges[order.paymentStatus] ?? paymentStatusBadges['pending_payment'];
+
+                    return (
+                      <div
+                        key={order.id}
+                        style={{
+                          padding: '20px 24px',
+                          borderRadius: '16px',
+                          border: '2px solid #E4E2DC',
+                          backgroundColor: '#FFFFFF',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '14px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                          <div>
+                            <span style={{ fontSize: '18px', fontWeight: 800, color: '#0E4A27' }}>
+                              Order #{order.id.slice(-6).toUpperCase()}
+                            </span>
+                            <span style={{ fontSize: '16px', color: '#525450', marginLeft: '12px', fontWeight: 600 }}>
+                              Supplier: {order.supplierName}
+                            </span>
+                          </div>
+
+                          <span className={`badge ${payBadge.badgeClass}`} style={{ fontSize: '15px' }}>
+                            {payBadge.label}
+                          </span>
+                        </div>
+
+                        {/* Order Items */}
+                        <div style={{ fontSize: '17px', color: '#1A1C1A', backgroundColor: '#F8F7F3', padding: '14px 18px', borderRadius: '12px', border: '1px solid #E4E2DC' }}>
+                          {order.items.map((i, idx) => (
+                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                              <span>{i.quantity} × {i.productName}</span>
+                              <span style={{ fontWeight: 800 }}>₱{(i.quantity * i.pricePerItem).toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                          <span style={{ fontSize: '16px', color: '#525450', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{payMethod.icon}</span>
+                            <span>{payMethod.label}</span>
+                            <span>•</span>
+                            <span>🚚 Delivery</span>
+                          </span>
+
+                          <span style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27' }}>
+                            Total: ₱{order.totalAmount.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>
+        )}
 
-          {/* ── My Purchases Section (for Farmer / Buyer) ────── */}
-          {(user.role === 'farmer' || user.role === 'buyer') && (
-            <div className="card-elevated">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 className="text-title" style={{ margin: 0 }}>
-                  🛍️ My Purchases
-                </h3>
-                <a href="/supply/orders" style={{ fontSize: '13px', color: '#ca8a04', fontWeight: 700, textDecoration: 'none' }}>
-                  View All Orders →
-                </a>
-              </div>
+        {/* ─── Personal Information Form Card ─── */}
+        <div className="card" style={{ padding: '28px' }}>
+          <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27', marginBottom: '24px' }}>
+            {user.role === 'super_admin'
+              ? 'Personal Information & Office Jurisdiction'
+              : user.role === 'lgu_staff'
+              ? 'Personal Information & LGU Jurisdiction'
+              : user.role === 'buyer'
+              ? 'Personal Information & Business Location'
+              : user.role === 'supplier'
+              ? 'Personal Information & Supply Store Location'
+              : 'Personal Information & Farm Address'}
+          </h2>
 
-              {/* Tabs */}
-              <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', overflowX: 'auto' }}>
-                {purchaseTabs.map((tab) => {
-                  const count = getOrdersForTab(tab.key).length;
-                  const isActive = activeTab === tab.key;
-                  return (
-                    <button
-                      key={tab.key}
-                      onClick={() => setActiveTab(tab.key)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '8px 14px',
-                        borderRadius: '10px',
-                        border: 'none',
-                        backgroundColor: isActive ? '#fef9c3' : '#f8fafc',
-                        color: isActive ? '#854d0e' : '#64748b',
-                        fontWeight: isActive ? 700 : 600,
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      <span>{tab.icon}</span>
-                      <span>{tab.label}</span>
-                      {count > 0 && (
-                        <span style={{
-                          backgroundColor: isActive ? '#ca8a04' : '#cbd5e1',
-                          color: '#fff',
-                          fontSize: '10px',
-                          fontWeight: 800,
-                          padding: '1px 6px',
-                          borderRadius: '10px',
-                          lineHeight: 1,
-                        }}>
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Tab Content */}
-              <div style={{ marginTop: '16px' }}>
-                {ordersLoading ? (
-                  <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
-                    Loading purchases…
-                  </div>
-                ) : currentTabOrders.length === 0 ? (
-                  <div style={{ padding: '32px 16px', textAlign: 'center', color: '#94a3b8' }}>
-                    <div style={{ fontSize: '32px', marginBottom: '8px' }}>🛒</div>
-                    <div style={{ fontSize: '14px', fontWeight: 600 }}>No orders in "{purchaseTabs.find(t => t.key === activeTab)?.label}"</div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {currentTabOrders.map((order) => {
-                      const payMethod = paymentMethodLabels[order.paymentMethod] ?? { label: order.paymentMethod, icon: '💳' };
-                      const payBadge = paymentStatusBadges[order.paymentStatus] ?? paymentStatusBadges['pending_payment'];
-
-                      return (
-                        <div
-                          key={order.id}
-                          style={{
-                            padding: '14px 16px',
-                            borderRadius: '12px',
-                            border: '1px solid #e2e8f0',
-                            backgroundColor: '#fff',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '10px',
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                            <div>
-                              <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>
-                                Order #{order.id.slice(-6).toUpperCase()}
-                              </span>
-                              <span style={{ fontSize: '12px', color: '#64748b', marginLeft: '8px' }}>
-                                · Supplier: {order.supplierName}
-                              </span>
-                            </div>
-                            <span style={{
-                              fontSize: '11px',
-                              fontWeight: 800,
-                              padding: '2px 8px',
-                              borderRadius: '8px',
-                              backgroundColor: payBadge.bg,
-                              color: payBadge.color,
-                            }}>
-                              {payBadge.icon} {payBadge.label}
-                            </span>
-                          </div>
-
-                          <div style={{ fontSize: '13px', color: '#475569', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '8px' }}>
-                            {order.items.map((i, idx) => (
-                              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span>{i.quantity} × {i.productName}</span>
-                                <span style={{ fontWeight: 600 }}>₱{(i.quantity * i.pricePerItem).toLocaleString()}</span>
-                              </div>
-                            ))}
-                          </div>
-
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-                            <span style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              {payMethod.icon} {payMethod.label} · 🚚 {order.deliveryMethod}
-                            </span>
-                            <span style={{ fontSize: '15px', fontWeight: 800, color: '#ca8a04' }}>
-                              Total: ₱{order.totalAmount.toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Details Form Card */}
-          <div className="card-elevated">
-            <h3 className="text-title" style={{ marginBottom: '20px' }}>
-              Personal information
-            </h3>
-
-            <form onSubmit={handleUpdateProfile}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '16px' }}>
-                <div className="form-field">
-                  <label className="form-label">First name</label>
-                  <input
-                    className="form-input"
-                    type="text"
-                    required
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                  />
-                </div>
-                <div className="form-field">
-                  <label className="form-label">Last name</label>
-                  <input
-                    className="form-input"
-                    type="text"
-                    required
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '16px' }}>
-                <div className="form-field">
-                  <label className="form-label">Phone number</label>
-                  <input
-                    className="form-input"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+63 917 123 4567"
-                  />
-                </div>
-                <div className="form-field">
-                  <label className="form-label">Region / Province</label>
-                  <select
-                    className="form-input"
-                    value={region}
-                    onChange={(e) => setRegion(e.target.value)}
-                  >
-                    <option value="">Select Region</option>
-                    {philippineRegions.map((r) => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-field">
-                <label className="form-label">Full address</label>
-                <textarea
-                  className="form-input form-textarea"
-                  rows={3}
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Street address, Barangay, City, Province"
+          <form onSubmit={handleUpdateProfile}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', marginBottom: '20px' }}>
+              <div className="form-group">
+                <label className="form-label">First Name</label>
+                <input
+                  className="form-input"
+                  type="text"
+                  required
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  style={{ fontSize: '18px' }}
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={saving}
-                className="btn btn--primary"
-                style={{ marginTop: '8px' }}
+              <div className="form-group">
+                <label className="form-label">Last Name</label>
+                <input
+                  className="form-input"
+                  type="text"
+                  required
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  style={{ fontSize: '18px' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <div className="form-group" style={{ maxWidth: '420px' }}>
+                <label className="form-label">Contact Phone Number</label>
+                <input
+                  className="form-input"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="e.g. 0917-123-4567"
+                  style={{ fontSize: '18px' }}
+                />
+              </div>
+            </div>
+
+            {/* Cascading Philippine Location Dropdowns */}
+            <div
+              style={{
+                marginBottom: '24px',
+                padding: '24px',
+                borderRadius: '16px',
+                backgroundColor: '#F7FAF7',
+                border: '1.5px solid #D1E5D9',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '19px',
+                  fontWeight: 800,
+                  color: '#0E4A27',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
               >
-                {saving ? 'Saving changes…' : 'Save profile changes'}
-              </button>
-            </form>
-          </div>
+                <span>📍</span>{' '}
+                {user.role === 'super_admin' || user.role === 'lgu_staff'
+                  ? 'Office & Jurisdiction Location'
+                  : user.role === 'buyer' || user.role === 'supplier'
+                  ? 'Business & Jurisdiction Location'
+                  : 'Farm & Jurisdiction Location'}
+              </div>
+              <p style={{ color: '#525450', fontSize: '15px', marginTop: '-10px', marginBottom: '16px' }}>
+                Select your official Region, Province, Municipality, and Barangay jurisdiction.
+              </p>
+
+              <LocationSelector
+                layout="grid"
+                showNumbers={false}
+                fontSize="18px"
+                region={region}
+                province={province}
+                municipality={municipality}
+                barangay={barangay}
+                onChange={(r, p, m, b) => {
+                  setRegion(r);
+                  setProvince(p);
+                  setMunicipality(m);
+                  setBarangay(b);
+                }}
+              />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: '28px' }}>
+              <label className="form-label">
+                {user.role === 'farmer'
+                  ? 'Specific Street Address / Farm Landmark'
+                  : 'Specific Street Address / Building Landmark'}
+              </label>
+              <textarea
+                className="form-input"
+                rows={3}
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Purok, Sitio, Street name, House/Lot No., Landmark"
+                style={{ fontSize: '18px', resize: 'vertical' }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={saving}
+              className="btn btn-primary btn-large btn-full"
+              style={{ fontSize: '20px' }}
+            >
+              {saving ? 'Saving changes…' : '✓ Save Profile Changes'}
+            </button>
+          </form>
         </div>
-      </main>
+      </div>
     </div>
   );
 };

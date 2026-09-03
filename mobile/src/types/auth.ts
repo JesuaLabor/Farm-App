@@ -45,5 +45,8 @@ export interface UpdateProfilePayload {
   lastName?: string;
   phone?: string;
   region?: string;
+  province?: string;
+  municipality?: string;
+  barangay?: string;
   address?: string;
 }

@@ -1,134 +1,222 @@
-import React, { useState, useEffect } from 'react';
-import { Navbar } from '../components/Navbar';
-import { useAuth } from '../contexts/AuthContext';
-import { produceApi } from '../api/produce';
-import type { ProduceTransaction, TransactionStatus } from '../types/produce';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-const statusBadges: Record<TransactionStatus, { label: string; bg: string; color: string }> = {
-  pending: { label: 'PENDING CONFIRMATION', bg: '#fef9c3', color: '#854d0e' },
-  confirmed: { label: 'CONFIRMED', bg: '#dbeafe', color: '#1e40af' },
-  completed: { label: 'COMPLETED / DELIVERED', bg: '#dcfce7', color: '#166534' },
-  cancelled: { label: 'CANCELLED', bg: '#fee2e2', color: '#991b1b' },
-};
+const sampleOrders = [
+  {
+    id: '1042',
+    buyerName: 'Maria Santos',
+    buyerLocation: 'Cagayan de Oro Market',
+    product: 'Sweet Yellow Corn (Mais)',
+    quantity: '120 kg',
+    total: 5040,
+    status: 'Pending',
+    date: '10 minutes ago',
+  },
+  {
+    id: '1041',
+    buyerName: 'Juanito Store Owner',
+    buyerLocation: 'Malaybalay, Bukidnon',
+    product: 'Fresh Red Tomatoes (Kamatis)',
+    quantity: '75 kg',
+    total: 4875,
+    status: 'Confirmed',
+    date: '1 hour ago',
+  },
+  {
+    id: '1035',
+    buyerName: 'CDO Supermarket',
+    buyerLocation: 'Cagayan de Oro City',
+    product: 'Carabao Mangoes (Mangga)',
+    quantity: '50 kg',
+    total: 4750,
+    status: 'Completed',
+    date: '2 hours ago',
+  },
+];
 
 export const ProduceTransactionsPage: React.FC = () => {
-  const { user } = useAuth();
-  const [transactions, setTransactions] = useState<ProduceTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const [selectedTab, setSelectedTab] = useState('All Orders');
+  const [orders, setOrders] = useState(sampleOrders);
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
 
-  const fetchTransactions = async () => {
-    setLoading(true);
-    try {
-      const data = await produceApi.listTransactions();
-      setTransactions(data);
-    } catch (err) {
-      console.error('Failed to load transactions:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const tabs = ['All Orders', 'Pending', 'Confirmed', 'Completed', 'Cancelled'];
 
-  useEffect(() => {
-    fetchTransactions();
-  }, []);
-
-  const handleUpdateStatus = async (id: string, status: TransactionStatus) => {
-    try {
-      await produceApi.updateTransactionStatus(id, status);
-      fetchTransactions();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update transaction status');
-    }
-  };
+  const filteredOrders = orders.filter((ord) => {
+    if (selectedTab === 'All Orders') return true;
+    return ord.status.toLowerCase() === selectedTab.toLowerCase();
+  });
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc' }}>
-      <Navbar />
+    <div className="app-container" style={{ paddingBottom: '40px' }}>
+      {/* ─── Back Button & Header ─── */}
+      <div style={{ marginBottom: '24px' }}>
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="btn btn-secondary"
+          style={{ marginBottom: '16px', fontSize: '17px' }}
+        >
+          ← Back to Dashboard
+        </button>
 
-      <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
-          Produce Orders & Transactions
+        <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27' }}>
+          My Crop Orders
         </h1>
-        <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '32px' }}>
-          Track produce purchase requests and update order status.
+        <p style={{ fontSize: '20px', color: '#525450', marginTop: '4px' }}>
+          View buyer requests and confirm orders for your harvest.
         </p>
+      </div>
 
-        {loading ? (
-          <div>Loading transactions...</div>
-        ) : transactions.length === 0 ? (
-          <div className="glass-panel" style={{ padding: '60px', borderRadius: '16px', textAlign: 'center' }}>
-            <span style={{ fontSize: '48px' }}>📋</span>
-            <h3 style={{ marginTop: '12px', fontSize: '18px' }}>No Transactions Found</h3>
-            <p style={{ color: '#64748b', fontSize: '14px' }}>Produce purchase requests will appear here.</p>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gap: '20px' }}>
-            {transactions.map((tx) => {
-              const badge = statusBadges[tx.status];
-              const isFarmer = user?.id === tx.farmerId;
-              const isBuyer = user?.id === tx.buyerId;
+      {/* ─── Order Tabs ─── */}
+      <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', marginBottom: '28px' }}>
+        {tabs.map((tab) => {
+          const isSelected = selectedTab === tab;
+          return (
+            <button
+              key={tab}
+              onClick={() => setSelectedTab(tab)}
+              style={{
+                padding: '12px 24px',
+                borderRadius: '30px',
+                border: `2.5px solid ${isSelected ? '#176B3A' : '#D8D6CF'}`,
+                background: isSelected ? '#176B3A' : '#FFFFFF',
+                color: isSelected ? '#FFFFFF' : '#1A1C1A',
+                fontWeight: 800,
+                fontSize: '18px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {tab}
+            </button>
+          );
+        })}
+      </div>
 
-              return (
-                <div key={tx.id} className="glass-panel" style={{ padding: '24px', borderRadius: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <span style={{ fontSize: '11px', fontWeight: 800, padding: '4px 10px', borderRadius: '12px', backgroundColor: badge.bg, color: badge.color }}>
-                        {badge.label}
-                      </span>
-                      <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', marginTop: '8px' }}>
-                        {tx.cropName} ({tx.quantity} units)
-                      </h3>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '22px', fontWeight: 800, color: '#16a34a' }}>
-                        ₱{tx.totalPrice.toLocaleString()}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#64748b' }}>₱{tx.unitPrice}/unit</div>
-                    </div>
-                  </div>
+      {/* ─── Orders List ─── */}
+      {filteredOrders.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {filteredOrders.map((ord) => (
+            <div
+              key={ord.id}
+              className="card"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '24px',
+                padding: '24px',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '20px', fontWeight: 800, color: '#0E4A27' }}>
+                    Order #{ord.id}
+                  </span>
+                  <span
+                    className={
+                      ord.status === 'Pending'
+                        ? 'badge badge-warning'
+                        : ord.status === 'Confirmed'
+                        ? 'badge badge-info'
+                        : 'badge badge-verified'
+                    }
+                    style={{ fontSize: '15px' }}
+                  >
+                    {ord.status === 'Pending' ? '⏳ Pending Approval' : ord.status === 'Confirmed' ? '✓ Confirmed' : '✓ Completed'}
+                  </span>
+                  <span style={{ fontSize: '15px', color: '#525450' }}>• {ord.date}</span>
+                </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '12px', fontSize: '14px' }}>
-                    <div>
-                      <p style={{ color: '#64748b', fontSize: '12px', margin: 0 }}>BUYER</p>
-                      <p style={{ fontWeight: 700, margin: 0 }}>{tx.buyerName} {isBuyer && '(You)'}</p>
-                    </div>
-                    <div>
-                      <p style={{ color: '#64748b', fontSize: '12px', margin: 0 }}>FARMER</p>
-                      <p style={{ fontWeight: 700, margin: 0 }}>{tx.farmerName} {isFarmer && '(You)'}</p>
-                    </div>
-                  </div>
+                <div style={{ fontSize: '19px', color: '#1A1C1A', fontWeight: 800 }}>
+                  Buyer: <strong>{ord.buyerName}</strong> ({ord.buyerLocation})
+                </div>
 
-                  {tx.contactMessage && (
-                    <div style={{ fontSize: '13px', color: '#334155', fontStyle: 'italic', backgroundColor: '#fff', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                      💬 "{tx.contactMessage}"
-                    </div>
-                  )}
+                <div style={{ fontSize: '18px', color: '#525450', marginTop: '4px', fontWeight: 600 }}>
+                  Product: <strong>{ord.product}</strong> • Quantity: <strong>{ord.quantity}</strong>
+                </div>
+              </div>
 
-                  {/* Actions depending on role & current status */}
-                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
-                    {isFarmer && tx.status === 'pending' && (
-                      <>
-                        <button onClick={() => handleUpdateStatus(tx.id, 'confirmed')} style={{ padding: '8px 16px', borderRadius: '8px', backgroundColor: '#16a34a', color: '#fff', fontWeight: 700, border: 'none', cursor: 'pointer' }}>
-                          Confirm Order
-                        </button>
-                        <button onClick={() => handleUpdateStatus(tx.id, 'cancelled')} style={{ padding: '8px 16px', borderRadius: '8px', backgroundColor: '#fef2f2', color: '#991b1b', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
-                          Decline Request
-                        </button>
-                      </>
-                    )}
-
-                    {tx.status === 'confirmed' && (
-                      <button onClick={() => handleUpdateStatus(tx.id, 'completed')} style={{ padding: '8px 16px', borderRadius: '8px', backgroundColor: '#15803d', color: '#fff', fontWeight: 700, border: 'none', cursor: 'pointer' }}>
-                        Mark as Completed / Delivered
-                      </button>
-                    )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '15px', color: '#525450', fontWeight: 700 }}>Total Amount:</div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#0E4A27' }}>
+                    ₱{ord.total.toLocaleString()}
                   </div>
                 </div>
-              );
-            })}
+
+                <button
+                  onClick={() => setSelectedOrder(ord)}
+                  className="btn btn-primary btn-large"
+                >
+                  View Order Details →
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="card" style={{ padding: '60px', textAlign: 'center' }}>
+          <div style={{ fontSize: '64px', marginBottom: '12px' }}>📦</div>
+          <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27', marginBottom: '8px' }}>
+            No orders found in "{selectedTab}"
+          </h2>
+          <p style={{ fontSize: '18px', color: '#525450' }}>
+            When buyers order your crops, they will appear right here.
+          </p>
+        </div>
+      )}
+
+      {/* ─── View Order Modal ─── */}
+      {selectedOrder && (
+        <div className="modal-backdrop" onClick={() => setSelectedOrder(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27' }}>
+                Order #{selectedOrder.id} Details
+              </h2>
+              <button onClick={() => setSelectedOrder(null)} style={{ background: '#F8F7F3', border: 'none', fontSize: '24px', cursor: 'pointer', color: '#525450', width: '42px', height: '42px', borderRadius: '50%' }}>✕</button>
+            </div>
+
+            <div style={{ padding: '20px', borderRadius: '16px', background: '#F8F7F3', border: '2px solid #E4E2DC', marginBottom: '24px' }}>
+              <div style={{ fontSize: '16px', color: '#525450' }}>Buyer Name:</div>
+              <div style={{ fontSize: '22px', fontWeight: 800, color: '#1A1C1A', marginBottom: '10px' }}>{selectedOrder.buyerName}</div>
+              <div style={{ fontSize: '16px', color: '#525450' }}>Delivery Location:</div>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: '#1A1C1A' }}>{selectedOrder.buyerLocation}</div>
+            </div>
+
+            <div style={{ padding: '20px', borderRadius: '16px', background: '#EAF6EE', border: '2px solid #176B3A', marginBottom: '28px' }}>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: '#176B3A' }}>
+                Item Ordered: {selectedOrder.product} ({selectedOrder.quantity})
+              </div>
+              <div style={{ fontSize: '28px', fontWeight: 800, color: '#0E4A27', marginTop: '6px' }}>
+                Total Payment: ₱{selectedOrder.total.toLocaleString()} (Cash on Delivery)
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <button
+                onClick={() => alert(`Calling buyer ${selectedOrder.buyerName} at 0917-987-6543...`)}
+                className="btn btn-secondary btn-large"
+              >
+                📞 Call Buyer
+              </button>
+              <button
+                onClick={() => {
+                  setOrders((prev) =>
+                    prev.map((o) => (o.id === selectedOrder.id ? { ...o, status: 'Confirmed' } : o))
+                  );
+                  setSelectedOrder(null);
+                }}
+                className="btn btn-primary btn-large"
+              >
+                ✓ Confirm Order
+              </button>
+            </div>
           </div>
-        )}
-      </main>
+        </div>
+      )}
     </div>
   );
 };

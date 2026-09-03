@@ -4,6 +4,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api';
 import type { SupplyOrder, PaymentMethod, PaymentStatus } from '../types/app';
 import { Spinner } from '../components/Spinner';
+import {
+  getRegions,
+  getProvinces,
+  getMunicipalities,
+  getBarangays,
+} from '../data/philippineLocations';
 
 type PurchaseTab = 'to_ship' | 'to_receive' | 'completed' | 'cancelled' | 'refunded';
 
@@ -34,11 +40,69 @@ export const ProfileScreen: React.FC = () => {
   const { user, refreshProfile } = useAuth();
   const navigate = useNavigate();
 
+  const allRegions = getRegions();
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
   const [phone, setPhone] = useState(user?.phone || '');
-  const [region, setRegion] = useState(user?.region || '');
+  const [region, setRegion] = useState(user?.region || allRegions[0]);
+  const [province, setProvince] = useState(user?.province || getProvinces(user?.region || allRegions[0])[0] || '');
+  const [municipality, setMunicipality] = useState(user?.municipality || getMunicipalities(user?.region || allRegions[0], user?.province || '')[0] || '');
+  const [barangay, setBarangay] = useState(user?.barangay || getBarangays(user?.region || allRegions[0], user?.province || '', user?.municipality || '')[0] || '');
   const [address, setAddress] = useState(user?.address || '');
+
+  const provinces = getProvinces(region);
+  const municipalities = getMunicipalities(region, province);
+  const barangays = getBarangays(region, province, municipality);
+
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.firstName || '');
+      setLastName(user.lastName || '');
+      setPhone(user.phone || '');
+      const r = user.region || allRegions[0];
+      setRegion(r);
+      const provs = getProvinces(r);
+      const p = user.province && provs.includes(user.province) ? user.province : (provs[0] || '');
+      setProvince(p);
+      const muns = getMunicipalities(r, p);
+      const m = user.municipality && muns.includes(user.municipality) ? user.municipality : (muns[0] || '');
+      setMunicipality(m);
+      const bars = getBarangays(r, p, m);
+      const b = user.barangay && bars.includes(user.barangay) ? user.barangay : (bars[0] || '');
+      setBarangay(b);
+      setAddress(user.address || '');
+    }
+  }, [user]);
+
+  const handleRegionChange = (newRegion: string) => {
+    const provs = getProvinces(newRegion);
+    const newProv = provs[0] || '';
+    const muns = getMunicipalities(newRegion, newProv);
+    const newMun = muns[0] || '';
+    const bars = getBarangays(newRegion, newProv, newMun);
+
+    setRegion(newRegion);
+    setProvince(newProv);
+    setMunicipality(newMun);
+    setBarangay(bars[0] || '');
+  };
+
+  const handleProvinceChange = (newProv: string) => {
+    const muns = getMunicipalities(region, newProv);
+    const newMun = muns[0] || '';
+    const bars = getBarangays(region, newProv, newMun);
+
+    setProvince(newProv);
+    setMunicipality(newMun);
+    setBarangay(bars[0] || '');
+  };
+
+  const handleMunicipalityChange = (newMun: string) => {
+    const bars = getBarangays(region, province, newMun);
+
+    setMunicipality(newMun);
+    setBarangay(bars[0] || '');
+  };
 
   const [saving, setSaving] = useState(false);
   const [msgType, setMsgType] = useState<'success' | 'error' | null>(null);
@@ -72,11 +136,12 @@ export const ProfileScreen: React.FC = () => {
   const initials = `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase();
 
   const roleLabelMap: Record<string, string> = {
-    farmer:    'Farmer',
-    buyer:     'Buyer',
-    supplier:  'Supplier',
-    expert:    'Expert',
-    lgu_staff: 'LGU Staff',
+    farmer:      'Farmer',
+    buyer:       'Buyer',
+    supplier:    'Supplier',
+    expert:      'Expert',
+    lgu_staff:   'LGU Staff',
+    super_admin: 'Super Admin',
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -85,7 +150,16 @@ export const ProfileScreen: React.FC = () => {
     setMsgType(null);
     setMsgText('');
     try {
-      await api.updateProfile({ firstName, lastName, phone, region, address });
+      await api.updateProfile({
+        firstName,
+        lastName,
+        phone,
+        region,
+        province,
+        municipality,
+        barangay,
+        address,
+      });
       await refreshProfile();
       setMsgType('success');
       setMsgText('Profile updated successfully.');
@@ -330,26 +404,74 @@ export const ProfileScreen: React.FC = () => {
           />
         </div>
 
+        {/* ── Philippine Locations ── */}
         <div className="field">
-          <label className="label" htmlFor="prof-region">Region / Province</label>
-          <input
+          <label className="label" htmlFor="prof-region">Region</label>
+          <select
             id="prof-region"
             className="input"
-            type="text"
             value={region}
-            onChange={(e) => setRegion(e.target.value)}
-            placeholder="Region III - Central Luzon"
-          />
+            onChange={(e) => handleRegionChange(e.target.value)}
+          >
+            {allRegions.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
         </div>
 
         <div className="field">
-          <label className="label" htmlFor="prof-address">Address</label>
+          <label className="label" htmlFor="prof-province">Province</label>
+          <select
+            id="prof-province"
+            className="input"
+            value={province}
+            disabled={provinces.length === 0}
+            onChange={(e) => handleProvinceChange(e.target.value)}
+          >
+            {provinces.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor="prof-municipality">Municipality / City</label>
+          <select
+            id="prof-municipality"
+            className="input"
+            value={municipality}
+            disabled={municipalities.length === 0}
+            onChange={(e) => handleMunicipalityChange(e.target.value)}
+          >
+            {municipalities.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor="prof-barangay">Barangay</label>
+          <select
+            id="prof-barangay"
+            className="input"
+            value={barangay}
+            disabled={barangays.length === 0}
+            onChange={(e) => setBarangay(e.target.value)}
+          >
+            {barangays.map((b) => (
+              <option key={b} value={b}>{b}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor="prof-address">Specific Street Address / Landmark</label>
           <textarea
             id="prof-address"
             className="input input-textarea"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder="Street, Barangay, City, Province"
+            placeholder="Purok, Sitio, Street name, House/Lot No., Landmark"
             rows={3}
           />
         </div>
