@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { AppLayout } from './components/AppLayout';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -35,7 +36,9 @@ export const App: React.FC = () => {
             path="/dashboard"
             element={
               <ProtectedRoute>
-                <DashboardPage />
+                <AppLayout>
+                  <DashboardPage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -43,7 +46,9 @@ export const App: React.FC = () => {
             path="/profile"
             element={
               <ProtectedRoute>
-                <ProfilePage />
+                <AppLayout>
+                  <ProfilePage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -53,7 +58,9 @@ export const App: React.FC = () => {
             path="/produce"
             element={
               <ProtectedRoute>
-                <ProduceMarketplacePage />
+                <AppLayout>
+                  <ProduceMarketplacePage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -61,7 +68,9 @@ export const App: React.FC = () => {
             path="/produce/manage"
             element={
               <ProtectedRoute>
-                <ManageProduceListingsPage />
+                <AppLayout>
+                  <ManageProduceListingsPage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -69,7 +78,9 @@ export const App: React.FC = () => {
             path="/produce/orders"
             element={
               <ProtectedRoute>
-                <ProduceTransactionsPage />
+                <AppLayout>
+                  <ProduceTransactionsPage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -79,7 +90,9 @@ export const App: React.FC = () => {
             path="/supply"
             element={
               <ProtectedRoute>
-                <SupplyStorePage />
+                <AppLayout>
+                  <SupplyStorePage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -87,7 +100,9 @@ export const App: React.FC = () => {
             path="/supply/cart"
             element={
               <ProtectedRoute>
-                <SupplyCartPage />
+                <AppLayout>
+                  <SupplyCartPage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -95,7 +110,9 @@ export const App: React.FC = () => {
             path="/supply/manage"
             element={
               <ProtectedRoute>
-                <ManageSupplyProductsPage />
+                <AppLayout>
+                  <ManageSupplyProductsPage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -103,7 +120,9 @@ export const App: React.FC = () => {
             path="/supply/orders"
             element={
               <ProtectedRoute>
-                <SupplyOrdersPage />
+                <AppLayout>
+                  <SupplyOrdersPage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -113,7 +132,19 @@ export const App: React.FC = () => {
             path="/market-prices"
             element={
               <ProtectedRoute>
-                <MarketPriceMonitoringPage />
+                <AppLayout>
+                  <MarketPriceMonitoringPage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/price-trends"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <MarketPriceMonitoringPage initialTab="trends" />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -121,7 +152,9 @@ export const App: React.FC = () => {
             path="/market-prices/manage"
             element={
               <ProtectedRoute>
-                <ManageMarketPricesPage />
+                <AppLayout>
+                  <ManageMarketPricesPage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -131,7 +164,9 @@ export const App: React.FC = () => {
             path="/finances"
             element={
               <ProtectedRoute>
-                <FarmFinancialTrackerPage />
+                <AppLayout>
+                  <FarmFinancialTrackerPage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -141,7 +176,9 @@ export const App: React.FC = () => {
             path="/programs"
             element={
               <ProtectedRoute>
-                <GovernmentProgramsPage />
+                <AppLayout>
+                  <GovernmentProgramsPage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -149,7 +186,9 @@ export const App: React.FC = () => {
             path="/programs/manage"
             element={
               <ProtectedRoute>
-                <ManageGovernmentProgramsPage />
+                <AppLayout>
+                  <ManageGovernmentProgramsPage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -159,7 +198,19 @@ export const App: React.FC = () => {
             path="/community"
             element={
               <ProtectedRoute>
-                <CommunityHubPage />
+                <AppLayout>
+                  <CommunityHubPage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/guides"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <CommunityHubPage initialTab="guides" />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -167,7 +218,9 @@ export const App: React.FC = () => {
             path="/community/posts/:id"
             element={
               <ProtectedRoute>
-                <CommunityPostDetailPage />
+                <AppLayout>
+                  <CommunityPostDetailPage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -177,7 +230,9 @@ export const App: React.FC = () => {
             path="/lgu/dashboard"
             element={
               <ProtectedRoute>
-                <LGUDashboardPage />
+                <AppLayout>
+                  <LGUDashboardPage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -187,7 +242,9 @@ export const App: React.FC = () => {
             path="/admin/approvals"
             element={
               <ProtectedRoute>
-                <SuperAdminApprovalsPage />
+                <AppLayout>
+                  <SuperAdminApprovalsPage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -195,7 +252,9 @@ export const App: React.FC = () => {
             path="/lgu/approvals"
             element={
               <ProtectedRoute>
-                <LGUAccountApprovalsPage />
+                <AppLayout>
+                  <LGUAccountApprovalsPage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
