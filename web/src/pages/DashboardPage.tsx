@@ -307,7 +307,7 @@ export const DashboardPage: React.FC = () => {
             <button
               key={idx}
               onClick={() => navigate(card.path)}
-              className={`big-action-card ${card.primary ? 'big-action-card-primary' : ''}`}
+              className={`big-action-card ${(card as any).primary ? 'big-action-card-primary' : ''}`}
             >
               <div className="big-action-icon-box" style={{ background: card.bg }}>
                 {card.icon}

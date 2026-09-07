@@ -166,6 +166,12 @@ func (s *SupplyService) CreateOrder(ctx context.Context, buyerID string, req mod
 	var supplierID bson.ObjectID
 	var supplierName string
 
+	type validatedItem struct {
+		product  *models.SupplyProduct
+		quantity int
+	}
+	var validated []validatedItem
+
 	for i, itemReq := range req.Items {
 		pOID, err := bson.ObjectIDFromHex(itemReq.ProductID)
 		if err != nil {
@@ -184,21 +190,27 @@ func (s *SupplyService) CreateOrder(ctx context.Context, buyerID string, req mod
 		if i == 0 {
 			supplierID = product.SupplierID
 			supplierName = product.SupplierName
+		} else if product.SupplierID != supplierID {
+			return nil, errors.New("all items in an order must be from the same supplier; please place separate orders per supplier")
 		}
 
-		itemTotal := float64(itemReq.Quantity) * product.Price
+		validated = append(validated, validatedItem{product: product, quantity: itemReq.Quantity})
+	}
+
+	for _, v := range validated {
+		itemTotal := float64(v.quantity) * v.product.Price
 		totalAmount += itemTotal
 
 		items = append(items, models.SupplyOrderItem{
-			ProductID:    product.ID,
-			ProductName:  product.Name,
-			Quantity:     itemReq.Quantity,
-			PricePerItem: product.Price,
+			ProductID:    v.product.ID,
+			ProductName:  v.product.Name,
+			Quantity:     v.quantity,
+			PricePerItem: v.product.Price,
 		})
 
 		// Deduct inventory
-		if err := s.supplyRepo.DeductStock(ctx, product.ID, itemReq.Quantity); err != nil {
-			return nil, fmt.Errorf("deduct inventory for %s: %w", product.Name, err)
+		if err := s.supplyRepo.DeductStock(ctx, v.product.ID, v.quantity); err != nil {
+			return nil, fmt.Errorf("deduct inventory for %s: %w", v.product.Name, err)
 		}
 	}
 

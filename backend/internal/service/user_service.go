@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -113,4 +114,37 @@ func (s *UserService) UploadPhoto(ctx context.Context, userID string, filename s
 	}
 
 	return s.repo.FindByID(ctx, oid)
+}
+
+// ChangePassword verifies the current password and updates to the new one.
+func (s *UserService) ChangePassword(ctx context.Context, userID string, req models.ChangePasswordRequest) error {
+	if req.CurrentPassword == "" || req.NewPassword == "" {
+		return errors.New("current password and new password are required")
+	}
+	if len(req.NewPassword) < 8 {
+		return errors.New("new password must be at least 8 characters")
+	}
+
+	oid, err := bson.ObjectIDFromHex(userID)
+	if err != nil {
+		return fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	user, err := s.repo.FindByID(ctx, oid)
+	if err != nil {
+		return err
+	}
+
+	// Verify current password
+	if !CheckPassword(req.CurrentPassword, user.Password) {
+		return errors.New("current password is incorrect")
+	}
+
+	// Hash new password
+	hashed, err := HashPassword(req.NewPassword)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+
+	return s.repo.Update(ctx, oid, bson.M{"password": hashed})
 }

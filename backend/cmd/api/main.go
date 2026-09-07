@@ -84,6 +84,7 @@ func main() {
 	communityHandler := handler.NewCommunityHandler(communityService)
 	analyticsHandler := handler.NewAnalyticsHandler(analyticsService)
 	notifHandler := handler.NewNotificationHandler(notifService)
+	uploadHandler := handler.NewUploadHandler(cfg.UploadDir)
 
 	// Build router
 	r := router.New(
@@ -98,6 +99,7 @@ func main() {
 		analyticsHandler,
 		notifHandler,
 		adminHandler,
+		uploadHandler,
 		cfg.JWTSecret,
 		cfg.UploadDir,
 	)

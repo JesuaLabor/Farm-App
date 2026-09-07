@@ -11,20 +11,18 @@ interface CartItem {
 }
 
 // Payment options config — easy to enable/disable as gateways go live.
-const PAYMENT_OPTIONS: {
+const getPaymentOptions = (isPickup: boolean): {
   id: PaymentMethod;
   label: string;
   icon: string;
   desc: string;
-  deliveryOnly?: boolean; // true = hidden when pickup is selected
   comingSoon?: boolean;
-}[] = [
+}[] => [
   {
     id: 'cod',
-    label: 'Cash on Delivery',
+    label: isPickup ? 'Cash on Pickup' : 'Cash on Delivery',
     icon: '💵',
-    desc: 'Pay in cash when your order arrives.',
-    deliveryOnly: true,
+    desc: isPickup ? 'Pay in cash upon in-store collection.' : 'Pay in cash when your order arrives.',
   },
   {
     id: 'gcash',
@@ -68,6 +66,9 @@ export const SupplyCartPage: React.FC = () => {
   const [ordering, setOrdering] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const uniqueSupplierNames = Array.from(new Set(cart.map((i) => i.product.supplierName || 'Supplier')));
+  const hasMultipleSuppliers = uniqueSupplierNames.length > 1;
+
   const loadCart = () => {
     const raw = localStorage.getItem('agriconnect_cart');
     if (raw) {
@@ -75,14 +76,13 @@ export const SupplyCartPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { loadCart(); }, []);
-
-  // When switching to pickup, fall back from COD to gcash (COD requires delivery)
   useEffect(() => {
-    if (deliveryMethod === 'pickup' && paymentMethod === 'cod') {
-      setPaymentMethod('gcash');
+    if (user?.role === 'supplier') {
+      navigate('/supply/manage');
+      return;
     }
-  }, [deliveryMethod]);
+    loadCart();
+  }, [user, navigate]);
 
   const saveCart = (newCart: CartItem[]) => {
     setCart(newCart);
@@ -119,6 +119,14 @@ export const SupplyCartPage: React.FC = () => {
     setOrdering(true);
     setMessage(null);
 
+    if (hasMultipleSuppliers) {
+      setMessage({
+        type: 'error',
+        text: `Your cart contains items from multiple suppliers (${uniqueSupplierNames.join(', ')}). Please place separate orders per supplier.`,
+      });
+      return;
+    }
+
     try {
       await supplyApi.createOrder({
         items: cart.map((item) => ({ productId: item.product.id, quantity: item.quantity })),
@@ -132,7 +140,7 @@ export const SupplyCartPage: React.FC = () => {
       setMessage({
         type: 'success',
         text: paymentMethod === 'cod'
-          ? '✅ Order placed! Pay in cash upon delivery. Track it under My Supply Orders.'
+          ? (deliveryMethod === 'pickup' ? '✅ Order placed! Pay in cash upon in-store pickup. Track it under My Supply Orders.' : '✅ Order placed! Pay in cash upon delivery. Track it under My Supply Orders.')
           : '✅ Order placed! Check My Supply Orders for payment instructions.',
       });
       setTimeout(() => navigate('/supply/orders'), 2500);
@@ -144,9 +152,7 @@ export const SupplyCartPage: React.FC = () => {
   };
 
   // Visible payment options based on delivery method
-  const visiblePaymentOptions = PAYMENT_OPTIONS.filter(
-    (opt) => !(opt.deliveryOnly && deliveryMethod === 'pickup')
-  );
+  const visiblePaymentOptions = getPaymentOptions(deliveryMethod === 'pickup');
 
   // Card style helpers
   const panelBtn = (active: boolean): React.CSSProperties => ({
@@ -330,10 +336,28 @@ export const SupplyCartPage: React.FC = () => {
                   {/* COD info note */}
                   {paymentMethod === 'cod' && (
                     <div style={{ marginTop: '10px', padding: '10px 12px', borderRadius: '8px', backgroundColor: '#fffbeb', border: '1px solid #fde68a', fontSize: '12px', color: '#92400e' }}>
-                      💡 <strong>Cash on Delivery:</strong> Have the exact amount ready when the supplier's rider arrives. A handling fee may apply.
+                      💡 <strong>{deliveryMethod === 'pickup' ? 'Cash on Pickup:' : 'Cash on Delivery:'}</strong>{' '}
+                      {deliveryMethod === 'pickup'
+                        ? 'Have exact cash ready upon picking up your order at the store.'
+                        : "Have the exact amount ready when the supplier's rider arrives. A handling fee may apply."}
                     </div>
                   )}
                 </div>
+
+                {hasMultipleSuppliers && (
+                  <div style={{
+                    padding: '12px 14px',
+                    borderRadius: '10px',
+                    backgroundColor: '#fff1f2',
+                    border: '1.5px solid #fecdd3',
+                    color: '#9f1239',
+                    fontSize: '13px',
+                    marginBottom: '16px',
+                    lineHeight: 1.4,
+                  }}>
+                    ⚠️ <strong>Multiple Suppliers in Cart:</strong> Your cart contains items from {uniqueSupplierNames.join(', ')}. Please keep products from only 1 supplier before checking out.
+                  </div>
+                )}
 
                 {/* Order Total */}
                 <div style={{ padding: '14px', backgroundColor: '#f8fafc', borderRadius: '10px', marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -350,21 +374,24 @@ export const SupplyCartPage: React.FC = () => {
 
                 <button
                   type="submit"
-                  disabled={ordering}
+                  disabled={ordering || hasMultipleSuppliers}
                   style={{
                     width: '100%',
                     padding: '14px',
                     borderRadius: '12px',
-                    backgroundColor: ordering ? '#a3a3a3' : '#ca8a04',
+                    backgroundColor: ordering || hasMultipleSuppliers ? '#a3a3a3' : '#ca8a04',
                     color: '#fff',
                     fontWeight: 800,
                     border: 'none',
-                    cursor: ordering ? 'not-allowed' : 'pointer',
+                    cursor: ordering || hasMultipleSuppliers ? 'not-allowed' : 'pointer',
                     fontSize: '15px',
                     transition: 'background 0.2s',
                   }}
                 >
-                  {ordering ? 'Placing Order…' : `Place Order · ${PAYMENT_OPTIONS.find(p => p.id === paymentMethod)?.icon} ${paymentMethod === 'cod' ? 'Pay on Delivery' : 'Pay Now'}`}
+                  {ordering
+                    ? 'Placing Order…'
+                    : `Place Order · ${visiblePaymentOptions.find(p => p.id === paymentMethod)?.icon || '💵'} ${paymentMethod === 'cod' ? (deliveryMethod === 'pickup' ? 'Pay on Pickup' : 'Pay on Delivery') : 'Pay Now'}`
+                  }
                 </button>
               </form>
             </div>

@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 const samplePrograms = [
   {
@@ -32,7 +31,6 @@ const samplePrograms = [
 ];
 
 export const GovernmentProgramsPage: React.FC = () => {
-  const navigate = useNavigate();
   const [selectedCat, setSelectedCat] = useState('All Programs');
   const [selectedProgram, setSelectedProgram] = useState<any | null>(null);
 
@@ -47,15 +45,8 @@ export const GovernmentProgramsPage: React.FC = () => {
   return (
     <div className="app-container" style={{ paddingBottom: '40px' }}>
       {/* ─── Back Button & Header ─── */}
+      {/* ─── Page Title ─── */}
       <div style={{ marginBottom: '24px' }}>
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="btn btn-secondary"
-          style={{ marginBottom: '16px', fontSize: '17px' }}
-        >
-          ← Back to Dashboard
-        </button>
-
         <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27' }}>
           Government Cash Assistance & Grants
         </h1>

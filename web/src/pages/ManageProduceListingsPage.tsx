@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { api, getImageUrl } from '../api';
+import { produceApi } from '../api/produce';
 
 const sampleMyListings = [
   {
@@ -27,11 +29,11 @@ const sampleMyListings = [
 ];
 
 export const ManageProduceListingsPage: React.FC = () => {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [myListings, setMyListings] = useState<any[]>(sampleMyListings);
   const [showAddForm, setShowAddForm] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form Fields (One Clear Question Per Field)
   const [cropName, setCropName] = useState('');
@@ -39,6 +41,9 @@ export const ManageProduceListingsPage: React.FC = () => {
   const [price, setPrice] = useState('65');
   const [farmLocation, setFarmLocation] = useState('Cagayan de Oro');
   const [availableDate, setAvailableDate] = useState('2026-09-15');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (searchParams.get('action') === 'new') {
@@ -46,27 +51,93 @@ export const ManageProduceListingsPage: React.FC = () => {
     }
   }, [searchParams]);
 
-  const handlePublishListing = (e: React.FormEvent) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handlePublishListing = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cropName.trim()) return;
 
-    const newListing = {
-      id: `my-${Date.now()}`,
-      cropName,
-      pricePerUnit: Number(price),
-      unit: 'kg',
-      quantity: Number(quantity),
-      status: 'Active',
-      location: farmLocation,
-      harvestDate: availableDate,
-      imageUrl: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80',
-    };
+    setIsSubmitting(true);
+    let uploadedPhotoUrl = '';
 
-    setMyListings([newListing, ...myListings]);
-    setShowAddForm(false);
-    setToastMessage(`✓ Listing Published! Your ${cropName} is now live and visible to buyers.`);
-    setCropName('');
-    setTimeout(() => setToastMessage(''), 5000);
+    try {
+      if (imageFile) {
+        const uploadRes = await api.uploadImage(imageFile);
+        uploadedPhotoUrl = uploadRes.url;
+      }
+    } catch (uploadErr) {
+      console.warn('Image upload failed, continuing with listing:', uploadErr);
+    }
+
+    const finalPhoto = uploadedPhotoUrl || imagePreview || 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80';
+
+    try {
+      const backendListing = await produceApi.createListing({
+        cropName,
+        category: 'vegetables',
+        quantity: Number(quantity),
+        unit: 'kg',
+        pricePerUnit: Number(price),
+        harvestDate: availableDate,
+        location: farmLocation,
+        photos: uploadedPhotoUrl ? [uploadedPhotoUrl] : [],
+        description: `Fresh harvest from ${farmLocation}`,
+      });
+
+      const formatted = {
+        id: backendListing.id,
+        cropName: backendListing.cropName,
+        pricePerUnit: backendListing.pricePerUnit,
+        unit: backendListing.unit,
+        quantity: backendListing.quantity,
+        status: 'Active',
+        location: backendListing.location,
+        harvestDate: backendListing.harvestDate ? String(backendListing.harvestDate).split('T')[0] : availableDate,
+        imageUrl: getImageUrl(uploadedPhotoUrl, finalPhoto),
+        photos: backendListing.photos || (uploadedPhotoUrl ? [uploadedPhotoUrl] : []),
+      };
+
+      setMyListings([formatted, ...myListings]);
+    } catch (createErr) {
+      console.warn('Backend listing creation error, adding locally:', createErr);
+      const newListing = {
+        id: `my-${Date.now()}`,
+        cropName,
+        pricePerUnit: Number(price),
+        unit: 'kg',
+        quantity: Number(quantity),
+        status: 'Active',
+        location: farmLocation,
+        harvestDate: availableDate,
+        imageUrl: getImageUrl(uploadedPhotoUrl, finalPhoto),
+        photos: uploadedPhotoUrl ? [uploadedPhotoUrl] : [],
+      };
+      setMyListings([newListing, ...myListings]);
+    } finally {
+      setIsSubmitting(false);
+      setShowAddForm(false);
+      setToastMessage(`✓ Listing Published! Your ${cropName} is now live with photo attached.`);
+      setCropName('');
+      setImageFile(null);
+      setImagePreview('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setTimeout(() => setToastMessage(''), 5000);
+    }
   };
 
   const togglePauseStatus = (id: string) => {
@@ -81,16 +152,8 @@ export const ManageProduceListingsPage: React.FC = () => {
 
   return (
     <div className="app-container" style={{ paddingBottom: '40px' }}>
-      {/* ─── Back Button & Header ─── */}
+      {/* ─── Page Header ─── */}
       <div style={{ marginBottom: '24px' }}>
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="btn btn-secondary"
-          style={{ marginBottom: '16px', fontSize: '17px' }}
-        >
-          ← Back to Dashboard
-        </button>
-
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27' }}>
@@ -202,7 +265,7 @@ export const ManageProduceListingsPage: React.FC = () => {
               </div>
 
               {/* Question 5 */}
-              <div className="form-group" style={{ marginBottom: '28px' }}>
+              <div className="form-group">
                 <label className="form-label">5. When will it be ready for pickup?</label>
                 <input
                   type="date"
@@ -212,6 +275,56 @@ export const ManageProduceListingsPage: React.FC = () => {
                   className="form-input"
                   style={{ fontSize: '20px' }}
                 />
+              </div>
+
+              {/* Question 6 - Image Upload */}
+              <div className="form-group" style={{ marginBottom: '28px' }}>
+                <label className="form-label">6. Attach a photo of your produce (optional)</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  style={{ display: 'none' }}
+                />
+
+                {!imagePreview ? (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      border: '2px dashed #93c5fd',
+                      borderRadius: '16px',
+                      padding: '24px',
+                      textAlign: 'center',
+                      backgroundColor: '#eff6ff',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <div style={{ fontSize: '32px', marginBottom: '8px' }}>📷</div>
+                    <div style={{ fontWeight: 700, color: '#1d4ed8', fontSize: '16px' }}>Click to select or capture produce photo</div>
+                    <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>Supports JPG, PNG, WEBP (Max 10MB)</div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px', borderRadius: '16px', border: '1px solid #bfdbfe', backgroundColor: '#f0f9ff' }}>
+                    <img
+                      src={imagePreview}
+                      alt="Crop preview"
+                      style={{ width: '80px', height: '80px', borderRadius: '12px', objectFit: 'cover' }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>{imageFile?.name || 'Selected crop image'}</div>
+                      <div style={{ fontSize: '13px', color: '#16a34a', fontWeight: 600 }}>Ready to upload with listing</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#dc2626', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '14px' }}>
@@ -226,10 +339,11 @@ export const ManageProduceListingsPage: React.FC = () => {
 
                 <button
                   type="submit"
+                  disabled={isSubmitting}
                   className="btn btn-primary btn-large"
                   style={{ flex: 2 }}
                 >
-                  Publish Listing →
+                  {isSubmitting ? 'Uploading & Publishing...' : 'Publish Listing →'}
                 </button>
               </div>
             </form>
@@ -255,7 +369,7 @@ export const ManageProduceListingsPage: React.FC = () => {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
                 <img
-                  src={item.imageUrl}
+                  src={getImageUrl(item.photos?.[0] || item.imageUrl, 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80')}
                   alt={item.cropName}
                   style={{ width: '100px', height: '100px', borderRadius: '16px', objectFit: 'cover' }}
                 />

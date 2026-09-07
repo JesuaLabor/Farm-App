@@ -15,17 +15,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
   onOpenHelp,
 }) => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const currentPath = location.pathname;
   const currentHash = location.hash;
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   const isItemActive = (to: string): boolean => {
     if (to === '/dashboard') return currentPath === '/dashboard';
@@ -66,6 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return (currentPath === '/community' && currentHash === '#guides') || currentPath === '/guides';
     }
     if (to === '/profile') return currentPath === '/profile';
+    if (to === '/settings') return currentPath === '/settings';
 
     return false;
   };
@@ -196,6 +192,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {
         title: 'PLATFORM CHANNELS',
         items: [
+          { label: 'Agri-Supply Store', to: '/supply', icon: icons.supply },
           { label: 'Produce Marketplace', to: '/produce', icon: icons.marketplace },
           { label: 'Community Hub', to: '/community', icon: icons.community },
         ],
@@ -203,7 +200,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {
         title: 'ACCOUNT',
         items: [
-          { label: 'Settings', to: '/profile', icon: icons.settings },
+          { label: 'Settings', to: '/settings', icon: icons.settings },
           { label: 'Help & Support', to: '/help', isAction: true, action: onOpenHelp, icon: icons.help },
         ],
       },
@@ -232,7 +229,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {
         title: 'ACCOUNT',
         items: [
-          { label: 'Settings', to: '/profile', icon: icons.settings },
+          { label: 'Settings', to: '/settings', icon: icons.settings },
           { label: 'Help & Support', to: '/help', isAction: true, action: onOpenHelp, icon: icons.help },
         ],
       },
@@ -253,6 +250,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {
         title: 'MARKET',
         items: [
+          { label: 'Agri-Supply Store', to: '/supply', icon: icons.supply },
           { label: 'Produce Marketplace', to: '/produce', icon: icons.marketplace },
           { label: 'Market Prices', to: '/market-prices', icon: icons.marketPrices },
         ],
@@ -266,7 +264,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {
         title: 'ACCOUNT',
         items: [
-          { label: 'Settings', to: '/profile', icon: icons.settings },
+          { label: 'Settings', to: '/settings', icon: icons.settings },
           { label: 'Help & Support', to: '/help', isAction: true, action: onOpenHelp, icon: icons.help },
         ],
       },
@@ -300,7 +298,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {
         title: 'ACCOUNT',
         items: [
-          { label: 'Settings', to: '/profile', icon: icons.settings },
+          { label: 'Settings', to: '/settings', icon: icons.settings },
           { label: 'Help & Support', to: '/help', isAction: true, action: onOpenHelp, icon: icons.help },
         ],
       },
@@ -328,7 +326,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {
         title: 'ACCOUNT',
         items: [
-          { label: 'Settings', to: '/profile', icon: icons.settings },
+          { label: 'Settings', to: '/settings', icon: icons.settings },
           { label: 'Help & Support', to: '/help', isAction: true, action: onOpenHelp, icon: icons.help },
         ],
       },
@@ -366,7 +364,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {
         title: 'ACCOUNT',
         items: [
-          { label: 'Settings', to: '/profile', icon: icons.settings },
+          { label: 'Settings', to: '/settings', icon: icons.settings },
           { label: 'Help & Support', to: '/help', isAction: true, action: onOpenHelp, icon: icons.help },
         ],
       },
@@ -574,121 +572,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           ))}
         </div>
-
-        {/* Farmer Profile Footer */}
-        <div
-          style={{
-            padding: collapsed ? '12px 8px' : '16px 14px',
-            borderTop: '1px solid #E4E2DC',
-            background: '#F8F7F3',
-          }}
-        >
-          {!collapsed ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
-                <div
-                  style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '50%',
-                    background: '#176B3A',
-                    color: '#FFFFFF',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 800,
-                    fontSize: '18px',
-                    flexShrink: 0,
-                  }}
-                >
-                  {user?.firstName ? user.firstName.charAt(0).toUpperCase() : 'J'}
-                </div>
-                <div style={{ overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      fontSize: '15px',
-                      fontWeight: 700,
-                      color: '#222522',
-                      whiteSpace: 'nowrap',
-                      textOverflow: 'ellipsis',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {user ? `${user.firstName} ${user.lastName}` : 'Juan Dela Cruz'}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#176B3A', fontWeight: 700 }}>
-                    <span>
-                      {user?.role === 'super_admin'
-                        ? 'Super Admin'
-                        : user?.role === 'lgu_staff'
-                        ? 'LGU Officer'
-                        : user?.role === 'supplier'
-                        ? 'Supplier'
-                        : user?.role === 'expert'
-                        ? 'Agronomist'
-                        : user?.role === 'buyer'
-                        ? 'Buyer'
-                        : 'Farmer'}
-                    </span>
-                    <span>•</span>
-                    <span style={{ color: user?.status === 'pending' ? '#D97706' : user?.status === 'rejected' ? '#BA3C3C' : '#2E8B57' }}>
-                      {user?.role === 'super_admin' || user?.status === 'approved'
-                        ? '✓ Verified'
-                        : user?.status === 'rejected'
-                        ? '❌ Rejected'
-                        : '⏳ Pending'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={handleLogout}
-                title="Log Out"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#C94C4C',
-                  cursor: 'pointer',
-                  padding: '8px',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                aria-label="Log out"
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={handleLogout}
-              style={{
-                width: '100%',
-                padding: '10px',
-                background: 'transparent',
-                border: 'none',
-                color: '#C94C4C',
-                cursor: 'pointer',
-                display: 'flex',
-                justifyContent: 'center',
-              }}
-              title="Log Out"
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-            </button>
-          )}
-        </div>
       </aside>
     </>
   );
 };
+

@@ -115,38 +115,29 @@ export const MarketPriceMonitoringPage: React.FC<MarketPriceMonitoringPageProps>
 
   return (
     <div className="app-container" style={{ paddingBottom: '50px' }}>
-      {/* ─── Back Button & Header ─── */}
+      {/* ─── Page Header ─── */}
       <div style={{ marginBottom: '24px' }}>
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="btn btn-secondary"
-          style={{ marginBottom: '16px', fontSize: '16px' }}
+        <div>
+          <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
+            {activeTab === 'prices' ? 'Official Market Prices' : 'Commodity Price Trends & Analytics'}
+          </h1>
+          <p style={{ fontSize: '19px', color: '#525450', marginTop: '6px', marginBottom: '20px' }}>
+            {activeTab === 'prices'
+              ? 'Daily official wholesale and retail price bulletin monitored by DA-AMAS & local trading posts.'
+              : 'Analyze historical price patterns, volatility indicators, and seasonal market forecasts.'}
+          </p>
+        </div>
+
+        {/* ─── Top Segregated Navigation Tabs ─── */}
+        <div
+          style={{
+            display: 'inline-flex',
+            background: '#EAECE9',
+            padding: '6px',
+            borderRadius: '16px',
+            gap: '6px',
+          }}
         >
-          ← Back to Dashboard
-        </button>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
-              {activeTab === 'prices' ? 'Official Market Prices' : 'Commodity Price Trends & Analytics'}
-            </h1>
-            <p style={{ fontSize: '19px', color: '#525450', marginTop: '6px' }}>
-              {activeTab === 'prices'
-                ? 'Daily official wholesale and retail price bulletin monitored by DA-AMAS & local trading posts.'
-                : 'Analyze historical price patterns, volatility indicators, and seasonal market forecasts.'}
-            </p>
-          </div>
-
-          {/* ─── Top Segregated Navigation Tabs ─── */}
-          <div
-            style={{
-              display: 'inline-flex',
-              background: '#EAECE9',
-              padding: '6px',
-              borderRadius: '16px',
-              gap: '6px',
-            }}
-          >
             <button
               onClick={() => handleTabChange('prices')}
               style={{
@@ -192,7 +183,6 @@ export const MarketPriceMonitoringPage: React.FC<MarketPriceMonitoringPageProps>
             </button>
           </div>
         </div>
-      </div>
 
       {/* ─── Commodity & Location Filter Bar ─── */}
       <div className="card" style={{ padding: '22px', marginBottom: '32px' }}>

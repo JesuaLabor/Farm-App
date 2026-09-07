@@ -155,16 +155,8 @@ export const ProfilePage: React.FC = () => {
 
   return (
     <div className="app-container" style={{ paddingBottom: '40px' }}>
-      {/* ─── Back Button & Header ─── */}
+      {/* ─── Page Header ─── */}
       <div style={{ marginBottom: '28px' }}>
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="btn btn-secondary"
-          style={{ marginBottom: '16px', fontSize: '17px' }}
-        >
-          ← Back to Dashboard
-        </button>
-
         <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27' }}>
           My Account & Profile
         </h1>

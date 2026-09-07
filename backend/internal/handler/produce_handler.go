@@ -150,6 +150,7 @@ func (h *ProduceHandler) ListTransactions(w http.ResponseWriter, r *http.Request
 // UpdateTransactionStatus handles PUT /api/produce/transactions/{id}/status.
 func (h *ProduceHandler) UpdateTransactionStatus(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r.Context())
+	role := middleware.GetRole(r.Context())
 	txID := chi.URLParam(r, "id")
 
 	var req models.UpdateTransactionStatusRequest
@@ -158,7 +159,7 @@ func (h *ProduceHandler) UpdateTransactionStatus(w http.ResponseWriter, r *http.
 		return
 	}
 
-	tx, err := h.produceService.UpdateTransactionStatus(r.Context(), userID, txID, req.Status)
+	tx, err := h.produceService.UpdateTransactionStatus(r.Context(), userID, role, txID, req.Status)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return

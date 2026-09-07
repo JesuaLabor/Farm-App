@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
 import { supplyApi } from '../api/supply';
+import { api, getImageUrl } from '../api';
 import type { SupplyCategory, SupplyProduct } from '../types/supply';
 
 const categories: { key: SupplyCategory; label: string }[] = [
@@ -13,6 +15,7 @@ const categories: { key: SupplyCategory; label: string }[] = [
 ];
 
 export const ManageSupplyProductsPage: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [products, setProducts] = useState<SupplyProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +30,10 @@ export const ManageSupplyProductsPage: React.FC = () => {
   const [price, setPrice] = useState<number>(1000);
   const [stockQuantity, setStockQuantity] = useState<number>(50);
   const [unit, setUnit] = useState('bag');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const [existingImageUrl, setExistingImageUrl] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -49,6 +56,8 @@ export const ManageSupplyProductsPage: React.FC = () => {
   }, [user]);
 
   const handleOpenForm = (product?: SupplyProduct) => {
+    setImageFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
     if (product) {
       setEditingId(product.id);
       setName(product.name);
@@ -57,6 +66,9 @@ export const ManageSupplyProductsPage: React.FC = () => {
       setPrice(product.price);
       setStockQuantity(product.stockQuantity);
       setUnit(product.unit);
+      const img = product.images?.[0] || '';
+      setExistingImageUrl(img);
+      setImagePreview(img ? getImageUrl(img) : '');
     } else {
       setEditingId(null);
       setName('');
@@ -65,15 +77,44 @@ export const ManageSupplyProductsPage: React.FC = () => {
       setPrice(1000);
       setStockQuantity(50);
       setUnit('bag');
+      setExistingImageUrl('');
+      setImagePreview('');
     }
     setShowForm(true);
     setMessage(null);
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setExistingImageUrl('');
+    setImagePreview('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setMessage(null);
+
+    let finalImageUrl = existingImageUrl;
+    if (imageFile) {
+      try {
+        const uploadRes = await api.uploadImage(imageFile);
+        finalImageUrl = uploadRes.url;
+      } catch (err: any) {
+        setMessage({ type: 'error', text: 'Failed to upload product image: ' + (err.response?.data?.error || err.message) });
+        setSaving(false);
+        return;
+      }
+    }
 
     const payload = {
       name,
@@ -82,6 +123,7 @@ export const ManageSupplyProductsPage: React.FC = () => {
       price,
       stockQuantity,
       unit,
+      images: finalImageUrl ? [finalImageUrl] : [],
     };
 
     try {
@@ -93,6 +135,9 @@ export const ManageSupplyProductsPage: React.FC = () => {
         setMessage({ type: 'success', text: 'New supply product added!' });
       }
       setShowForm(false);
+      setImageFile(null);
+      setExistingImageUrl('');
+      setImagePreview('');
       fetchMyProducts();
     } catch (err: any) {
       setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to save product.' });
@@ -123,20 +168,42 @@ export const ManageSupplyProductsPage: React.FC = () => {
             <p style={{ color: '#64748b', fontSize: '14px' }}>Add and manage agricultural input listings.</p>
           </div>
 
-          <button
-            onClick={() => handleOpenForm()}
-            style={{
-              padding: '12px 24px',
-              borderRadius: '12px',
-              backgroundColor: '#ca8a04',
-              color: '#fff',
-              fontWeight: 700,
-              border: 'none',
-              cursor: 'pointer',
-            }}
-          >
-            + Add New Product
-          </button>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={() => navigate('/supply')}
+              style={{
+                padding: '12px 20px',
+                borderRadius: '12px',
+                backgroundColor: '#f1f5f9',
+                color: '#334155',
+                fontWeight: 700,
+                border: '1.5px solid #cbd5e1',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+              }}
+            >
+              🏪 View Storefront
+            </button>
+
+            <button
+              onClick={() => handleOpenForm()}
+              style={{
+                padding: '12px 24px',
+                borderRadius: '12px',
+                backgroundColor: '#ca8a04',
+                color: '#fff',
+                fontWeight: 700,
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              + Add New Product
+            </button>
+          </div>
         </div>
 
         {message && (
@@ -183,6 +250,54 @@ export const ManageSupplyProductsPage: React.FC = () => {
                   </div>
                 </div>
 
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>Product Image (optional)</label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    style={{ display: 'none' }}
+                  />
+
+                  {!imagePreview ? (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        border: '2px dashed #ca8a04',
+                        borderRadius: '12px',
+                        padding: '18px',
+                        textAlign: 'center',
+                        backgroundColor: '#fefce8',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div style={{ fontSize: '24px', marginBottom: '4px' }}>📦📸</div>
+                      <div style={{ fontWeight: 700, color: '#854d0e', fontSize: '14px' }}>Click to upload product photo</div>
+                      <div style={{ fontSize: '12px', color: '#a16207' }}>Supports JPG, PNG, WEBP (Max 10MB)</div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '10px', borderRadius: '12px', border: '1px solid #fef08a', backgroundColor: '#fefce8' }}>
+                      <img
+                        src={imagePreview}
+                        alt="Product preview"
+                        style={{ width: '64px', height: '64px', borderRadius: '8px', objectFit: 'cover' }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{imageFile?.name || 'Current product photo'}</div>
+                        <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>Ready to save</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveImage}
+                        style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#dc2626', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 <div style={{ marginBottom: '24px' }}>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>Description</label>
                   <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Product features, active ingredients, usage guidelines..." style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontFamily: 'inherit' }} />
@@ -207,16 +322,29 @@ export const ManageSupplyProductsPage: React.FC = () => {
           <div style={{ display: 'grid', gap: '16px' }}>
             {products.map((item) => (
               <div key={item.id} className="glass-panel" style={{ padding: '20px', borderRadius: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>{item.name}</h3>
-                    <span style={{ fontSize: '12px', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', backgroundColor: '#fef9c3', color: '#854d0e' }}>
-                      {item.category.toUpperCase().replace('_', ' ')}
-                    </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  {item.images && item.images.length > 0 ? (
+                    <img
+                      src={getImageUrl(item.images[0])}
+                      alt={item.name}
+                      style={{ width: '64px', height: '64px', borderRadius: '10px', objectFit: 'cover', border: '1px solid #e2e8f0' }}
+                    />
+                  ) : (
+                    <div style={{ width: '64px', height: '64px', borderRadius: '10px', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
+                      📦
+                    </div>
+                  )}
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                      <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>{item.name}</h3>
+                      <span style={{ fontSize: '12px', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', backgroundColor: '#fef9c3', color: '#854d0e' }}>
+                        {item.category.toUpperCase().replace('_', ' ')}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
+                      Stock: {item.stockQuantity} {item.unit}s • ₱{item.price}/{item.unit}
+                    </p>
                   </div>
-                  <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
-                    Stock: {item.stockQuantity} {item.unit}s • ₱{item.price}/{item.unit}
-                  </p>
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px' }}>

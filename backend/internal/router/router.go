@@ -23,6 +23,7 @@ func New(
 	analyticsHandler *handler.AnalyticsHandler,
 	notifHandler *handler.NotificationHandler,
 	adminHandler *handler.AdminHandler,
+	uploadHandler *handler.UploadHandler,
 	jwtSecret string,
 	uploadDir string,
 ) http.Handler {
@@ -74,7 +75,11 @@ func New(
 		r.Get("/me", userHandler.GetProfile)
 		r.Put("/me", userHandler.UpdateProfile)
 		r.Put("/me/photo", userHandler.UploadPhoto)
+		r.Put("/me/password", userHandler.ChangePassword)
 	})
+
+	// General file/image upload route
+	r.With(middleware.JWTAuth(jwtSecret)).Post("/api/upload", uploadHandler.UploadImage)
 
 	// Produce Marketplace routes
 	r.Route("/api/produce", func(r chi.Router) {
@@ -88,7 +93,7 @@ func New(
 			r.With(middleware.RequireRole(models.RoleFarmer)).Put("/listings/{id}", produceHandler.UpdateListing)
 			r.With(middleware.RequireRole(models.RoleFarmer)).Delete("/listings/{id}", produceHandler.DeleteListing)
 
-			r.With(middleware.RequireRole(models.RoleBuyer)).Post("/transactions", produceHandler.InitiateTransaction)
+			r.With(middleware.RequireRole(models.RoleBuyer, models.RoleFarmer, models.RoleSuperAdmin)).Post("/transactions", produceHandler.InitiateTransaction)
 
 			r.Get("/transactions", produceHandler.ListTransactions)
 			r.Put("/transactions/{id}/status", produceHandler.UpdateTransactionStatus)

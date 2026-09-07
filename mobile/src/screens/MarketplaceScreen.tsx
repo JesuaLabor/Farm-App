@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { api, getImageUrl } from '../api';
 import { db, type CachedProduceListing } from '../db/db';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
@@ -33,6 +33,9 @@ export const MarketplaceScreen: React.FC = () => {
   const [pricePerUnit, setPricePerUnit] = useState('');
   const [location, setLocation] = useState(user?.region || 'Central Luzon');
   const [desc, setDesc] = useState('');
+  const [sellImageFile, setSellImageFile] = useState<File | null>(null);
+  const [sellImagePreview, setSellImagePreview] = useState<string>('');
+  const sellFileInputRef = useRef<HTMLInputElement>(null);
   const [submittingSell, setSubmittingSell] = useState(false);
   const [sellErr, setSellErr] = useState('');
 
@@ -113,6 +116,16 @@ export const MarketplaceScreen: React.FC = () => {
     setSubmittingSell(true);
     setSellErr('');
 
+    let uploadedPhotoUrl = '';
+    if (sellImageFile && isOnline) {
+      try {
+        const uploadRes = await api.uploadImage(sellImageFile);
+        uploadedPhotoUrl = uploadRes.url;
+      } catch (uploadErr) {
+        console.warn('Produce image upload failed, continuing with listing:', uploadErr);
+      }
+    }
+
     const payload = {
       cropName,
       category: sellCat,
@@ -121,6 +134,7 @@ export const MarketplaceScreen: React.FC = () => {
       pricePerUnit: Number(pricePerUnit),
       location,
       description: desc,
+      photos: uploadedPhotoUrl ? [uploadedPhotoUrl] : (sellImagePreview ? [sellImagePreview] : []),
     };
 
     try {
@@ -143,6 +157,8 @@ export const MarketplaceScreen: React.FC = () => {
 
       setShowSellModal(false);
       setCropName(''); setQuantity(''); setPricePerUnit(''); setDesc('');
+      setSellImageFile(null); setSellImagePreview('');
+      if (sellFileInputRef.current) sellFileInputRef.current.value = '';
     } catch (err: any) {
       console.warn('Listing creation failed, queuing offline:', err);
       const tempId = `offline-${Date.now()}`;
@@ -159,6 +175,8 @@ export const MarketplaceScreen: React.FC = () => {
 
       setShowSellModal(false);
       setCropName(''); setQuantity(''); setPricePerUnit(''); setDesc('');
+      setSellImageFile(null); setSellImagePreview('');
+      if (sellFileInputRef.current) sellFileInputRef.current.value = '';
     } finally {
       setSubmittingSell(false);
     }
@@ -172,13 +190,20 @@ export const MarketplaceScreen: React.FC = () => {
           <span>←</span> Back
         </button>
         <div className="top-bar-title">Produce Marketplace</div>
-        {user?.role === 'farmer' ? (
-          <button className="btn-action" onClick={() => setShowSellModal(true)}>
-            + Sell
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            className="btn-action"
+            style={{ fontSize: 12, padding: '6px 10px' }}
+            onClick={() => navigate('/produce/orders')}
+          >
+            📦 Orders
           </button>
-        ) : (
-          <div style={{ width: 50 }} />
-        )}
+          {user?.role === 'farmer' && (
+            <button className="btn-action" onClick={() => setShowSellModal(true)}>
+              + Sell
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Search Bar ────────────────────────────────────────── */}
@@ -217,41 +242,78 @@ export const MarketplaceScreen: React.FC = () => {
             <div className="empty-desc">Try searching for a different crop or category.</div>
           </div>
         ) : (
-          listings.map((item) => (
-            <div key={item.id} className="listing-card">
-              <div className="listing-card-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span className="category-badge">{item.category}</span>
-                  {item.pendingSync && <span className="pending-badge">Pending Sync ⏳</span>}
+          listings.map((item) => {
+            const isOwnListing = Boolean(
+              user && (
+                (item as any).farmerId === user.id ||
+                item.farmerName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase()
+              )
+            );
+            return (
+              <div key={item.id} className="listing-card">
+                <div className="listing-card-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className="category-badge">{item.category}</span>
+                    {item.pendingSync && <span className="pending-badge">Pending Sync ⏳</span>}
+                    {isOwnListing && (
+                      <span className="badge" style={{ backgroundColor: '#e2e8f0', color: '#475569', fontSize: 11 }}>
+                        Your Crop
+                      </span>
+                    )}
+                  </div>
+                  <span className="empty-desc">📍 {item.location}</span>
                 </div>
-                <span className="empty-desc">📍 {item.location}</span>
-              </div>
 
-              <div className="quick-title" style={{ marginTop: 4 }}>{item.cropName}</div>
-              <div className="empty-desc" style={{ marginBottom: 8 }}>by {item.farmerName}</div>
+                {item.photos && item.photos.length > 0 && (
+                  <img
+                    src={getImageUrl(item.photos[0])}
+                    alt={item.cropName}
+                    style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '10px', marginTop: 8 }}
+                  />
+                )}
 
-              <div className="price-row">
-                <span className="price-value">₱{item.pricePerUnit.toLocaleString()}</span>
-                <span className="price-unit"> / {item.unit}</span>
-              </div>
-              <div className="empty-desc" style={{ marginBottom: 12 }}>
-                Available: {item.quantity} {item.unit}
-              </div>
+                <div className="quick-title" style={{ marginTop: 4 }}>{item.cropName}</div>
+                <div className="empty-desc" style={{ marginBottom: 8 }}>by {item.farmerName}</div>
 
-              <button
-                className="btn btn-primary"
-                style={{ fontSize: 13, padding: 10 }}
-                onClick={() => {
-                  setSelectedItem(item);
-                  setPurchaseQty('1');
-                  setContactMsg('');
-                  setFeedback(null);
-                }}
-              >
-                View Details & Order
-              </button>
-            </div>
-          ))
+                <div className="price-row">
+                  <span className="price-value">₱{item.pricePerUnit.toLocaleString()}</span>
+                  <span className="price-unit"> / {item.unit}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b', marginBottom: 12 }}>
+                  <span>Available: <strong>{item.quantity} {item.unit}</strong></span>
+                  <span>Batch Val: <strong>₱{(item.quantity * item.pricePerUnit).toLocaleString()}</strong></span>
+                </div>
+
+                {isOwnListing ? (
+                  <div style={{
+                    padding: '8px 12px',
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: '#64748b',
+                    textAlign: 'center',
+                  }}>
+                    🌱 Your Listing
+                  </div>
+                ) : (
+                  <button
+                    className="btn btn-primary"
+                    style={{ fontSize: 13, padding: 10 }}
+                    onClick={() => {
+                      setSelectedItem(item);
+                      setPurchaseQty('1');
+                      setContactMsg('');
+                      setFeedback(null);
+                    }}
+                  >
+                    View Details & Order
+                  </button>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
 
@@ -338,6 +400,56 @@ export const MarketplaceScreen: React.FC = () => {
               </div>
 
               <div className="field">
+                <label className="label">Produce Photo (optional)</label>
+                <input
+                  ref={sellFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setSellImageFile(file);
+                      setSellImagePreview(URL.createObjectURL(file));
+                    }
+                  }}
+                  style={{ display: 'none' }}
+                />
+
+                {!sellImagePreview ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ width: '100%', padding: '12px', borderStyle: 'dashed', borderColor: 'var(--color-primary, #15803d)', color: 'var(--color-primary, #15803d)' }}
+                    onClick={() => sellFileInputRef.current?.click()}
+                  >
+                    📷 Attach Crop Photo
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 8, borderRadius: 8, backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                    <img
+                      src={sellImagePreview}
+                      alt="Crop preview"
+                      style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover' }}
+                    />
+                    <span style={{ fontSize: 13, flex: 1, fontWeight: 600, color: '#166534' }}>
+                      {sellImageFile?.name || 'Photo selected'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSellImageFile(null);
+                        setSellImagePreview('');
+                        if (sellFileInputRef.current) sellFileInputRef.current.value = '';
+                      }}
+                      style={{ border: 'none', background: 'none', color: '#ef4444', fontWeight: 700, padding: '4px 8px', cursor: 'pointer' }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="field">
                 <label className="label">Description (optional)</label>
                 <textarea
                   className="input input-textarea"
@@ -377,7 +489,11 @@ export const MarketplaceScreen: React.FC = () => {
               </div>
             )}
 
-            {user?.role === 'buyer' ? (
+            {user && (selectedItem.farmerName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase() || (selectedItem as any).farmerId === user.id) ? (
+              <div className="rbac-box" style={{ backgroundColor: '#fff1f2', color: '#9f1239' }}>
+                You cannot order your own produce listing.
+              </div>
+            ) : user?.role === 'buyer' || user?.role === 'farmer' || user?.role === 'super_admin' ? (
               <form onSubmit={handleBuy}>
                 <div className="field">
                   <label className="label">Quantity Needed ({selectedItem.unit})</label>
@@ -394,7 +510,7 @@ export const MarketplaceScreen: React.FC = () => {
                   <label className="label">Delivery Note / Instructions</label>
                   <textarea
                     className="input input-textarea"
-                    placeholder="Preferred pickup address..."
+                    placeholder="Preferred pickup address or delivery notes..."
                     value={contactMsg}
                     onChange={(e) => setContactMsg(e.target.value)}
                     rows={2}
@@ -414,7 +530,7 @@ export const MarketplaceScreen: React.FC = () => {
               </form>
             ) : (
               <div className="rbac-box">
-                Only registered <strong>Buyers</strong> can initiate produce purchase requests. Log in with a buyer account to buy directly.
+                Only registered <strong>Buyers</strong> and <strong>Farmers</strong> can place crop order requests.
               </div>
             )}
           </div>

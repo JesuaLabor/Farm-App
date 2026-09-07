@@ -1,222 +1,1118 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { produceApi } from '../api/produce';
 
-const sampleOrders = [
+export interface OrderItem {
+  id: string;
+  isBackend?: boolean;
+  buyerName: string;
+  buyerLocation: string;
+  farmerName?: string;
+  product: string;
+  quantityNum: number;
+  quantity: string;
+  unitPrice: number;
+  total: number;
+  status: 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled';
+  date: string;
+  contactMessage?: string;
+}
+
+export interface ParsedContactInfo {
+  fulfillment: string;
+  phone: string;
+  payment: string;
+  notes: string;
+}
+
+export function parseContactMessage(msg?: string): ParsedContactInfo {
+  if (!msg) {
+    return { fulfillment: 'Farm Delivery / Pickup', phone: '', payment: 'Cash on Delivery (COD)', notes: '' };
+  }
+
+  const parts = msg.split('•').map((p) => p.trim());
+  let fulfillment = '';
+  let phone = '';
+  let payment = '';
+  let notes = '';
+
+  for (const part of parts) {
+    if (part.toLowerCase().startsWith('fulfillment:')) {
+      fulfillment = part.replace(/fulfillment:\s*/i, '').trim();
+    } else if (part.toLowerCase().startsWith('phone:')) {
+      phone = part.replace(/phone:\s*/i, '').trim();
+    } else if (part.toLowerCase().startsWith('payment:')) {
+      payment = part.replace(/payment:\s*/i, '').trim();
+    } else if (part.toLowerCase().startsWith('notes:')) {
+      notes = part.replace(/notes:\s*/i, '').trim();
+    }
+  }
+
+  if (!fulfillment && !phone && !payment) {
+    fulfillment = msg;
+  }
+
+  return {
+    fulfillment: fulfillment || 'Farm-Gate Pickup',
+    phone: phone || '',
+    payment: payment || 'Cash on Delivery (COD)',
+    notes: notes || '',
+  };
+}
+
+export function getCropIcon(cropName: string = ''): string {
+  const c = cropName.toLowerCase();
+  if (c.includes('corn') || c.includes('mais')) return '🌽';
+  if (c.includes('rice') || c.includes('palay') || c.includes('bugas') || c.includes('dinorado')) return '🌾';
+  if (c.includes('tomato') || c.includes('kamatis')) return '🍅';
+  if (c.includes('mango') || c.includes('mangga')) return '🥭';
+  if (c.includes('banana') || c.includes('saging')) return '🍌';
+  if (c.includes('potato') || c.includes('patatas') || c.includes('cassava') || c.includes('kamote')) return '🥔';
+  if (c.includes('onion') || c.includes('sibuyas')) return '🧅';
+  if (c.includes('garlic') || c.includes('ahos') || c.includes('bawang')) return '🧄';
+  if (c.includes('cabbage') || c.includes('lettuce') || c.includes('pechay')) return '🥬';
+  if (c.includes('eggplant') || c.includes('talong')) return '🍆';
+  if (c.includes('chili') || c.includes('sili')) return '🌶️';
+  return '🌱';
+}
+
+export function formatOrderId(id: string): string {
+  if (id.length > 8) {
+    return `#ORD-${id.slice(-6).toUpperCase()}`;
+  }
+  return `#ORD-${id}`;
+}
+
+const sampleOrders: OrderItem[] = [
   {
     id: '1042',
     buyerName: 'Maria Santos',
-    buyerLocation: 'Cagayan de Oro Market',
+    buyerLocation: 'Fulfillment: Delivery to CDO Public Market • Phone: +63 917 555 1234 • Payment: Cash on Delivery (COD)',
     product: 'Sweet Yellow Corn (Mais)',
+    quantityNum: 120,
     quantity: '120 kg',
+    unitPrice: 42,
     total: 5040,
     status: 'Pending',
-    date: '10 minutes ago',
+    date: '10 mins ago',
+    contactMessage: 'Fulfillment: Delivery to CDO Public Market • Phone: +63 917 555 1234 • Payment: Cash on Delivery (COD)',
   },
   {
     id: '1041',
     buyerName: 'Juanito Store Owner',
-    buyerLocation: 'Malaybalay, Bukidnon',
+    buyerLocation: 'Fulfillment: Farm-Gate Pickup • Phone: +63 920 888 7766 • Payment: Cash on Delivery (COD)',
     product: 'Fresh Red Tomatoes (Kamatis)',
+    quantityNum: 75,
     quantity: '75 kg',
+    unitPrice: 65,
     total: 4875,
     status: 'Confirmed',
     date: '1 hour ago',
+    contactMessage: 'Fulfillment: Farm-Gate Pickup • Phone: +63 920 888 7766 • Payment: Cash on Delivery (COD)',
   },
   {
     id: '1035',
     buyerName: 'CDO Supermarket',
-    buyerLocation: 'Cagayan de Oro City',
+    buyerLocation: 'Fulfillment: Delivery to Lapasan Highway, CDO • Phone: +63 908 111 2233 • Payment: GCash / Maya',
     product: 'Carabao Mangoes (Mangga)',
+    quantityNum: 50,
     quantity: '50 kg',
+    unitPrice: 95,
     total: 4750,
     status: 'Completed',
     date: '2 hours ago',
+    contactMessage: 'Fulfillment: Delivery to Lapasan Highway, CDO • Phone: +63 908 111 2233 • Payment: GCash / Maya',
   },
 ];
 
 export const ProduceTransactionsPage: React.FC = () => {
-  const navigate = useNavigate();
-  const [selectedTab, setSelectedTab] = useState('All Orders');
-  const [orders, setOrders] = useState(sampleOrders);
-  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [selectedTab, setSelectedTab] = useState<'All Orders' | 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled'>('All Orders');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [orders, setOrders] = useState<OrderItem[]>(sampleOrders);
+  const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const tabs = ['All Orders', 'Pending', 'Confirmed', 'Completed', 'Cancelled'];
+  const tabs: ('All Orders' | 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled')[] = [
+    'All Orders',
+    'Pending',
+    'Confirmed',
+    'Completed',
+    'Cancelled',
+  ];
 
+  useEffect(() => {
+    loadTransactions();
+  }, []);
+
+  const loadTransactions = async () => {
+    setLoading(true);
+    try {
+      const res = await produceApi.listTransactions();
+      if (res && res.length > 0) {
+        const mapped: OrderItem[] = res.map((t) => {
+          const capStatus = (t.status.charAt(0).toUpperCase() + t.status.slice(1).toLowerCase()) as any;
+          const d = new Date(t.createdAt);
+          const timeStr = !isNaN(d.getTime())
+            ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : 'Just now';
+          return {
+            id: t.id,
+            isBackend: true,
+            buyerName: t.buyerName || 'Buyer',
+            buyerLocation: t.contactMessage || 'Northern Mindanao',
+            farmerName: t.farmerName,
+            product: t.cropName || 'Produce',
+            quantityNum: t.quantity,
+            quantity: `${t.quantity} kg`,
+            unitPrice: t.unitPrice || (t.totalPrice / (t.quantity || 1)),
+            total: t.totalPrice,
+            status: capStatus,
+            date: timeStr,
+            contactMessage: t.contactMessage,
+          };
+        });
+        setOrders([...mapped, ...sampleOrders]);
+      }
+    } catch {
+      // Keep sample orders on fallback
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (orderId: string, newStatus: 'confirmed' | 'completed' | 'cancelled') => {
+    setIsUpdatingStatus(true);
+    try {
+      const target = orders.find((o) => o.id === orderId);
+      if (target?.isBackend) {
+        await produceApi.updateTransactionStatus(orderId, newStatus);
+      }
+      const capStatus = (newStatus.charAt(0).toUpperCase() + newStatus.slice(1).toLowerCase()) as any;
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: capStatus } : o))
+      );
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder((prev) => (prev ? { ...prev, status: capStatus } : null));
+      }
+    } catch (err) {
+      console.error('Failed to update status', err);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleCopyId = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  // KPI calculations
+  const totalOrdersCount = orders.length;
+  const pendingCount = orders.filter((o) => o.status === 'Pending').length;
+  const confirmedCount = orders.filter((o) => o.status === 'Confirmed').length;
+  const completedCount = orders.filter((o) => o.status === 'Completed').length;
+  const cancelledCount = orders.filter((o) => o.status === 'Cancelled').length;
+
+  const totalRevenue = orders
+    .filter((o) => o.status === 'Confirmed' || o.status === 'Completed')
+    .reduce((sum, o) => sum + o.total, 0);
+
+  // Filtering
   const filteredOrders = orders.filter((ord) => {
-    if (selectedTab === 'All Orders') return true;
-    return ord.status.toLowerCase() === selectedTab.toLowerCase();
+    const matchesTab = selectedTab === 'All Orders' || ord.status.toLowerCase() === selectedTab.toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      query === '' ||
+      ord.product.toLowerCase().includes(query) ||
+      ord.buyerName.toLowerCase().includes(query) ||
+      ord.id.toLowerCase().includes(query) ||
+      (ord.contactMessage && ord.contactMessage.toLowerCase().includes(query));
+    return matchesTab && matchesSearch;
   });
 
-  return (
-    <div className="app-container" style={{ paddingBottom: '40px' }}>
-      {/* ─── Back Button & Header ─── */}
-      <div style={{ marginBottom: '24px' }}>
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="btn btn-secondary"
-          style={{ marginBottom: '16px', fontSize: '17px' }}
-        >
-          ← Back to Dashboard
-        </button>
+  const getStatusBadgeStyle = (status: OrderItem['status']) => {
+    switch (status) {
+      case 'Pending':
+        return {
+          bg: '#FEF9C3',
+          border: '#FDE047',
+          color: '#854D0E',
+          dot: '#CA8A04',
+          label: '⏳ Pending Confirmation',
+        };
+      case 'Confirmed':
+        return {
+          bg: '#EFF6FF',
+          border: '#BFDBFE',
+          color: '#1E40AF',
+          dot: '#3B82F6',
+          label: '🚚 Confirmed / In Delivery',
+        };
+      case 'Completed':
+        return {
+          bg: '#F0FDF4',
+          border: '#BBF7D0',
+          color: '#166534',
+          dot: '#22C55E',
+          label: '✓ Completed & Paid',
+        };
+      case 'Cancelled':
+        return {
+          bg: '#FEF2F2',
+          border: '#FECACA',
+          color: '#991B1B',
+          dot: '#EF4444',
+          label: '✕ Cancelled',
+        };
+    }
+  };
 
-        <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27' }}>
-          My Crop Orders
-        </h1>
-        <p style={{ fontSize: '20px', color: '#525450', marginTop: '4px' }}>
-          View buyer requests and confirm orders for your harvest.
-        </p>
+  const getStatusBorderColor = (status: OrderItem['status']) => {
+    switch (status) {
+      case 'Pending':
+        return '#EAB308';
+      case 'Confirmed':
+        return '#3B82F6';
+      case 'Completed':
+        return '#16A34A';
+      case 'Cancelled':
+        return '#EF4444';
+    }
+  };
+
+  return (
+    <div className="app-container" style={{ paddingBottom: '60px' }}>
+      {/* ─── Page Header ─── */}
+      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+            <span style={{ fontSize: '32px' }}>📦</span>
+            <h1 style={{ fontSize: '32px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
+              Crop Orders & Fulfillment
+            </h1>
+          </div>
+          <p style={{ fontSize: '17px', color: '#525450', margin: 0 }}>
+            Manage incoming buyer orders, review delivery addresses, and update fulfillment progress.
+          </p>
+        </div>
+
+        {loading && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '20px', backgroundColor: '#E0F2FE', color: '#0369A1', fontWeight: 700, fontSize: '14px' }}>
+            <span style={{ animation: 'spin 1s linear infinite' }}>🔄</span> Syncing latest orders...
+          </span>
+        )}
       </div>
 
-      {/* ─── Order Tabs ─── */}
-      <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', marginBottom: '28px' }}>
-        {tabs.map((tab) => {
-          const isSelected = selectedTab === tab;
-          return (
+      {/* ─── Top KPI Metric Summary Cards ─── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '16px',
+          marginBottom: '28px',
+        }}
+      >
+        <div
+          style={{
+            background: '#FFFFFF',
+            borderRadius: '16px',
+            padding: '20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+          }}
+        >
+          <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
+            📋
+          </div>
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Orders</div>
+            <div style={{ fontSize: '26px', fontWeight: 800, color: '#0F172A' }}>{totalOrdersCount}</div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: pendingCount > 0 ? '#FEFCE8' : '#FFFFFF',
+            borderRadius: '16px',
+            padding: '20px',
+            border: `1.5px solid ${pendingCount > 0 ? '#FDE047' : '#E2E8F0'}`,
+            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+          }}
+        >
+          <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#FEF9C3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
+            ⏳
+          </div>
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: pendingCount > 0 ? '#A16207' : '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Pending Action
+            </div>
+            <div style={{ fontSize: '26px', fontWeight: 800, color: pendingCount > 0 ? '#A16207' : '#0F172A' }}>
+              {pendingCount}
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: '#FFFFFF',
+            borderRadius: '16px',
+            padding: '20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+          }}
+        >
+          <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
+            🚚
+          </div>
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Active Deliveries</div>
+            <div style={{ fontSize: '26px', fontWeight: 800, color: '#1E40AF' }}>{confirmedCount}</div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: '#FFFFFF',
+            borderRadius: '16px',
+            padding: '20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+          }}
+        >
+          <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
+            💰
+          </div>
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Fulfilled Volume</div>
+            <div style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27' }}>₱{totalRevenue.toLocaleString()}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Search & Status Filters Bar ─── */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '16px',
+          marginBottom: '24px',
+          backgroundColor: '#FFFFFF',
+          padding: '16px 20px',
+          borderRadius: '18px',
+          border: '1.5px solid #E2E8F0',
+        }}
+      >
+        {/* Filter Tabs with Counter Badges */}
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: '4px' }}>
+          {tabs.map((tab) => {
+            const isSelected = selectedTab === tab;
+            let count = totalOrdersCount;
+            if (tab === 'Pending') count = pendingCount;
+            if (tab === 'Confirmed') count = confirmedCount;
+            if (tab === 'Completed') count = completedCount;
+            if (tab === 'Cancelled') count = cancelledCount;
+
+            return (
+              <button
+                key={tab}
+                onClick={() => setSelectedTab(tab)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 18px',
+                  borderRadius: '12px',
+                  border: isSelected ? '1.5px solid #0E4A27' : '1.5px solid transparent',
+                  background: isSelected ? '#0E4A27' : '#F1F5F9',
+                  color: isSelected ? '#FFFFFF' : '#334155',
+                  fontWeight: 700,
+                  fontSize: '15px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <span>{tab}</span>
+                <span
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    background: isSelected ? 'rgba(255,255,255,0.25)' : '#CBD5E1',
+                    color: isSelected ? '#FFFFFF' : '#1E293B',
+                  }}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Search Input Box */}
+        <div style={{ position: 'relative', minWidth: '280px', flex: '1 1 280px', maxWidth: '400px' }}>
+          <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', fontSize: '16px' }}>
+            🔍
+          </span>
+          <input
+            type="text"
+            placeholder="Search crop, buyer, phone, or order ID..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 14px 10px 40px',
+              borderRadius: '12px',
+              border: '1.5px solid #CBD5E1',
+              backgroundColor: '#F8FAFC',
+              fontSize: '14px',
+              fontWeight: 600,
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+          {searchQuery && (
             <button
-              key={tab}
-              onClick={() => setSelectedTab(tab)}
+              onClick={() => setSearchQuery('')}
               style={{
-                padding: '12px 24px',
-                borderRadius: '30px',
-                border: `2.5px solid ${isSelected ? '#176B3A' : '#D8D6CF'}`,
-                background: isSelected ? '#176B3A' : '#FFFFFF',
-                color: isSelected ? '#FFFFFF' : '#1A1C1A',
-                fontWeight: 800,
-                fontSize: '18px',
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                color: '#94A3B8',
                 cursor: 'pointer',
-                whiteSpace: 'nowrap',
+                fontWeight: 700,
               }}
             >
-              {tab}
+              ✕
             </button>
-          );
-        })}
+          )}
+        </div>
       </div>
 
       {/* ─── Orders List ─── */}
       {filteredOrders.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {filteredOrders.map((ord) => (
-            <div
-              key={ord.id}
-              className="card"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '24px',
-                padding: '24px',
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '20px', fontWeight: 800, color: '#0E4A27' }}>
-                    Order #{ord.id}
-                  </span>
-                  <span
-                    className={
-                      ord.status === 'Pending'
-                        ? 'badge badge-warning'
-                        : ord.status === 'Confirmed'
-                        ? 'badge badge-info'
-                        : 'badge badge-verified'
-                    }
-                    style={{ fontSize: '15px' }}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          {filteredOrders.map((ord) => {
+            const badge = getStatusBadgeStyle(ord.status);
+            const parsed = parseContactMessage(ord.contactMessage);
+            const cropIcon = getCropIcon(ord.product);
+            const shortId = formatOrderId(ord.id);
+            const leftBorder = getStatusBorderColor(ord.status);
+
+            return (
+              <div
+                key={ord.id}
+                style={{
+                  background: '#FFFFFF',
+                  borderRadius: '18px',
+                  border: '1.5px solid #E2E8F0',
+                  borderLeft: `6px solid ${leftBorder}`,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                  padding: '24px',
+                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                }}
+              >
+                {/* Order Card Header */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                    paddingBottom: '16px',
+                    borderBottom: '1px solid #F1F5F9',
+                    marginBottom: '18px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    <div
+                      onClick={(e) => handleCopyId(ord.id, e)}
+                      title={`Click to copy full ID: ${ord.id}`}
+                      style={{
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        backgroundColor: '#F1F5F9',
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: 800,
+                        color: '#0E4A27',
+                        fontFamily: 'monospace',
+                        letterSpacing: '0.5px',
+                      }}
+                    >
+                      <span>{shortId}</span>
+                      <span style={{ fontSize: '12px', opacity: 0.7 }}>
+                        {copiedId === ord.id ? '✓ Copied!' : '📋'}
+                      </span>
+                    </div>
+
+                    <span style={{ fontSize: '14px', color: '#64748B', fontWeight: 600 }}>
+                      🕒 {ord.date}
+                    </span>
+                  </div>
+
+                  {/* Rich Status Badge */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '6px 14px',
+                      borderRadius: '20px',
+                      backgroundColor: badge.bg,
+                      border: `1px solid ${badge.border}`,
+                      color: badge.color,
+                      fontSize: '14px',
+                      fontWeight: 700,
+                    }}
                   >
-                    {ord.status === 'Pending' ? '⏳ Pending Approval' : ord.status === 'Confirmed' ? '✓ Confirmed' : '✓ Completed'}
-                  </span>
-                  <span style={{ fontSize: '15px', color: '#525450' }}>• {ord.date}</span>
+                    <span
+                      style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: badge.dot,
+                        display: 'inline-block',
+                      }}
+                    />
+                    <span>{badge.label}</span>
+                  </div>
                 </div>
 
-                <div style={{ fontSize: '19px', color: '#1A1C1A', fontWeight: 800 }}>
-                  Buyer: <strong>{ord.buyerName}</strong> ({ord.buyerLocation})
+                {/* Order Card Main Content Grid */}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(260px, 1.2fr) minmax(280px, 1.8fr)',
+                    gap: '24px',
+                    alignItems: 'start',
+                  }}
+                >
+                  {/* Left Column: Crop & Quantity */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                    <div
+                      style={{
+                        width: '60px',
+                        height: '60px',
+                        borderRadius: '16px',
+                        backgroundColor: '#EAF6EE',
+                        border: '1.5px solid #C8E6D2',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '30px',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {cropIcon}
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
+                        Produce Item
+                      </div>
+                      <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', margin: '2px 0 6px 0' }}>
+                        {ord.product}
+                      </h3>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, backgroundColor: '#ECFDF5', color: '#065F46', padding: '3px 10px', borderRadius: '8px' }}>
+                          📦 Quantity: {ord.quantity}
+                        </span>
+                        {ord.unitPrice > 0 && (
+                          <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>
+                            • ₱{ord.unitPrice.toLocaleString()}/kg
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Buyer & Structured Logistics Information */}
+                  <div style={{ backgroundColor: '#F8FAFC', padding: '16px', borderRadius: '14px', border: '1px solid #E2E8F0' }}>
+                    {/* Buyer Identity */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#0E4A27', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800 }}>
+                        {ord.buyerName.charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
+                        {ord.buyerName}
+                      </div>
+                    </div>
+
+                    {/* Logistics Chips */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13.5px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#334155' }}>
+                        <span>📍</span>
+                        <span style={{ fontWeight: 600 }}>{parsed.fulfillment}</span>
+                      </div>
+
+                      {parsed.phone && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>📞</span>
+                          <a
+                            href={`tel:${parsed.phone.replace(/[^0-9+]/g, '')}`}
+                            style={{ color: '#0369A1', fontWeight: 700, textDecoration: 'none' }}
+                          >
+                            {parsed.phone}
+                          </a>
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569' }}>
+                        <span>💳</span>
+                        <span style={{ fontWeight: 600, color: '#0F172A' }}>{parsed.payment}</span>
+                      </div>
+
+                      {parsed.notes && (
+                        <div style={{ marginTop: '4px', padding: '6px 10px', borderRadius: '8px', backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', fontStyle: 'italic', color: '#64748B', fontSize: '13px' }}>
+                          "{parsed.notes}"
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                <div style={{ fontSize: '18px', color: '#525450', marginTop: '4px', fontWeight: 600 }}>
-                  Product: <strong>{ord.product}</strong> • Quantity: <strong>{ord.quantity}</strong>
+                {/* Order Card Footer */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '16px',
+                    marginTop: '20px',
+                    paddingTop: '16px',
+                    borderTop: '1px solid #F1F5F9',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#64748B' }}>Total Order Value</div>
+                    <div style={{ fontSize: '28px', fontWeight: 800, color: '#0E4A27' }}>
+                      ₱{ord.total.toLocaleString()}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    {ord.status === 'Pending' && (
+                      <button
+                        type="button"
+                        disabled={isUpdatingStatus}
+                        onClick={() => handleUpdateStatus(ord.id, 'confirmed')}
+                        style={{
+                          padding: '10px 20px',
+                          borderRadius: '10px',
+                          backgroundColor: '#16A34A',
+                          color: '#FFFFFF',
+                          fontWeight: 700,
+                          fontSize: '15px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          boxShadow: '0 2px 4px rgba(22,163,74,0.2)',
+                        }}
+                      >
+                        <span>✓</span>
+                        <span>Confirm Order</span>
+                      </button>
+                    )}
+
+                    {ord.status === 'Confirmed' && (
+                      <button
+                        type="button"
+                        disabled={isUpdatingStatus}
+                        onClick={() => handleUpdateStatus(ord.id, 'completed')}
+                        style={{
+                          padding: '10px 20px',
+                          borderRadius: '10px',
+                          backgroundColor: '#2563EB',
+                          color: '#FFFFFF',
+                          fontWeight: 700,
+                          fontSize: '15px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          boxShadow: '0 2px 4px rgba(37,99,235,0.2)',
+                        }}
+                      >
+                        <span>✓</span>
+                        <span>Mark as Completed</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => setSelectedOrder(ord)}
+                      style={{
+                        padding: '10px 18px',
+                        borderRadius: '10px',
+                        border: '1.5px solid #CBD5E1',
+                        backgroundColor: '#FFFFFF',
+                        color: '#0F172A',
+                        fontWeight: 700,
+                        fontSize: '15px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      View Order Details →
+                    </button>
+                  </div>
                 </div>
               </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Empty State */
+        <div
+          style={{
+            padding: '60px 24px',
+            backgroundColor: '#FFFFFF',
+            borderRadius: '20px',
+            border: '2px dashed #CBD5E1',
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ fontSize: '56px', marginBottom: '16px' }}>🌾📦</div>
+          <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A', marginBottom: '8px' }}>
+            No orders found in "{selectedTab}"
+          </h2>
+          <p style={{ fontSize: '16px', color: '#64748B', maxWidth: '480px', margin: '0 auto 20px auto' }}>
+            {searchQuery
+              ? `No match found for "${searchQuery}". Try clearing your search query.`
+              : 'When buyers request to purchase your harvest on AgriConnect, their order slips will appear here.'}
+          </p>
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '10px',
+                backgroundColor: '#0E4A27',
+                color: '#FFFFFF',
+                fontWeight: 700,
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              Clear Search Query
+            </button>
+          )}
+        </div>
+      )}
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '15px', color: '#525450', fontWeight: 700 }}>Total Amount:</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#0E4A27' }}>
-                    ₱{ord.total.toLocaleString()}
+      {/* ─── High-Fidelity Order Details Modal ─── */}
+      {selectedOrder && (() => {
+        const parsedModal = parseContactMessage(selectedOrder.contactMessage);
+        const modalBadge = getStatusBadgeStyle(selectedOrder.status);
+        const modalCropIcon = getCropIcon(selectedOrder.product);
+
+        return (
+          <div className="modal-backdrop" onClick={() => setSelectedOrder(null)}>
+            <div
+              className="modal-content"
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: '640px', padding: '32px', borderRadius: '24px' }}
+            >
+              {/* Modal Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                    <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
+                      Order Summary
+                    </h2>
+                    <span style={{ fontSize: '13px', fontWeight: 800, padding: '4px 10px', borderRadius: '8px', backgroundColor: '#F1F5F9', color: '#334155', fontFamily: 'monospace' }}>
+                      {formatOrderId(selectedOrder.id)}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '14px', color: '#64748B' }}>
+                    Placed on {selectedOrder.date}
                   </div>
                 </div>
 
                 <button
-                  onClick={() => setSelectedOrder(ord)}
-                  className="btn btn-primary btn-large"
+                  onClick={() => setSelectedOrder(null)}
+                  style={{
+                    background: '#F1F5F9',
+                    border: 'none',
+                    fontSize: '20px',
+                    cursor: 'pointer',
+                    color: '#64748B',
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
                 >
-                  View Order Details →
+                  ✕
                 </button>
               </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="card" style={{ padding: '60px', textAlign: 'center' }}>
-          <div style={{ fontSize: '64px', marginBottom: '12px' }}>📦</div>
-          <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27', marginBottom: '8px' }}>
-            No orders found in "{selectedTab}"
-          </h2>
-          <p style={{ fontSize: '18px', color: '#525450' }}>
-            When buyers order your crops, they will appear right here.
-          </p>
-        </div>
-      )}
 
-      {/* ─── View Order Modal ─── */}
-      {selectedOrder && (
-        <div className="modal-backdrop" onClick={() => setSelectedOrder(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27' }}>
-                Order #{selectedOrder.id} Details
-              </h2>
-              <button onClick={() => setSelectedOrder(null)} style={{ background: '#F8F7F3', border: 'none', fontSize: '24px', cursor: 'pointer', color: '#525450', width: '42px', height: '42px', borderRadius: '50%' }}>✕</button>
-            </div>
+              {/* Lifecycle Progress Stepper */}
+              <div style={{ backgroundColor: '#F8FAFC', padding: '16px 20px', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}>
+                  {/* Step 1: Placed */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#16A34A', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 800 }}>
+                      ✓
+                    </div>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A', marginTop: '6px' }}>Placed</span>
+                  </div>
 
-            <div style={{ padding: '20px', borderRadius: '16px', background: '#F8F7F3', border: '2px solid #E4E2DC', marginBottom: '24px' }}>
-              <div style={{ fontSize: '16px', color: '#525450' }}>Buyer Name:</div>
-              <div style={{ fontSize: '22px', fontWeight: 800, color: '#1A1C1A', marginBottom: '10px' }}>{selectedOrder.buyerName}</div>
-              <div style={{ fontSize: '16px', color: '#525450' }}>Delivery Location:</div>
-              <div style={{ fontSize: '18px', fontWeight: 800, color: '#1A1C1A' }}>{selectedOrder.buyerLocation}</div>
-            </div>
+                  {/* Connecting Line 1 */}
+                  <div style={{ flex: 1, height: '3px', backgroundColor: selectedOrder.status !== 'Pending' && selectedOrder.status !== 'Cancelled' ? '#16A34A' : '#CBD5E1', margin: '0 8px 18px 8px' }} />
 
-            <div style={{ padding: '20px', borderRadius: '16px', background: '#EAF6EE', border: '2px solid #176B3A', marginBottom: '28px' }}>
-              <div style={{ fontSize: '18px', fontWeight: 800, color: '#176B3A' }}>
-                Item Ordered: {selectedOrder.product} ({selectedOrder.quantity})
+                  {/* Step 2: Confirmed */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        backgroundColor: selectedOrder.status === 'Confirmed' || selectedOrder.status === 'Completed' ? '#2563EB' : '#E2E8F0',
+                        color: selectedOrder.status === 'Confirmed' || selectedOrder.status === 'Completed' ? '#FFF' : '#64748B',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '14px',
+                        fontWeight: 800,
+                      }}
+                    >
+                      {selectedOrder.status === 'Completed' ? '✓' : '2'}
+                    </div>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: selectedOrder.status === 'Confirmed' || selectedOrder.status === 'Completed' ? '#1E40AF' : '#64748B', marginTop: '6px' }}>
+                      Confirmed
+                    </span>
+                  </div>
+
+                  {/* Connecting Line 2 */}
+                  <div style={{ flex: 1, height: '3px', backgroundColor: selectedOrder.status === 'Completed' ? '#16A34A' : '#CBD5E1', margin: '0 8px 18px 8px' }} />
+
+                  {/* Step 3: Completed */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        backgroundColor: selectedOrder.status === 'Completed' ? '#16A34A' : '#E2E8F0',
+                        color: selectedOrder.status === 'Completed' ? '#FFF' : '#64748B',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '14px',
+                        fontWeight: 800,
+                      }}
+                    >
+                      {selectedOrder.status === 'Completed' ? '✓' : '3'}
+                    </div>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: selectedOrder.status === 'Completed' ? '#166534' : '#64748B', marginTop: '6px' }}>
+                      Fulfilled
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: '28px', fontWeight: 800, color: '#0E4A27', marginTop: '6px' }}>
-                Total Payment: ₱{selectedOrder.total.toLocaleString()} (Cash on Delivery)
-              </div>
-            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <button
-                onClick={() => alert(`Calling buyer ${selectedOrder.buyerName} at 0917-987-6543...`)}
-                className="btn btn-secondary btn-large"
-              >
-                📞 Call Buyer
-              </button>
-              <button
-                onClick={() => {
-                  setOrders((prev) =>
-                    prev.map((o) => (o.id === selectedOrder.id ? { ...o, status: 'Confirmed' } : o))
-                  );
-                  setSelectedOrder(null);
-                }}
-                className="btn btn-primary btn-large"
-              >
-                ✓ Confirm Order
-              </button>
+              {/* Order Items & Calculation */}
+              <div style={{ border: '1.5px solid #E2E8F0', borderRadius: '16px', padding: '18px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '28px' }}>{modalCropIcon}</span>
+                    <div>
+                      <div style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>{selectedOrder.product}</div>
+                      <div style={{ fontSize: '13px', color: '#64748B' }}>Quantity: <strong>{selectedOrder.quantity}</strong></div>
+                    </div>
+                  </div>
+
+                  <span style={{ padding: '4px 12px', borderRadius: '14px', backgroundColor: modalBadge.bg, color: modalBadge.color, fontWeight: 700, fontSize: '13px' }}>
+                    {modalBadge.label}
+                  </span>
+                </div>
+
+                <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '15px', color: '#64748B', fontWeight: 600 }}>Total Harvest Amount:</span>
+                  <span style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27' }}>
+                    ₱{selectedOrder.total.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Customer & Delivery Card */}
+              <div style={{ backgroundColor: '#F8FAFC', borderRadius: '16px', border: '1.5px solid #E2E8F0', padding: '18px', marginBottom: '24px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '10px' }}>
+                  Customer & Delivery Details
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '16px' }}>👤</span>
+                    <span style={{ color: '#0F172A', fontWeight: 700 }}>{selectedOrder.buyerName}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <span style={{ fontSize: '16px' }}>📍</span>
+                    <span style={{ color: '#334155', fontWeight: 600 }}>{parsedModal.fulfillment}</span>
+                  </div>
+
+                  {parsedModal.phone && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '16px' }}>📞</span>
+                      <a href={`tel:${parsedModal.phone.replace(/[^0-9+]/g, '')}`} style={{ color: '#0284C7', fontWeight: 700, textDecoration: 'none' }}>
+                        {parsedModal.phone}
+                      </a>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '16px' }}>💵</span>
+                    <span style={{ color: '#0F172A', fontWeight: 600 }}>{parsedModal.payment}</span>
+                  </div>
+
+                  {parsedModal.notes && (
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      <span style={{ fontSize: '16px' }}>📝</span>
+                      <span style={{ color: '#475569', fontStyle: 'italic' }}>"{parsedModal.notes}"</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Modal Action Buttons */}
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                {parsedModal.phone && (
+                  <a
+                    href={`tel:${parsedModal.phone.replace(/[^0-9+]/g, '')}`}
+                    style={{
+                      flex: 1,
+                      minWidth: '140px',
+                      padding: '12px',
+                      borderRadius: '12px',
+                      border: '1.5px solid #CBD5E1',
+                      backgroundColor: '#FFFFFF',
+                      color: '#0F172A',
+                      fontWeight: 700,
+                      fontSize: '15px',
+                      textAlign: 'center',
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <span>📞</span>
+                    <span>Call Buyer</span>
+                  </a>
+                )}
+
+                {selectedOrder.status === 'Pending' && (
+                  <button
+                    type="button"
+                    disabled={isUpdatingStatus}
+                    onClick={async () => {
+                      await handleUpdateStatus(selectedOrder.id, 'confirmed');
+                      setSelectedOrder(null);
+                    }}
+                    style={{
+                      flex: 2,
+                      minWidth: '180px',
+                      padding: '12px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      backgroundColor: '#16A34A',
+                      color: '#FFFFFF',
+                      fontWeight: 700,
+                      fontSize: '15px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {isUpdatingStatus ? 'Updating...' : '✓ Confirm Order'}
+                  </button>
+                )}
+
+                {selectedOrder.status === 'Confirmed' && (
+                  <button
+                    type="button"
+                    disabled={isUpdatingStatus}
+                    onClick={async () => {
+                      await handleUpdateStatus(selectedOrder.id, 'completed');
+                      setSelectedOrder(null);
+                    }}
+                    style={{
+                      flex: 2,
+                      minWidth: '180px',
+                      padding: '12px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      backgroundColor: '#2563EB',
+                      color: '#FFFFFF',
+                      fontWeight: 700,
+                      fontSize: '15px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {isUpdatingStatus ? 'Updating...' : '✓ Mark Completed'}
+                  </button>
+                )}
+
+                {selectedOrder.status !== 'Cancelled' && selectedOrder.status !== 'Completed' && (
+                  <button
+                    type="button"
+                    disabled={isUpdatingStatus}
+                    onClick={async () => {
+                      if (window.confirm('Are you sure you want to cancel this order?')) {
+                        await handleUpdateStatus(selectedOrder.id, 'cancelled');
+                        setSelectedOrder(null);
+                      }
+                    }}
+                    style={{
+                      padding: '12px 18px',
+                      borderRadius: '12px',
+                      border: '1.5px solid #FECACA',
+                      backgroundColor: '#FEF2F2',
+                      color: '#DC2626',
+                      fontWeight: 700,
+                      fontSize: '15px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

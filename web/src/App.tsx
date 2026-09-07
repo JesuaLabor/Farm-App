@@ -7,6 +7,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { SettingsPage } from './pages/SettingsPage';
 import { ProduceMarketplacePage } from './pages/ProduceMarketplacePage';
 import { ManageProduceListingsPage } from './pages/ManageProduceListingsPage';
 import { ProduceTransactionsPage } from './pages/ProduceTransactionsPage';
@@ -48,6 +49,16 @@ export const App: React.FC = () => {
               <ProtectedRoute>
                 <AppLayout>
                   <ProfilePage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <SettingsPage />
                 </AppLayout>
               </ProtectedRoute>
             }

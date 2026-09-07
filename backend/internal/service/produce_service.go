@@ -186,6 +186,10 @@ func (s *ProduceService) InitiateTransaction(ctx context.Context, buyerID string
 		return nil, errors.New("listing is no longer available")
 	}
 
+	if listing.FarmerID.Hex() == buyerID {
+		return nil, errors.New("you cannot purchase your own produce listing")
+	}
+
 	if req.Quantity <= 0 || req.Quantity > listing.Quantity {
 		return nil, fmt.Errorf("invalid quantity: requested %.2f, available %.2f", req.Quantity, listing.Quantity)
 	}
@@ -210,6 +214,16 @@ func (s *ProduceService) InitiateTransaction(ctx context.Context, buyerID string
 		return nil, err
 	}
 
+	// Immediately reserve listing quantity
+	newQty := listing.Quantity - req.Quantity
+	listingUpdate := bson.M{"quantity": newQty}
+	if newQty <= 0 {
+		listingUpdate["status"] = models.ListingSold
+	}
+	if err := s.produceRepo.UpdateListing(ctx, listing.ID, listingUpdate); err != nil {
+		return nil, fmt.Errorf("failed to reserve harvest quantity: %w", err)
+	}
+
 	// Notify the farmer about the buyer inquiry
 	if s.notifRepo != nil {
 		_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
@@ -217,7 +231,7 @@ func (s *ProduceService) InitiateTransaction(ctx context.Context, buyerID string
 			Title:   "🌾 New Produce Purchase Inquiry",
 			Message: fmt.Sprintf("%s sent an inquiry for %.2f %s of %s", tx.BuyerName, tx.Quantity, listing.Unit, listing.CropName),
 			Type:    models.NotifTypeProduceInquiry,
-			Link:    "/produce/transactions",
+			Link:    "/produce/orders",
 		})
 	}
 
@@ -229,8 +243,8 @@ func (s *ProduceService) ListTransactions(ctx context.Context, userID string, ro
 	return s.produceRepo.ListTransactions(ctx, userID, role)
 }
 
-// UpdateTransactionStatus updates order status (Farmer/Buyer).
-func (s *ProduceService) UpdateTransactionStatus(ctx context.Context, userID string, txID string, status models.TransactionStatus) (*models.ProduceTransaction, error) {
+// UpdateTransactionStatus updates order status (Farmer/Buyer/Admin) with role-based checks and stock restoration.
+func (s *ProduceService) UpdateTransactionStatus(ctx context.Context, userID string, role string, txID string, status models.TransactionStatus) (*models.ProduceTransaction, error) {
 	tOID, err := bson.ObjectIDFromHex(txID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid transaction ID: %w", err)
@@ -241,18 +255,80 @@ func (s *ProduceService) UpdateTransactionStatus(ctx context.Context, userID str
 		return nil, err
 	}
 
-	// Verify user is either buyer or farmer
-	if tx.BuyerID.Hex() != userID && tx.FarmerID.Hex() != userID {
+	isBuyer := tx.BuyerID.Hex() == userID
+	isFarmer := tx.FarmerID.Hex() == userID
+	isAdmin := role == string(models.RoleSuperAdmin) || role == string(models.RoleLGUStaff)
+
+	// Verify user is either buyer, farmer, or admin
+	if !isBuyer && !isFarmer && !isAdmin {
 		return nil, errors.New("unauthorized to update this transaction")
+	}
+
+	// Enforce role-based status transition rules
+	if !isAdmin {
+		if isBuyer && !isFarmer {
+			if status != models.TxCancelled {
+				return nil, errors.New("buyers can only cancel their pending orders")
+			}
+			if tx.Status != models.TxPending {
+				return nil, errors.New("cannot cancel an order that has already been confirmed or processed")
+			}
+		} else if isFarmer {
+			if tx.Status == models.TxCompleted || tx.Status == models.TxCancelled {
+				return nil, fmt.Errorf("cannot update a transaction that is already %s", tx.Status)
+			}
+			if status == models.TxCompleted && tx.Status != models.TxConfirmed {
+				return nil, errors.New("order must be confirmed before marking as completed")
+			}
+		}
 	}
 
 	if err := s.produceRepo.UpdateTransactionStatus(ctx, tOID, status); err != nil {
 		return nil, err
 	}
 
-	// Auto-update listing status if completed
+	// Stock restoration on cancellation
+	if status == models.TxCancelled && tx.Status != models.TxCancelled {
+		if listing, err := s.produceRepo.GetListingByID(ctx, tx.ListingID); err == nil {
+			restoredQty := listing.Quantity + tx.Quantity
+			update := bson.M{"quantity": restoredQty}
+			if listing.Status == models.ListingSold && restoredQty > 0 {
+				update["status"] = models.ListingAvailable
+			}
+			_ = s.produceRepo.UpdateListing(ctx, tx.ListingID, update)
+		}
+	}
+
+	// Auto-update listing status if completed and depleted
 	if status == models.TxCompleted {
-		_ = s.produceRepo.UpdateListing(ctx, tx.ListingID, bson.M{"status": models.ListingSold})
+		if listing, err := s.produceRepo.GetListingByID(ctx, tx.ListingID); err == nil && listing.Quantity <= 0 {
+			_ = s.produceRepo.UpdateListing(ctx, tx.ListingID, bson.M{"status": models.ListingSold})
+		}
+	}
+
+	// Send notification on status update
+	if s.notifRepo != nil {
+		var notifRecipient bson.ObjectID
+		var notifTitle string
+		var notifMsg string
+
+		if isFarmer || isAdmin {
+			notifRecipient = tx.BuyerID
+			notifTitle = "🌾 Crop Order Status Updated"
+			notifMsg = fmt.Sprintf("Your order for %s has been %s by %s", tx.CropName, status, tx.FarmerName)
+		} else {
+			notifRecipient = tx.FarmerID
+			notifTitle = "🌾 Crop Order Cancelled"
+			notifMsg = fmt.Sprintf("Buyer %s cancelled their order for %s", tx.BuyerName, tx.CropName)
+		}
+
+		_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
+			UserID:  notifRecipient,
+			Title:   notifTitle,
+			Message: notifMsg,
+			Type:    models.NotifTypeOrderStatus,
+			Link:    "/produce/orders",
+		})
 	}
 
 	return s.produceRepo.GetTransactionByID(ctx, tOID)

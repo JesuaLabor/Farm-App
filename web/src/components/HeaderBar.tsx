@@ -1,7 +1,87 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { NotificationBell } from './NotificationBell';
+
+interface BreadcrumbInfo {
+  parent: string;
+  parentPath?: string;
+  current: string;
+  icon?: string;
+}
+
+const getBreadcrumbs = (pathname: string): BreadcrumbInfo => {
+  if (pathname === '/dashboard') {
+    return { parent: 'Dashboard', parentPath: '/dashboard', current: 'Overview', icon: '⊞' };
+  }
+  if (pathname === '/produce/manage') {
+    return { parent: 'Marketplace', parentPath: '/produce', current: 'My Listings', icon: '📦' };
+  }
+  if (pathname === '/produce/orders') {
+    return { parent: 'Marketplace', parentPath: '/produce', current: 'Orders & Transactions', icon: '🧾' };
+  }
+  if (pathname.startsWith('/produce')) {
+    return { parent: 'Marketplace', parentPath: '/produce', current: 'Browse Produce', icon: '🌾' };
+  }
+  if (pathname === '/market-prices') {
+    return { parent: 'Market Prices', parentPath: '/market-prices', current: 'Northern Mindanao', icon: '📈' };
+  }
+  if (pathname === '/price-trends') {
+    return { parent: 'Market Prices', parentPath: '/market-prices', current: 'Price Trends', icon: '📊' };
+  }
+  if (pathname === '/market-prices/manage') {
+    return { parent: 'Market Prices', parentPath: '/market-prices', current: 'Manage Benchmarks', icon: '⚖️' };
+  }
+  if (pathname === '/programs/manage') {
+    return { parent: 'Government Programs', parentPath: '/programs', current: 'Program Management', icon: '📋' };
+  }
+  if (pathname.startsWith('/programs')) {
+    return { parent: 'Government Programs', parentPath: '/programs', current: 'Available Programs', icon: '🏛️' };
+  }
+  if (pathname === '/supply/cart') {
+    return { parent: 'Agri-Supply Store', parentPath: '/supply', current: 'Shopping Cart', icon: '🛒' };
+  }
+  if (pathname === '/supply/manage') {
+    return { parent: 'Agri-Supply Store', parentPath: '/supply', current: 'Manage Products', icon: '🏷️' };
+  }
+  if (pathname === '/supply/orders') {
+    return { parent: 'Agri-Supply Store', parentPath: '/supply', current: 'Supply Orders', icon: '📦' };
+  }
+  if (pathname.startsWith('/supply')) {
+    return { parent: 'Agri-Supply Store', parentPath: '/supply', current: 'Store Catalog', icon: '🏪' };
+  }
+  if (pathname === '/finances') {
+    return { parent: 'Farm Management', parentPath: '/finances', current: 'Financial Tracker', icon: '💰' };
+  }
+  if (pathname === '/guides') {
+    return { parent: 'Community Hub', parentPath: '/community', current: 'Learn & Field Guides', icon: '📚' };
+  }
+  if (pathname.startsWith('/community/posts')) {
+    return { parent: 'Community Hub', parentPath: '/community', current: 'Post Discussion', icon: '💬' };
+  }
+  if (pathname.startsWith('/community')) {
+    return { parent: 'Community Hub', parentPath: '/community', current: 'Farmer Forum', icon: '💬' };
+  }
+  if (pathname === '/lgu/dashboard') {
+    return { parent: 'LGU Monitoring', parentPath: '/lgu/dashboard', current: 'Regional Dashboard', icon: '🏛️' };
+  }
+  if (pathname === '/admin/approvals') {
+    return { parent: 'Platform Governance', parentPath: '/admin/approvals', current: 'Staff & Approvals', icon: '🛡️' };
+  }
+  if (pathname === '/lgu/approvals') {
+    return { parent: 'LGU Governance', parentPath: '/lgu/approvals', current: 'Account Approvals', icon: '🛡️' };
+  }
+  if (pathname === '/profile') {
+    return { parent: 'Account', parentPath: '/profile', current: 'Farmer Profile', icon: '👤' };
+  }
+  if (pathname === '/settings') {
+    return { parent: 'Account', parentPath: '/settings', current: 'Settings', icon: '⚙️' };
+  }
+
+  const segment = pathname.replace(/^\//, '').split('/')[0];
+  const capitalized = segment ? segment.charAt(0).toUpperCase() + segment.slice(1) : 'Dashboard';
+  return { parent: capitalized, parentPath: pathname, current: 'Overview', icon: '⊞' };
+};
 
 interface HeaderBarProps {
   collapsed: boolean;
@@ -21,28 +101,57 @@ const sampleAutocompleteSuggestions = [
   { term: 'rice', title: 'Rice Farmer Cash Assistance', path: '/programs', icon: '🏛' },
 ];
 
+const roleLabels: Record<string, string> = {
+  farmer: 'Farmer',
+  buyer: 'Buyer',
+  supplier: 'Supplier',
+  expert: 'Expert',
+  lgu_staff: 'LGU Staff',
+  super_admin: 'Super Admin',
+};
+
 export const HeaderBar: React.FC<HeaderBarProps> = ({
   collapsed: _collapsed,
   onToggleSidebar,
   onOpenMobileSidebar,
-  onOpenHelp,
-  onOpenOnboarding,
+  onOpenHelp: _onOpenHelp,
+  onOpenOnboarding: _onOpenOnboarding,
 }) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const breadcrumb = getBreadcrumbs(location.pathname);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
       }
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+        setShowProfileDropdown(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Close dropdown on Escape key
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowProfileDropdown(false);
+      }
+    };
+    if (showProfileDropdown) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [showProfileDropdown]);
 
   const filteredSuggestions = searchQuery.trim()
     ? sampleAutocompleteSuggestions.filter(
@@ -58,24 +167,39 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     navigate(path);
   };
 
+  const handleLogout = () => {
+    setShowProfileDropdown(false);
+    logout();
+    navigate('/login');
+  };
+
+  const handleProfileNavigation = (path: string) => {
+    setShowProfileDropdown(false);
+    navigate(path);
+  };
+
+  const userInitial = user?.firstName ? user.firstName.charAt(0).toUpperCase() : 'J';
+  const userFullName = user ? `${user.firstName} ${user.lastName}` : 'User';
+  const userEmail = user?.email || '';
+  const userRoleLabel = user?.role ? roleLabels[user.role] || user.role : '';
+
   return (
     <header
       style={{
         height: 'var(--topbar-height)',
         background: '#FFFFFF',
-        borderBottom: '2px solid #E4E2DC',
+        borderBottom: '1px solid #E4E2DC',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
         padding: '0 24px',
         position: 'sticky',
         top: 0,
         zIndex: 400,
-        gap: '16px',
+        gap: '20px',
       }}
     >
-      {/* Left: Sidebar Toggle Buttons */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      {/* Left: Sidebar Toggle Buttons & Contextual Breadcrumb */}
+      <div style={{ flex: '1', display: 'flex', alignItems: 'center', minWidth: 0, gap: '10px' }}>
         {/* Desktop Toggle Button */}
         <button
           onClick={onToggleSidebar}
@@ -83,22 +207,31 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             display: 'none',
             alignItems: 'center',
             justifyContent: 'center',
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-            border: '2px solid #E4E2DC',
+            width: '40px',
+            height: '40px',
+            borderRadius: '10px',
+            border: '1px solid #E4E2DC',
             background: '#FFFFFF',
-            color: '#222522',
+            color: '#374151',
             cursor: 'pointer',
+            flexShrink: 0,
+            transition: 'all 0.15s ease',
           }}
           className="desktop-toggle-btn"
           aria-label="Toggle Navigation Menu"
           title="Toggle Navigation Menu"
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#F4F3EE';
+            e.currentTarget.style.borderColor = '#D8D6CE';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#FFFFFF';
+            e.currentTarget.style.borderColor = '#E4E2DC';
+          }}
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="18" x2="21" y2="18" />
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect width="18" height="18" x="3" y="3" rx="2" />
+            <path d="M9 3v18" />
           </svg>
         </button>
 
@@ -109,45 +242,131 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '10px 16px',
-            borderRadius: '12px',
-            border: '2px solid #E4E2DC',
+            height: '40px',
+            padding: '0 14px',
+            borderRadius: '10px',
+            border: '1px solid #E4E2DC',
             background: '#EAF6EE',
             color: '#176B3A',
-            fontWeight: 800,
+            fontWeight: 700,
             cursor: 'pointer',
-            fontSize: '16px',
+            fontSize: '15px',
+            flexShrink: 0,
           }}
           className="mobile-menu-btn"
           aria-label="Open Navigation Menu"
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
             <line x1="3" y1="12" x2="21" y2="12" />
             <line x1="3" y1="6" x2="21" y2="6" />
             <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
           <span>Menu</span>
         </button>
+
+        {/* Vertical Divider */}
+        <div
+          className="header-breadcrumb-divider"
+          style={{
+            width: '1px',
+            height: '20px',
+            background: '#E4E2DC',
+            margin: '0 10px',
+            flexShrink: 0,
+          }}
+        />
+
+        {/* Contextual Breadcrumbs */}
+        <nav
+          aria-label="Breadcrumb"
+          className="header-breadcrumb"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            whiteSpace: 'nowrap',
+            fontSize: '14px',
+            lineHeight: 1,
+            minHeight: 'auto',
+            flexShrink: 0,
+          }}
+        >
+          <span style={{ fontSize: '15px', display: 'inline-flex', alignItems: 'center', opacity: 0.85, lineHeight: 1 }}>
+            {breadcrumb.icon || '⊞'}
+          </span>
+
+          <Link
+            to={breadcrumb.parentPath || '/dashboard'}
+            style={{
+              color: '#555852',
+              fontWeight: 500,
+              textDecoration: 'none',
+              padding: '2px 4px',
+              borderRadius: '4px',
+              transition: 'color 0.15s ease',
+              display: 'inline-flex',
+              alignItems: 'center',
+              lineHeight: 1,
+              minHeight: 'auto',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = '#176B3A')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = '#555852')}
+          >
+            {breadcrumb.parent}
+          </Link>
+
+          <span
+            style={{
+              color: '#A0A39D',
+              fontWeight: 600,
+              fontSize: '13px',
+              userSelect: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              lineHeight: 1,
+            }}
+            aria-hidden="true"
+          >
+            ›
+          </span>
+
+          <span
+            style={{
+              color: '#1A1C1A',
+              fontWeight: 700,
+              padding: '2px 4px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              lineHeight: 1,
+            }}
+            aria-current="page"
+          >
+            {breadcrumb.current}
+          </span>
+        </nav>
       </div>
 
-      {/* Center: Large Accessible Search Field */}
+      {/* Center: Centered Accessible Search Field */}
       <div
         ref={searchRef}
         style={{
-          flex: '1 1 500px',
-          maxWidth: '560px',
+          flex: '0 1 440px',
+          maxWidth: '440px',
+          width: '100%',
           position: 'relative',
         }}
       >
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <svg
-            width="24"
-            height="24"
+            width="16"
+            height="16"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#525450"
-            strokeWidth="2.5"
-            style={{ position: 'absolute', left: '18px', pointerEvents: 'none' }}
+            stroke="#6B7280"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ position: 'absolute', left: '14px', pointerEvents: 'none' }}
           >
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -160,20 +379,31 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
               setShowSuggestions(true);
             }}
             onFocus={() => setShowSuggestions(true)}
-            placeholder="Type crop name to search (e.g. Tomato, Corn)..."
-            aria-label="Type crop name to search"
+            placeholder="Search crops, prices, programs..."
+            aria-label="Search AgriConnect"
             style={{
               width: '100%',
-              height: '52px',
-              paddingLeft: '54px',
+              height: '40px',
+              paddingLeft: '40px',
               paddingRight: '16px',
-              borderRadius: '14px',
-              border: '2.5px solid #E4E2DC',
+              borderRadius: '10px',
+              border: '1px solid #D8D6CE',
               background: '#F8F7F3',
-              fontSize: '17px',
+              fontSize: '14px',
               color: '#1A1C1A',
-              fontWeight: 600,
+              fontWeight: 500,
               outline: 'none',
+              transition: 'background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease',
+            }}
+            onFocusCapture={(e) => {
+              e.currentTarget.style.background = '#FFFFFF';
+              e.currentTarget.style.borderColor = '#176B3A';
+              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(23, 107, 58, 0.12)';
+            }}
+            onBlurCapture={(e) => {
+              e.currentTarget.style.background = '#F8F7F3';
+              e.currentTarget.style.borderColor = '#D8D6CE';
+              e.currentTarget.style.boxShadow = 'none';
             }}
           />
         </div>
@@ -187,14 +417,14 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
               left: 0,
               right: 0,
               background: '#FFFFFF',
-              borderRadius: '16px',
-              border: '2px solid #E4E2DC',
+              borderRadius: '14px',
+              border: '1.5px solid #E4E2DC',
               boxShadow: '0 14px 36px rgba(23, 107, 58, 0.14)',
               overflow: 'hidden',
               zIndex: 600,
             }}
           >
-            <div style={{ padding: '12px 18px', fontSize: '13px', fontWeight: 800, color: '#525450', background: '#F8F7F3', borderBottom: '1.5px solid #E4E2DC' }}>
+            <div style={{ padding: '10px 16px', fontSize: '12px', fontWeight: 800, color: '#525450', background: '#F8F7F3', borderBottom: '1px solid #E4E2DC' }}>
               SEARCH SUGGESTIONS FOR "{searchQuery}"
             </div>
             {filteredSuggestions.length > 0 ? (
@@ -205,24 +435,24 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '14px',
-                    padding: '16px 20px',
+                    gap: '12px',
+                    padding: '12px 16px',
                     cursor: 'pointer',
-                    fontSize: '17px',
-                    fontWeight: 700,
+                    fontSize: '15px',
+                    fontWeight: 600,
                     color: '#1A1C1A',
                     borderBottom: '1px solid #F8F7F3',
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = '#EAF6EE')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = '#FFFFFF')}
                 >
-                  <span style={{ fontSize: '22px' }}>{item.icon}</span>
+                  <span style={{ fontSize: '18px' }}>{item.icon}</span>
                   <span style={{ flex: 1 }}>{item.title}</span>
-                  <span style={{ fontSize: '15px', color: '#176B3A', fontWeight: 800 }}>Open →</span>
+                  <span style={{ fontSize: '13px', color: '#176B3A', fontWeight: 700 }}>Open →</span>
                 </div>
               ))
             ) : (
-              <div style={{ padding: '18px', fontSize: '16px', color: '#525450', textAlign: 'center' }}>
+              <div style={{ padding: '16px', fontSize: '14px', color: '#525450', textAlign: 'center' }}>
                 No direct matches. Press Enter to search marketplace.
               </div>
             )}
@@ -230,151 +460,272 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
         )}
       </div>
 
-      {/* Right: Phone Support Hotline, Need Help, Notifications */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        {/* Direct Call Support Button */}
-        <button
-          onClick={onOpenHelp}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 16px',
-            borderRadius: '12px',
-            border: '2px solid #176B3A',
-            background: '#EAF6EE',
-            color: '#176B3A',
-            fontWeight: 800,
-            fontSize: '15px',
-            cursor: 'pointer',
-          }}
-          title="Call Support Hotline"
-        >
-          <span style={{ fontSize: '18px' }}>📞</span>
-          <span className="help-btn-text">Call Support (0917-123-4567)</span>
-        </button>
-
-        {/* Role-Specific Quick Action */}
-        {user?.role === 'farmer' && onOpenOnboarding && (
-          <button
-            onClick={onOpenOnboarding}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '10px 14px',
-              borderRadius: '12px',
-              border: '2px solid #E4E2DC',
-              background: '#FFFFFF',
-              color: '#0E4A27',
-              fontWeight: 800,
-              fontSize: '15px',
-              cursor: 'pointer',
-            }}
-            title="Setup Farm"
-          >
-            <span>✨</span>
-            <span className="onboarding-btn-text">Farm Setup</span>
-          </button>
-        )}
-        {user?.role === 'super_admin' && (
-          <button
-            onClick={() => navigate('/admin/approvals')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '10px 14px',
-              borderRadius: '12px',
-              border: '2px solid #0E4A27',
-              background: '#EAF6EE',
-              color: '#0E4A27',
-              fontWeight: 800,
-              fontSize: '15px',
-              cursor: 'pointer',
-            }}
-            title="Account Approvals"
-          >
-            <span>🛡️</span>
-            <span className="onboarding-btn-text">Staff Approvals</span>
-          </button>
-        )}
-        {user?.role === 'lgu_staff' && (
-          <button
-            onClick={() => navigate('/lgu/dashboard')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '10px 14px',
-              borderRadius: '12px',
-              border: '2px solid #0E4A27',
-              background: '#EAF6EE',
-              color: '#0E4A27',
-              fontWeight: 800,
-              fontSize: '15px',
-              cursor: 'pointer',
-            }}
-            title="LGU Regional Hub"
-          >
-            <span>🏛️</span>
-            <span className="onboarding-btn-text">LGU Hub</span>
-          </button>
-        )}
-        {user?.role === 'supplier' && (
-          <button
-            onClick={() => navigate('/supply/manage')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '10px 14px',
-              borderRadius: '12px',
-              border: '2px solid #0E4A27',
-              background: '#EAF6EE',
-              color: '#0E4A27',
-              fontWeight: 800,
-              fontSize: '15px',
-              cursor: 'pointer',
-            }}
-            title="Inventory Management"
-          >
-            <span>🚜</span>
-            <span className="onboarding-btn-text">My Products</span>
-          </button>
-        )}
-
+      {/* Right: Notifications & User Profile */}
+      <div style={{ flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
         {/* Notification Bell */}
         <NotificationBell />
 
-        {/* User Profile Trigger */}
+        {/* User Profile Dropdown */}
         <div
-          onClick={() => navigate('/profile')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            cursor: 'pointer',
-            padding: '4px 8px',
-            borderRadius: '12px',
-          }}
+          ref={profileDropdownRef}
+          style={{ position: 'relative' }}
         >
-          <div
+          {/* Avatar Trigger Button */}
+          <button
+            onClick={() => setShowProfileDropdown((prev) => !prev)}
             style={{
-              width: '46px',
-              height: '46px',
-              borderRadius: '50%',
-              background: '#176B3A',
-              color: '#FFFFFF',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontWeight: 800,
-              fontSize: '20px',
+              cursor: 'pointer',
+              padding: 0,
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              border: showProfileDropdown ? '2px solid #176B3A' : '2px solid transparent',
+              background: 'transparent',
+              transition: 'border-color 0.15s ease',
+              minHeight: 'auto',
             }}
+            aria-label="Open profile menu"
+            aria-expanded={showProfileDropdown}
+            aria-haspopup="true"
           >
-            {user?.firstName ? user.firstName.charAt(0).toUpperCase() : 'J'}
-          </div>
+            <div
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: showProfileDropdown ? '#0E4A27' : '#176B3A',
+                color: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 800,
+                fontSize: '16px',
+                transition: 'background 0.18s ease, box-shadow 0.18s ease',
+                boxShadow: showProfileDropdown ? '0 0 0 3px rgba(23, 107, 58, 0.3)' : '0 1px 3px rgba(0,0,0,0.1)',
+              }}
+            >
+              {userInitial}
+            </div>
+          </button>
+
+          {/* Profile Dropdown Menu */}
+          {showProfileDropdown && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 10px)',
+                right: 0,
+                width: '280px',
+                background: '#FFFFFF',
+                borderRadius: '16px',
+                border: '2px solid #E4E2DC',
+                boxShadow: '0 16px 48px rgba(14, 74, 39, 0.16), 0 4px 12px rgba(0, 0, 0, 0.06)',
+                overflow: 'hidden',
+                zIndex: 700,
+                animation: 'profileDropdownIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+              role="menu"
+              aria-label="Profile menu"
+            >
+              {/* User Info Header */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '14px',
+                  padding: '18px 20px',
+                  borderBottom: '1.5px solid #E4E2DC',
+                  background: '#FAFAF7',
+                }}
+              >
+                <div
+                  style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '50%',
+                    background: '#176B3A',
+                    color: '#FFFFFF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 800,
+                    fontSize: '18px',
+                    flexShrink: 0,
+                  }}
+                >
+                  {userInitial}
+                </div>
+                <div style={{ overflow: 'hidden', flex: 1 }}>
+                  <div
+                    style={{
+                      fontSize: '16px',
+                      fontWeight: 800,
+                      color: '#0E4A27',
+                      lineHeight: 1.3,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {userFullName}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      color: '#525450',
+                      lineHeight: 1.3,
+                      marginTop: '2px',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {userEmail}
+                  </div>
+                  {userRoleLabel && (
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        marginTop: '6px',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        color: '#176B3A',
+                        background: '#EAF6EE',
+                        padding: '2px 10px',
+                        borderRadius: '9999px',
+                        border: '1px solid rgba(23, 107, 58, 0.2)',
+                        letterSpacing: '0.3px',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {userRoleLabel}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Menu Items */}
+              <div style={{ padding: '6px 0' }}>
+                {/* Account */}
+                <button
+                  onClick={() => handleProfileNavigation('/profile')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    width: '100%',
+                    padding: '14px 20px',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    color: '#1A1C1A',
+                    transition: 'background 0.15s ease, color 0.15s ease',
+                    textAlign: 'left',
+                    minHeight: 'auto',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#EAF6EE';
+                    e.currentTarget.style.color = '#0E4A27';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = '#1A1C1A';
+                  }}
+                  role="menuitem"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M20 21a8 8 0 1 0-16 0" />
+                  </svg>
+                  <span>Account</span>
+                </button>
+
+                {/* Settings */}
+                <button
+                  onClick={() => handleProfileNavigation('/settings')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    width: '100%',
+                    padding: '14px 20px',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    color: '#1A1C1A',
+                    transition: 'background 0.15s ease, color 0.15s ease',
+                    textAlign: 'left',
+                    minHeight: 'auto',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#EAF6EE';
+                    e.currentTarget.style.color = '#0E4A27';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = '#1A1C1A';
+                  }}
+                  role="menuitem"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                  </svg>
+                  <span>Settings</span>
+                </button>
+              </div>
+
+              {/* Divider + Log Out */}
+              <div
+                style={{
+                  borderTop: '1.5px solid #E4E2DC',
+                  padding: '6px 0',
+                }}
+              >
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    width: '100%',
+                    padding: '14px 20px',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    color: '#BA3C3C',
+                    transition: 'background 0.15s ease',
+                    textAlign: 'left',
+                    minHeight: 'auto',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#FDF2F2';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                  role="menuitem"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  <span>Log out</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>

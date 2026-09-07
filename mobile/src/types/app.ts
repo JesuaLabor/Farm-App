@@ -43,6 +43,7 @@ export interface SupplyProduct {
   unit: string;
   stockQuantity: number;
   description?: string;
+  images?: string[];
   imageUrl?: string;
   createdAt: string;
 }

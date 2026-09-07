@@ -12,6 +12,7 @@ import { MarketplaceScreen } from './screens/MarketplaceScreen';
 import { CommunityScreen } from './screens/CommunityScreen';
 import { SupplyStoreScreen } from './screens/SupplyStoreScreen';
 import { FinancialTrackerScreen } from './screens/FinancialTrackerScreen';
+import { ProduceOrdersScreen } from './screens/ProduceOrdersScreen';
 
 const AppRoutes: React.FC = () => {
   const { user, loading } = useAuth();
@@ -43,6 +44,8 @@ const AppRoutes: React.FC = () => {
         <Routes>
           <Route path="/dashboard" element={<DashboardScreen />} />
           <Route path="/marketplace" element={<MarketplaceScreen />} />
+          <Route path="/produce/orders" element={<ProduceOrdersScreen />} />
+          <Route path="/produce/transactions" element={<ProduceOrdersScreen />} />
           <Route path="/community" element={<CommunityScreen />} />
           <Route path="/supply" element={<SupplyStoreScreen />} />
           <Route path="/profile" element={<ProfileScreen />} />

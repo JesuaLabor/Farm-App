@@ -57,6 +57,14 @@ export const api = {
     });
     return res.data;
   },
+  uploadImage: async (file: File | Blob, filename?: string): Promise<{ url: string; filename: string }> => {
+    const formData = new FormData();
+    formData.append('image', file, filename || (file instanceof File ? file.name : 'upload.jpg'));
+    const res = await apiClient.post<{ url: string; filename: string }>('/api/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
   listProduce: async (cropName?: string, category?: string) => {
     const params: string[] = [];
     if (cropName) params.push(`cropName=${encodeURIComponent(cropName)}`);
@@ -65,7 +73,7 @@ export const api = {
     const res = await apiClient.get(url);
     return res.data;
   },
-  createProduceListing: async (payload: { cropName: string; category: string; quantity: number; unit: string; pricePerUnit: number; location: string; description?: string }) => {
+  createProduceListing: async (payload: { cropName: string; category: string; quantity: number; unit: string; pricePerUnit: number; location: string; description?: string; photos?: string[] }) => {
     const res = await apiClient.post('/api/produce/listings', payload);
     return res.data;
   },
@@ -73,12 +81,20 @@ export const api = {
     const res = await apiClient.post('/api/produce/transactions', payload);
     return res.data;
   },
+  listProduceTransactions: async () => {
+    const res = await apiClient.get('/api/produce/transactions');
+    return res.data;
+  },
+  updateProduceTransactionStatus: async (txId: string, status: string) => {
+    const res = await apiClient.put(`/api/produce/transactions/${txId}/status`, { status });
+    return res.data;
+  },
   listSupply: async (category?: string) => {
     const url = category && category !== 'All' ? `/api/supply/products?category=${encodeURIComponent(category)}` : '/api/supply/products';
     const res = await apiClient.get(url);
     return res.data;
   },
-  createSupplyProduct: async (payload: { name: string; category: string; price: number; unit: string; stockQuantity: number; description?: string }) => {
+  createSupplyProduct: async (payload: { name: string; category: string; price: number; unit: string; stockQuantity: number; description?: string; images?: string[] }) => {
     const res = await apiClient.post('/api/supply/products', payload);
     return res.data;
   },
@@ -155,3 +171,12 @@ export const api = {
     return res.data;
   },
 };
+
+export const getImageUrl = (path?: string, fallback: string = ''): string => {
+  if (!path) return fallback;
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
+    return path;
+  }
+  return `${API_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+};
+

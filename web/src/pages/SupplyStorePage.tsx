@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supplyApi } from '../api/supply';
+import { api, getImageUrl } from '../api';
 import type { SupplyProduct } from '../types/supply';
 
 const categories: { key: string; label: string; icon: string }[] = [
@@ -44,11 +45,26 @@ export const SupplyStorePage: React.FC = () => {
   const [prodUnit, setProdUnit] = useState('50kg bag');
   const [prodStock, setProdStock] = useState<number>(500);
   const [prodDesc, setProdDesc] = useState('');
+  const [prodImageFile, setProdImageFile] = useState<File | null>(null);
+  const [prodImagePreview, setProdImagePreview] = useState<string>('');
+  const prodFileInputRef = useRef<HTMLInputElement>(null);
   const [submittingProd, setSubmittingProd] = useState(false);
 
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmittingProd(true);
+    let uploadedImageUrl = '';
+    if (prodImageFile) {
+      try {
+        const res = await api.uploadImage(prodImageFile);
+        uploadedImageUrl = res.url;
+      } catch (uploadErr: any) {
+        alert('Failed to upload image: ' + (uploadErr.response?.data?.error || uploadErr.message));
+        setSubmittingProd(false);
+        return;
+      }
+    }
+
     try {
       await supplyApi.createProduct({
         name: prodName,
@@ -57,9 +73,13 @@ export const SupplyStorePage: React.FC = () => {
         unit: prodUnit,
         stockQuantity: prodStock,
         description: prodDesc,
+        images: uploadedImageUrl ? [uploadedImageUrl] : [],
       });
       setShowAddModal(false);
       setProdName(''); setProdDesc('');
+      setProdImageFile(null);
+      setProdImagePreview('');
+      if (prodFileInputRef.current) prodFileInputRef.current.value = '';
       fetchProducts();
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to create supply product.');
@@ -131,16 +151,8 @@ export const SupplyStorePage: React.FC = () => {
 
   return (
     <div className="app-container" style={{ paddingBottom: '40px' }}>
-      {/* ─── Back Button & Header ─── */}
+      {/* ─── Page Header ─── */}
       <div style={{ marginBottom: '24px' }}>
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="btn btn-secondary"
-          style={{ marginBottom: '16px', fontSize: '17px' }}
-        >
-          ← Back to Dashboard
-        </button>
-
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27' }}>
@@ -157,13 +169,15 @@ export const SupplyStorePage: React.FC = () => {
                 + Add Supply Product
               </button>
             )}
-            <button
-              onClick={() => navigate('/supply/cart')}
-              className="btn btn-accent btn-large"
-              style={{ fontSize: '18px' }}
-            >
-              🛒 View Cart ({cartCount})
-            </button>
+            {user?.role !== 'supplier' && (
+              <button
+                onClick={() => navigate('/supply/cart')}
+                className="btn btn-accent btn-large"
+                style={{ fontSize: '18px' }}
+              >
+                🛒 View Cart ({cartCount})
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -262,15 +276,10 @@ export const SupplyStorePage: React.FC = () => {
             <div key={item.id} className="card card-interactive" style={{ padding: '0', overflow: 'hidden' }}>
               <div style={{ position: 'relative', height: '200px', background: '#EAF6EE' }}>
                 <img
-                  src={categoryImages[item.category] ?? 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=600&q=80'}
+                  src={getImageUrl(item.images?.[0], categoryImages[item.category] ?? 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=600&q=80')}
                   alt={item.name}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
-                <div style={{ position: 'absolute', top: '12px', right: '12px' }}>
-                  <span className="badge badge-verified" style={{ background: '#FFFFFF', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-                    ✓ Verified Supplier
-                  </span>
-                </div>
               </div>
 
               <div style={{ padding: '24px' }}>
@@ -294,16 +303,31 @@ export const SupplyStorePage: React.FC = () => {
                   {item.stockQuantity > 0 ? `✓ In Stock (${item.stockQuantity} ${item.unit}s available)` : '✕ Out of Stock'}
                 </div>
 
-                <button
-                  onClick={() => {
-                    setAddingProduct(item);
-                    setAddQty(1);
-                  }}
-                  disabled={item.stockQuantity <= 0}
-                  className="btn btn-primary btn-full btn-large"
-                >
-                  🛒 Add to Cart
-                </button>
+                {user?.role === 'supplier' ? (
+                  <div style={{
+                    padding: '12px',
+                    textAlign: 'center',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '10px',
+                    fontWeight: 700,
+                    color: '#64748b',
+                    fontSize: '15px',
+                    border: '1.5px solid #e2e8f0',
+                  }}>
+                    🏪 Catalog View (Supplier)
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setAddingProduct(item);
+                      setAddQty(1);
+                    }}
+                    disabled={item.stockQuantity <= 0}
+                    className="btn btn-primary btn-full btn-large"
+                  >
+                    🛒 Add to Cart
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -433,6 +457,65 @@ export const SupplyStorePage: React.FC = () => {
                   className="form-input"
                   style={{ fontSize: '18px' }}
                 />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Product Image (optional)</label>
+                <input
+                  ref={prodFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setProdImageFile(file);
+                      setProdImagePreview(URL.createObjectURL(file));
+                    }
+                  }}
+                  style={{ display: 'none' }}
+                />
+
+                {!prodImagePreview ? (
+                  <div
+                    onClick={() => prodFileInputRef.current?.click()}
+                    style={{
+                      border: '2px dashed #0E4A27',
+                      borderRadius: '14px',
+                      padding: '18px',
+                      textAlign: 'center',
+                      backgroundColor: '#F0F9F3',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ fontSize: '26px', marginBottom: '4px' }}>📦📸</div>
+                    <div style={{ fontWeight: 700, color: '#0E4A27', fontSize: '15px' }}>Click to select product image</div>
+                    <div style={{ fontSize: '13px', color: '#525450' }}>Supports JPG, PNG, WEBP (Max 10MB)</div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '12px', borderRadius: '14px', border: '1.5px solid #0E4A27', backgroundColor: '#F0F9F3' }}>
+                    <img
+                      src={prodImagePreview}
+                      alt="Product preview"
+                      style={{ width: '64px', height: '64px', borderRadius: '10px', objectFit: 'cover' }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: '15px', color: '#1A1C1A' }}>{prodImageFile?.name || 'Selected product image'}</div>
+                      <div style={{ fontSize: '13px', color: '#176B3A', fontWeight: 600 }}>Ready to upload</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProdImageFile(null);
+                        setProdImagePreview('');
+                        if (prodFileInputRef.current) prodFileInputRef.current.value = '';
+                      }}
+                      className="btn btn-secondary"
+                      style={{ padding: '6px 12px', fontSize: '13px', color: '#b91c1c', borderColor: '#fca5a5' }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="form-group" style={{ marginBottom: '24px' }}>

@@ -213,7 +213,6 @@ export const SuperAdminApprovalsPage: React.FC = () => {
             {users.map((u) => {
               const isApproved = u.status === 'approved';
               const isRejected = u.status === 'rejected';
-              const isPending = u.status === 'pending';
 
               const statusColor = isApproved ? '#1E7E45' : isRejected ? '#BA3C3C' : '#B87A00';
               const statusBg = isApproved ? '#EAF6EE' : isRejected ? '#FDF2F2' : '#FEF3D6';

@@ -98,6 +98,12 @@ type UpdateProfileRequest struct {
 	Address      *string `json:"address,omitempty"`
 }
 
+// ChangePasswordRequest is the JSON body for PUT /api/users/me/password.
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
 // ErrorResponse is a standard error payload.
 type ErrorResponse struct {
 	Error string `json:"error"`

@@ -118,16 +118,8 @@ export const FarmFinancialTrackerPage: React.FC = () => {
 
   return (
     <div className="app-container" style={{ paddingBottom: '50px' }}>
-      {/* ─── Back Button & Header ─── */}
+      {/* ─── Page Header ─── */}
       <div style={{ marginBottom: '24px' }}>
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="btn btn-secondary"
-          style={{ marginBottom: '16px', fontSize: '16px' }}
-        >
-          ← Back to Dashboard
-        </button>
-
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>

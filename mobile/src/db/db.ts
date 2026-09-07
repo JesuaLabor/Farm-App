@@ -28,6 +28,7 @@ export interface CachedProduceListing {
   pricePerUnit: number;
   location: string;
   description?: string;
+  photos?: string[];
   status?: string;
   createdAt: string;
   pendingSync?: boolean;

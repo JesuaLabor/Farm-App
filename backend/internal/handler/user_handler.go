@@ -85,3 +85,33 @@ func (h *UserHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, user)
 }
+
+// ChangePassword handles PUT /api/users/me/password.
+func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req models.ChangePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := h.userService.ChangePassword(r.Context(), userID, req); err != nil {
+		switch err.Error() {
+		case "current password is incorrect":
+			writeError(w, http.StatusUnauthorized, err.Error())
+		case "current password and new password are required",
+			"new password must be at least 8 characters":
+			writeError(w, http.StatusBadRequest, err.Error())
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to change password")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "password changed successfully"})
+}

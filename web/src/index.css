@@ -56,7 +56,7 @@
   /* Layout Dimensions */
   --sidebar-width: 280px;
   --sidebar-collapsed-width: 80px;
-  --topbar-height: 76px;
+  --topbar-height: 68px;
   --bottomnav-height: 72px;
   --max-content-width: 1400px;
 }
@@ -153,6 +153,13 @@ button, input, textarea, select {
 /* ─── Senior Farmer Accessibility & Touch Targets ───────────────── */
 a, button, input, select, textarea, [role="button"] {
   min-height: var(--touch-target-min);
+}
+
+header a,
+header button,
+header input,
+header [role="button"] {
+  min-height: unset;
 }
 
 .skip-link {
@@ -428,6 +435,11 @@ a, button, input, select, textarea, [role="button"] {
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+@keyframes profileDropdownIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 /* ─── Responsive Utilities ────────────────────────────────────────── */
 .app-sidebar {
   transition: width 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
@@ -462,6 +474,11 @@ a, button, input, select, textarea, [role="button"] {
   }
 
   .header-location-badge {
+    display: none !important;
+  }
+
+  .header-breadcrumb,
+  .header-breadcrumb-divider {
     display: none !important;
   }
 

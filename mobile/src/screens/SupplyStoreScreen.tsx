@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { api, getImageUrl } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import type { PaymentMethod, SupplyProduct } from '../types/app';
 import { Spinner } from '../components/Spinner';
@@ -21,12 +21,16 @@ interface PaymentOption {
   label: string;
   icon: string;
   desc: string;
-  deliveryOnly?: boolean;
   comingSoon?: boolean;
 }
 
-const PAYMENT_OPTIONS: PaymentOption[] = [
-  { id: 'cod',           label: 'Cash on Delivery', icon: '💵', desc: 'Pay in cash upon delivery.',         deliveryOnly: true },
+const getPaymentOptions = (isPickup: boolean): PaymentOption[] => [
+  {
+    id: 'cod',
+    label: isPickup ? 'Cash on Pickup' : 'Cash on Delivery',
+    icon: '💵',
+    desc: isPickup ? 'Pay in cash upon in-store collection.' : 'Pay in cash upon delivery.',
+  },
   { id: 'gcash',         label: 'GCash',            icon: '📱', desc: 'GCash e-wallet payment.',            comingSoon: true },
   { id: 'maya',          label: 'Maya',             icon: '💜', desc: 'Maya (formerly PayMaya).',           comingSoon: true },
   { id: 'bank_transfer', label: 'Bank Transfer',    icon: '🏦', desc: 'InstaPay / PESONet.',               comingSoon: true },
@@ -39,6 +43,17 @@ interface CartItem {
   quantity: number;
 }
 
+const CART_STORAGE_KEY = 'agriconnect_mobile_supply_cart';
+
+const loadSavedCart = (): CartItem[] => {
+  try {
+    const saved = localStorage.getItem(CART_STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+};
+
 // ── Screen ───────────────────────────────────────────────────────────────────
 export const SupplyStoreScreen: React.FC = () => {
   const { user } = useAuth();
@@ -49,10 +64,23 @@ export const SupplyStoreScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
 
-  // In-memory cart (mobile PWA uses session state, not localStorage)
-  const [cart, setCart] = useState<CartItem[]>([]);
+  // Persistent cart in localStorage
+  const [cart, setCart] = useState<CartItem[]>(loadSavedCart);
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
   const cartTotal = cart.reduce((s, i) => s + i.quantity * i.product.price, 0);
+
+  // Detect suppliers in cart
+  const uniqueSupplierNames = Array.from(new Set(cart.map((i) => i.product.supplierName || 'Unknown Supplier')));
+  const hasMultipleSuppliers = uniqueSupplierNames.length > 1;
+
+  // Sync cart to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+    } catch (e) {
+      console.error('Failed to save cart to localStorage', e);
+    }
+  }, [cart]);
 
   // Quick-add modal (tapping "Order Supply" on a product card)
   const [addingItem, setAddingItem] = useState<SupplyProduct | null>(null);
@@ -74,15 +102,11 @@ export const SupplyStoreScreen: React.FC = () => {
   const [prodUnit, setProdUnit] = useState('bag');
   const [prodStock, setProdStock] = useState('');
   const [prodDesc, setProdDesc] = useState('');
+  const [prodImageFile, setProdImageFile] = useState<File | null>(null);
+  const [prodImagePreview, setProdImagePreview] = useState<string>('');
+  const prodFileInputRef = useRef<HTMLInputElement>(null);
   const [addingProduct, setAddingProduct] = useState(false);
   const [addErr, setAddErr] = useState('');
-
-  // Auto-switch away from COD when pickup is selected
-  useEffect(() => {
-    if (deliveryMethod === 'pickup' && paymentMethod === 'cod') {
-      setPaymentMethod('gcash');
-    }
-  }, [deliveryMethod]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -136,6 +160,13 @@ export const SupplyStoreScreen: React.FC = () => {
       setOrderMsg({ ok: false, text: 'Only Farmers can place supply orders.' });
       return;
     }
+    if (hasMultipleSuppliers) {
+      setOrderMsg({
+        ok: false,
+        text: `Your cart contains items from multiple suppliers (${uniqueSupplierNames.join(', ')}). Please checkout items from one supplier at a time.`,
+      });
+      return;
+    }
     setPlacingOrder(true);
     setOrderMsg(null);
     try {
@@ -145,12 +176,13 @@ export const SupplyStoreScreen: React.FC = () => {
         deliveryAddress: deliveryMethod === 'delivery' ? deliveryAddress : undefined,
         paymentMethod,
       });
+      localStorage.removeItem(CART_STORAGE_KEY);
       setCart([]);
       setShowCheckout(false);
       setOrderMsg({
         ok: true,
         text: paymentMethod === 'cod'
-          ? '✅ Order placed! Pay in cash when your order arrives.'
+          ? (deliveryMethod === 'pickup' ? '✅ Order placed! Pay in cash upon picking up your order.' : '✅ Order placed! Pay in cash when your order arrives.')
           : '✅ Order placed! Check your orders for payment instructions.',
       });
     } catch (err: any) {
@@ -169,6 +201,16 @@ export const SupplyStoreScreen: React.FC = () => {
     }
     setAddingProduct(true);
     setAddErr('');
+    let uploadedImageUrl = '';
+    if (prodImageFile) {
+      try {
+        const uploadRes = await api.uploadImage(prodImageFile);
+        uploadedImageUrl = uploadRes.url;
+      } catch (uploadErr) {
+        console.warn('Product image upload failed, saving product anyway:', uploadErr);
+      }
+    }
+
     try {
       await api.createSupplyProduct({
         name: prodName,
@@ -177,9 +219,12 @@ export const SupplyStoreScreen: React.FC = () => {
         unit: prodUnit,
         stockQuantity: Number(prodStock),
         description: prodDesc,
+        images: uploadedImageUrl ? [uploadedImageUrl] : (prodImagePreview ? [prodImagePreview] : []),
       });
       setShowAddModal(false);
       setProdName(''); setProdPrice(''); setProdStock(''); setProdDesc('');
+      setProdImageFile(null); setProdImagePreview('');
+      if (prodFileInputRef.current) prodFileInputRef.current.value = '';
       fetchProducts();
     } catch (err: any) {
       setAddErr(err.response?.data?.error || 'Failed to add supply product.');
@@ -188,9 +233,7 @@ export const SupplyStoreScreen: React.FC = () => {
     }
   };
 
-  const visiblePaymentOptions = PAYMENT_OPTIONS.filter(
-    (opt) => !(opt.deliveryOnly && deliveryMethod === 'pickup')
-  );
+  const visiblePaymentOptions = getPaymentOptions(deliveryMethod === 'pickup');
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -281,6 +324,14 @@ export const SupplyStoreScreen: React.FC = () => {
                   <span className="empty-desc">by {item.supplierName}</span>
                 </div>
 
+                {((item.images && item.images.length > 0) || item.imageUrl) && (
+                  <img
+                    src={getImageUrl(item.images?.[0] || item.imageUrl)}
+                    alt={item.name}
+                    style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '10px', marginTop: 8 }}
+                  />
+                )}
+
                 <div className="quick-title" style={{ marginTop: 4 }}>{item.name}</div>
                 <div className="empty-desc" style={{ margin: '6px 0' }}>
                   {item.description || 'Quality agricultural input'}
@@ -296,7 +347,20 @@ export const SupplyStoreScreen: React.FC = () => {
                     : 'Out of Stock'}
                 </div>
 
-                {inCart ? (
+                {user?.role === 'supplier' ? (
+                  <div style={{
+                    padding: '8px 12px',
+                    textAlign: 'center',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: '#64748b',
+                    border: '1px solid #e2e8f0',
+                  }}>
+                    🏪 Supplier Catalog View
+                  </div>
+                ) : inCart ? (
                   /* Inline qty stepper if already in cart */
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <button
@@ -377,6 +441,20 @@ export const SupplyStoreScreen: React.FC = () => {
 
               {/* Cart Summary */}
               <div style={{ marginBottom: 20 }}>
+                {hasMultipleSuppliers && (
+                  <div style={{
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    backgroundColor: '#fff1f2',
+                    border: '1.5px solid #fecdd3',
+                    color: '#9f1239',
+                    fontSize: 12,
+                    marginBottom: 12,
+                    lineHeight: 1.4,
+                  }}>
+                    ⚠️ <strong>Multiple Suppliers in Cart:</strong> Items are from {uniqueSupplierNames.join(', ')}. Please keep items from only 1 supplier before checking out.
+                  </div>
+                )}
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
                   Your Cart ({cartCount} items)
                 </div>
@@ -483,7 +561,9 @@ export const SupplyStoreScreen: React.FC = () => {
 
                 {paymentMethod === 'cod' && (
                   <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, backgroundColor: '#fffbeb', border: '1px solid #fde68a', fontSize: 12, color: '#92400e' }}>
-                    💡 Have exact amount ready when the rider arrives. A handling fee may apply.
+                    💡 {deliveryMethod === 'pickup'
+                      ? 'Have exact cash ready upon collecting your items at the store.'
+                      : 'Have exact amount ready when the rider arrives. A handling fee may apply.'}
                   </div>
                 )}
               </div>
@@ -500,11 +580,11 @@ export const SupplyStoreScreen: React.FC = () => {
                 className="btn btn-primary"
                 style={{ width: '100%', padding: 14, fontSize: 15 }}
                 onClick={handlePlaceOrder}
-                disabled={placingOrder || (deliveryMethod === 'delivery' && !deliveryAddress.trim())}
+                disabled={placingOrder || hasMultipleSuppliers || (deliveryMethod === 'delivery' && !deliveryAddress.trim())}
               >
                 {placingOrder
                   ? <Spinner size={20} />
-                  : `Place Order · ${PAYMENT_OPTIONS.find(p => p.id === paymentMethod)?.icon} ${paymentMethod === 'cod' ? 'Pay on Delivery' : 'Pay Now'}`
+                  : `Place Order · ${visiblePaymentOptions.find(p => p.id === paymentMethod)?.icon || '💵'} ${paymentMethod === 'cod' ? (deliveryMethod === 'pickup' ? 'Pay on Pickup' : 'Pay on Delivery') : 'Pay Now'}`
                 }
               </button>
             </div>
@@ -552,6 +632,56 @@ export const SupplyStoreScreen: React.FC = () => {
               <div className="field">
                 <label className="label">Stock Quantity *</label>
                 <input className="input" type="number" placeholder="500" value={prodStock} onChange={(e) => setProdStock(e.target.value)} required />
+              </div>
+
+              <div className="field">
+                <label className="label">Product Image (optional)</label>
+                <input
+                  ref={prodFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setProdImageFile(file);
+                      setProdImagePreview(URL.createObjectURL(file));
+                    }
+                  }}
+                  style={{ display: 'none' }}
+                />
+
+                {!prodImagePreview ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ width: '100%', padding: '12px', borderStyle: 'dashed', borderColor: 'var(--color-primary, #15803d)', color: 'var(--color-primary, #15803d)' }}
+                    onClick={() => prodFileInputRef.current?.click()}
+                  >
+                    📦📸 Attach Product Photo
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 8, borderRadius: 8, backgroundColor: '#fefce8', border: '1px solid #fef08a' }}>
+                    <img
+                      src={prodImagePreview}
+                      alt="Product preview"
+                      style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover' }}
+                    />
+                    <span style={{ fontSize: 13, flex: 1, fontWeight: 600, color: '#854d0e' }}>
+                      {prodImageFile?.name || 'Photo selected'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProdImageFile(null);
+                        setProdImagePreview('');
+                        if (prodFileInputRef.current) prodFileInputRef.current.value = '';
+                      }}
+                      style={{ border: 'none', background: 'none', color: '#ef4444', fontWeight: 700, padding: '4px 8px', cursor: 'pointer' }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="field">

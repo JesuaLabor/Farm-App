@@ -48,4 +48,28 @@ export const api = {
     });
     return res.data;
   },
+  uploadImage: async (file: File): Promise<{ url: string; filename: string }> => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const res = await apiClient.post<{ url: string; filename: string }>('/api/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+  changePassword: async (currentPassword: string, newPassword: string): Promise<{ message: string }> => {
+    const res = await apiClient.put<{ message: string }>('/api/users/me/password', {
+      currentPassword,
+      newPassword,
+    });
+    return res.data;
+  },
 };
+
+export const getImageUrl = (path?: string, fallback: string = ''): string => {
+  if (!path) return fallback;
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
+    return path;
+  }
+  return `${API_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+};
+

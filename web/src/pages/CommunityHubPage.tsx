@@ -339,82 +339,72 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
 
   return (
     <div className="app-container" style={{ paddingBottom: '50px' }}>
-      {/* ─── Back Button & Header ─── */}
+      {/* ─── Page Header ─── */}
       <div style={{ marginBottom: '24px' }}>
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="btn btn-secondary"
-          style={{ marginBottom: '16px', fontSize: '16px' }}
+        <div>
+          <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
+            {activeTab === 'community' ? 'Farmer Forum & Community Q&A' : 'Agricultural Learning Hub & Field Guides'}
+          </h1>
+          <p style={{ fontSize: '19px', color: '#525450', marginTop: '6px', marginBottom: '20px' }}>
+            {activeTab === 'community'
+              ? 'Ask crop questions, discuss local farm prices, and receive verified recommendations from licensed agronomists.'
+              : 'Practical, step-by-step agricultural handbooks, pest identification sheets, and crop management manuals.'}
+          </p>
+        </div>
+
+        {/* ─── Top Segregated Navigation Tabs ─── */}
+        <div
+          style={{
+            display: 'inline-flex',
+            background: '#EAECE9',
+            padding: '6px',
+            borderRadius: '16px',
+            gap: '6px',
+          }}
         >
-          ← Back to Dashboard
-        </button>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
-              {activeTab === 'community' ? 'Farmer Forum & Community Q&A' : 'Agricultural Learning Hub & Field Guides'}
-            </h1>
-            <p style={{ fontSize: '19px', color: '#525450', marginTop: '6px' }}>
-              {activeTab === 'community'
-                ? 'Ask crop questions, discuss local farm prices, and receive verified recommendations from licensed agronomists.'
-                : 'Practical, step-by-step agricultural handbooks, pest identification sheets, and crop management manuals.'}
-            </p>
-          </div>
-
-          {/* ─── Top Segregated Navigation Tabs ─── */}
-          <div
+          <button
+            onClick={() => handleTabChange('community')}
             style={{
-              display: 'inline-flex',
-              background: '#EAECE9',
-              padding: '6px',
-              borderRadius: '16px',
-              gap: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 24px',
+              borderRadius: '12px',
+              border: 'none',
+              fontWeight: 800,
+              fontSize: '17px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              background: activeTab === 'community' ? '#FFFFFF' : 'transparent',
+              color: activeTab === 'community' ? '#0E4A27' : '#525450',
+              boxShadow: activeTab === 'community' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
             }}
           >
-            <button
-              onClick={() => handleTabChange('community')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '12px 24px',
-                borderRadius: '12px',
-                border: 'none',
-                fontWeight: 800,
-                fontSize: '17px',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                background: activeTab === 'community' ? '#FFFFFF' : 'transparent',
-                color: activeTab === 'community' ? '#0E4A27' : '#525450',
-                boxShadow: activeTab === 'community' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-              }}
-            >
-              <span>💬</span>
-              <span>Community Forum</span>
-            </button>
+            <span>💬</span>
+            <span>Community Forum</span>
+          </button>
 
-            <button
-              onClick={() => handleTabChange('guides')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '12px 24px',
-                borderRadius: '12px',
-                border: 'none',
-                fontWeight: 800,
-                fontSize: '17px',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                background: activeTab === 'guides' ? '#FFFFFF' : 'transparent',
-                color: activeTab === 'guides' ? '#0E4A27' : '#525450',
-                boxShadow: activeTab === 'guides' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-              }}
-            >
-              <span>📖</span>
-              <span>Learn & Field Guides</span>
-            </button>
-          </div>
+          <button
+            onClick={() => handleTabChange('guides')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 24px',
+              borderRadius: '12px',
+              border: 'none',
+              fontWeight: 800,
+              fontSize: '17px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              background: activeTab === 'guides' ? '#FFFFFF' : 'transparent',
+              color: activeTab === 'guides' ? '#0E4A27' : '#525450',
+              boxShadow: activeTab === 'guides' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+            }}
+          >
+            <span>📖</span>
+            <span>Learn & Field Guides</span>
+          </button>
         </div>
       </div>
 
