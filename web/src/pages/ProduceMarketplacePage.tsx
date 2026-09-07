@@ -199,18 +199,20 @@ export const ProduceMarketplacePage: React.FC = () => {
   return (
     <div className="app-container" style={{ paddingBottom: '40px' }}>
       {/* ─── Page Title ─── */}
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27' }}>
+      <div style={{ marginBottom: '20px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', margin: 0, lineHeight: 1.2 }}>
           Crop Marketplace
         </h1>
-        <p style={{ fontSize: '20px', color: '#525450', marginTop: '4px' }}>
-          Buy fresh crops directly from verified farmers in Northern Mindanao.
+        <p style={{ fontSize: '14px', color: '#64748B', marginTop: '4px', margin: '4px 0 0 0' }}>
+          {user?.role === 'lgu_staff'
+            ? 'Browse and monitor fresh harvests listed by verified local farmers in your jurisdiction.'
+            : 'Buy fresh crops directly from verified farmers in Northern Mindanao.'}
         </p>
       </div>
 
       {/* ─── Search Field & Category Pills ─── */}
-      <div className="card" style={{ padding: '24px', marginBottom: '32px' }}>
-        <div style={{ marginBottom: '20px' }}>
+      <div className="card" style={{ padding: '18px 20px', marginBottom: '24px', borderRadius: '18px', border: '1.5px solid #E2E8F0', background: '#FFFFFF' }}>
+        <div style={{ marginBottom: '14px' }}>
           <input
             type="text"
             value={search}
@@ -218,12 +220,21 @@ export const ProduceMarketplacePage: React.FC = () => {
             placeholder="Type crop name to search (e.g. Tomato, Corn)..."
             aria-label="Search for crops or products"
             className="form-input"
-            style={{ fontSize: '18px', minHeight: '56px' }}
+            style={{ fontSize: '14px', minHeight: '44px', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #CBD5E1' }}
           />
         </div>
 
-        {/* Category Buttons */}
-        <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
+        {/* Category Buttons (Clean scroll without visible grey scrollbar) */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '8px',
+            overflowX: 'auto',
+            paddingBottom: '2px',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+          }}
+        >
           {categories.map((cat) => {
             const isSelected = selectedCategory === cat.label;
             return (
@@ -233,19 +244,20 @@ export const ProduceMarketplacePage: React.FC = () => {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  padding: '12px 24px',
-                  borderRadius: '30px',
-                  border: `2.5px solid ${isSelected ? '#176B3A' : '#D8D6CF'}`,
+                  gap: '6px',
+                  padding: '8px 18px',
+                  borderRadius: '24px',
+                  border: `1.5px solid ${isSelected ? '#176B3A' : '#CBD5E1'}`,
                   background: isSelected ? '#176B3A' : '#FFFFFF',
-                  color: isSelected ? '#FFFFFF' : '#1A1C1A',
-                  fontWeight: 800,
-                  fontSize: '18px',
+                  color: isSelected ? '#FFFFFF' : '#334155',
+                  fontWeight: 700,
+                  fontSize: '13px',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
+                  transition: 'all 0.15s ease',
                 }}
               >
-                <span style={{ fontSize: '22px' }}>{cat.icon}</span>
+                <span style={{ fontSize: '16px' }}>{cat.icon}</span>
                 <span>{cat.label}</span>
               </button>
             );

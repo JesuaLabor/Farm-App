@@ -127,4 +127,3 @@ func (r *UserRepository) UpdateStatus(ctx context.Context, id bson.ObjectID, sta
 		"is_verified": isVerified,
 	})
 }
-

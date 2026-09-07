@@ -272,8 +272,10 @@ export const ProfilePage: React.FC = () => {
             </p>
 
             {(user.barangay || user.municipality || user.province || user.region) && (
-              <p style={{ color: '#0E4A27', fontSize: '16px', margin: '0 0 12px 0', fontWeight: 700 }}>
-                📍 {[user.barangay ? `Brgy. ${user.barangay}` : '', user.municipality, user.province, user.region].filter(Boolean).join(', ')}
+              <p style={{ color: '#0E4A27', fontSize: '15px', margin: '0 0 12px 0', fontWeight: 700 }}>
+                📍 {user.role === 'lgu_staff'
+                  ? [user.municipality ? `${user.municipality} (All Barangays)` : '', user.province, user.region].filter(Boolean).join(', ')
+                  : [user.barangay ? `Brgy. ${user.barangay}` : '', user.municipality, user.province, user.region].filter(Boolean).join(', ')}
               </p>
             )}
 
@@ -515,21 +517,79 @@ export const ProfilePage: React.FC = () => {
                 Select your official Region, Province, Municipality, and Barangay jurisdiction.
               </p>
 
-              <LocationSelector
-                layout="grid"
-                showNumbers={false}
-                fontSize="18px"
-                region={region}
-                province={province}
-                municipality={municipality}
-                barangay={barangay}
-                onChange={(r, p, m, b) => {
-                  setRegion(r);
-                  setProvince(p);
-                  setMunicipality(m);
-                  setBarangay(b);
-                }}
-              />
+              {user.role === 'lgu_staff' ? (
+                /* ─── LGU Officer Official Jurisdiction Lock (Immutable to prevent data leaks) ─── */
+                <div
+                  style={{
+                    background: '#FFFFFF',
+                    border: '1.5px solid #86EFAC',
+                    borderRadius: '12px',
+                    padding: '16px 20px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        🔒 Official Municipal Jurisdiction (Locked)
+                      </div>
+                      <div style={{ fontSize: '18px', fontWeight: 800, color: '#0E4A27', marginTop: '4px' }}>
+                        {user.municipality || 'Assigned Municipality'}, {user.province || 'Province'}
+                      </div>
+                      <div style={{ fontSize: '13px', color: '#4B5563', marginTop: '2px' }}>
+                        {user.region || 'Region X - Northern Mindanao'} • Covers All Municipal Barangays
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 14px',
+                        background: '#DCFCE7',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        color: '#15803D',
+                        border: '1px solid #86EFAC',
+                      }}
+                    >
+                      🏛️ LGU Agriculture Office
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: '14px',
+                      padding: '10px 14px',
+                      background: '#F0FDF4',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      color: '#166534',
+                      lineHeight: 1.45,
+                      borderLeft: '3px solid #16A34A',
+                    }}
+                  >
+                    <strong>Data Privacy & Security:</strong> To prevent unauthorized cross-municipality data leakage, jurisdiction cannot be self-edited. Barangay is excluded because your office oversees the entire municipality. To request an official jurisdictional transfer, contact the Super Administrator.
+                  </div>
+                </div>
+              ) : (
+                <LocationSelector
+                  layout="grid"
+                  showNumbers={false}
+                  fontSize="16px"
+                  region={region}
+                  province={province}
+                  municipality={municipality}
+                  barangay={barangay}
+                  onChange={(r, p, m, b) => {
+                    setRegion(r);
+                    setProvince(p);
+                    setMunicipality(m);
+                    setBarangay(b);
+                  }}
+                />
+              )}
             </div>
 
             <div className="form-group" style={{ marginBottom: '28px' }}>

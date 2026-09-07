@@ -290,19 +290,25 @@ export const RegisterPage: React.FC = () => {
 
           {/* Cascading Philippine Location Dropdowns */}
           <div style={{ marginBottom: '18px', padding: '16px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '12px' }}>
-              📍 Account LGU Jurisdiction
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '4px' }}>
+              📍 {role === 'lgu_staff' ? 'Municipal Jurisdiction Location' : 'Account Location'}
             </div>
+            {role === 'lgu_staff' && (
+              <p style={{ fontSize: '11px', color: '#64748B', margin: '0 0 10px 0' }}>
+                LGU officers administer at the municipal level (all barangays within the chosen municipality).
+              </p>
+            )}
             <LocationSelector
               region={region}
               province={province}
               municipality={municipality}
               barangay={barangay}
+              excludeBarangay={role === 'lgu_staff'}
               onChange={(r, p, m, b) => {
                 setRegion(r);
                 setProvince(p);
                 setMunicipality(m);
-                setBarangay(b);
+                setBarangay(role === 'lgu_staff' ? '' : b);
               }}
             />
           </div>

@@ -1,19 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-
-interface ForumPost {
-  id: string;
-  author: string;
-  location: string;
-  category: string;
-  title: string;
-  repliesCount: number;
-  likesCount: number;
-  expertAnswered: boolean;
-  expertName?: string;
-  expertReply?: string;
-  time: string;
-}
+import { communityApi } from '../api/community';
+import { useToast } from '../contexts/ToastContext';
+import type { Post, PostCategory } from '../types/community';
 
 interface FarmingGuide {
   id: string;
@@ -33,59 +22,6 @@ interface FarmingGuide {
     warnings: string;
   };
 }
-
-const samplePosts: ForumPost[] = [
-  {
-    id: 'post-1',
-    author: 'Mang Cardo',
-    location: 'Bukidnon',
-    category: 'Crop Care',
-    title: '🌱 What is the best fertilizer for red tomatoes during the rainy season?',
-    repliesCount: 42,
-    likesCount: 19,
-    expertAnswered: true,
-    expertName: 'Dr. Ramon Santos (Senior Agronomist)',
-    expertReply: 'Apply high-potassium organic fertilizer (0-0-60 or fermented fruit juice) and ensure raised beds with drainage furrows to prevent bacterial wilt and root rot during heavy downpours.',
-    time: '2 hours ago',
-  },
-  {
-    id: 'post-2',
-    author: 'Elena Cruz',
-    location: 'Misamis Oriental',
-    category: 'Pest Control',
-    title: '🐛 How do I manage corn fall armyworm naturally without toxic synthetic sprays?',
-    repliesCount: 27,
-    likesCount: 34,
-    expertAnswered: true,
-    expertName: 'Agronomist Maria Clara (Pest Specialist)',
-    expertReply: 'Deploy Trichogramma parasitoid cards within 14–21 days of emergence. For foliar spraying, use Neem seed kernel extract (50g/L) mixed with mild soap early in the morning before larvae burrow deep.',
-    time: '4 hours ago',
-  },
-  {
-    id: 'post-3',
-    author: 'Benito Ramos',
-    location: 'Cagayan de Oro',
-    category: 'Market & Sales',
-    title: '💰 Where can I sell bulk Carabao mangoes directly to institutional buyers in CDO?',
-    repliesCount: 18,
-    likesCount: 12,
-    expertAnswered: false,
-    time: '6 hours ago',
-  },
-  {
-    id: 'post-4',
-    author: 'Aling Tessie',
-    location: 'Lanao del Norte',
-    category: 'Soil & Fertilizer',
-    title: '🧪 How to correct acidic soil pH (5.2) before planting yellow sweet corn?',
-    repliesCount: 31,
-    likesCount: 22,
-    expertAnswered: true,
-    expertName: 'Engr. Dan Bautista (Soil Scientist)',
-    expertReply: 'Broadcast agricultural lime (calcitic or dolomitic) at 2 to 3 tons per hectare at least 3 weeks prior to furrowing. Incorporate well into the top 15cm of soil and water lightly.',
-    time: '1 day ago',
-  },
-];
 
 const sampleGuides: FarmingGuide[] = [
   {
@@ -261,6 +197,7 @@ interface CommunityHubPageProps {
 export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { success, error } = useToast();
 
   // Determine active tab from URL hash, props, or path
   const [activeTab, setActiveTab] = useState<'community' | 'guides'>(() => {
@@ -288,49 +225,138 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
   };
 
   // Community Forum State
-  const [posts, setPosts] = useState<ForumPost[]>(samplePosts);
-  const [forumCategory, setForumCategory] = useState('All');
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [forumCategory, setForumCategory] = useState<string>('all');
   const [showAskModal, setShowAskModal] = useState(false);
   const [questionTitle, setQuestionTitle] = useState('');
-  const [questionCategory, setQuestionCategory] = useState('Crop Care');
+  const [questionCategory, setQuestionCategory] = useState<PostCategory>('crop_advice');
   const [questionDetails, setQuestionDetails] = useState('');
+  const [submittingQuestion, setSubmittingQuestion] = useState(false);
 
   // Guides State
   const [guidesSearch, setGuidesSearch] = useState('');
   const [selectedGuideCategory, setSelectedGuideCategory] = useState('all');
   const [activeGuideModal, setActiveGuideModal] = useState<FarmingGuide | null>(null);
 
-  const handleCreatePost = (e: React.FormEvent) => {
+  // Fetch real posts from backend
+  const loadPosts = useCallback(async () => {
+    setLoadingPosts(true);
+    try {
+      const data = await communityApi.listPosts(forumCategory === 'all' ? undefined : forumCategory);
+      setPosts(data || []);
+    } catch (err) {
+      console.error('Failed to fetch community posts:', err);
+    } finally {
+      setLoadingPosts(false);
+    }
+  }, [forumCategory]);
+
+  useEffect(() => {
+    loadPosts();
+  }, [loadPosts]);
+
+  // Handle post upvote directly in feed
+  const handleToggleUpvote = async (e: React.MouseEvent, postId: string) => {
+    e.stopPropagation();
+    try {
+      const res = await communityApi.toggleUpvote(postId);
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.id === postId) {
+            return {
+              ...p,
+              isUpvotedByMe: res.isUpvoted,
+              upvotes: res.isUpvoted ? p.upvotes + 1 : Math.max(0, p.upvotes - 1),
+            };
+          }
+          return p;
+        })
+      );
+    } catch (err) {
+      console.error('Failed to toggle upvote:', err);
+    }
+  };
+
+  // Create post via backend API
+  const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!questionTitle.trim()) return;
 
-    const newPost: ForumPost = {
-      id: `post-${Date.now()}`,
-      author: 'Juan Dela Cruz',
-      location: 'Northern Mindanao',
-      category: questionCategory,
-      title: `🌱 ${questionTitle}`,
-      repliesCount: 0,
-      likesCount: 1,
-      expertAnswered: false,
-      time: 'Just now',
-    };
+    setSubmittingQuestion(true);
+    try {
+      const newPost = await communityApi.createPost({
+        title: questionTitle.trim(),
+        body: questionDetails.trim() || questionTitle.trim(),
+        category: questionCategory,
+      });
 
-    setPosts([newPost, ...posts]);
-    setShowAskModal(false);
-    setQuestionTitle('');
-    setQuestionDetails('');
+      setShowAskModal(false);
+      setQuestionTitle('');
+      setQuestionDetails('');
+      setQuestionCategory('crop_advice');
+      setPosts((prev) => [newPost, ...prev]);
+
+      success('Question Posted Successfully!', 'Your question is now visible to all farmers, buyers, and agronomists.');
+    } catch (err: any) {
+      error('Failed to Post Question', err.response?.data?.error || 'Please check your connection and try again.');
+    } finally {
+      setSubmittingQuestion(false);
+    }
   };
 
-  // Filtered Forum Posts
-  const filteredPosts = forumCategory === 'All'
-    ? posts
-    : posts.filter((p) => p.category.toLowerCase().includes(forumCategory.toLowerCase()));
+  const getRoleBadge = (role?: string) => {
+    switch (role) {
+      case 'expert':
+        return { label: '🎓 Agronomist', bg: '#f3e8ff', color: '#6b21a8' };
+      case 'farmer':
+        return { label: '🌾 Farmer', bg: '#dcfce7', color: '#15803d' };
+      case 'supplier':
+        return { label: '📦 Supplier', bg: '#e0f2fe', color: '#0369a1' };
+      case 'lgu':
+      case 'lgu_officer':
+        return { label: '🏛️ LGU Staff', bg: '#fef3c7', color: '#b45309' };
+      case 'buyer':
+        return { label: '🛒 Buyer', bg: '#f1f5f9', color: '#475569' };
+      default:
+        return { label: '👤 Member', bg: '#f1f5f9', color: '#475569' };
+    }
+  };
+
+  const getCategoryLabel = (cat: string) => {
+    switch (cat) {
+      case 'crop_advice':
+        return '🌱 Crop Care';
+      case 'pest_control':
+        return '🐛 Pest Control';
+      case 'market_talk':
+        return '💰 Market & Prices';
+      case 'equipment':
+        return '🚜 Equipment';
+      case 'general':
+      default:
+        return '🌾 General Farming';
+    }
+  };
+
+  const formatTimeAgo = (dateStr: string) => {
+    try {
+      const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+      if (diff < 60) return 'Just now';
+      if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+      if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+      if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+      return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    } catch {
+      return dateStr;
+    }
+  };
 
   // Filtered Guides
   const filteredGuides = sampleGuides.filter((g) => {
     const matchesCat = selectedGuideCategory === 'all' || g.category === selectedGuideCategory;
-    const matchesSearch = !guidesSearch.trim() ||
+    const matchesSearch =
+      !guidesSearch.trim() ||
       g.title.toLowerCase().includes(guidesSearch.toLowerCase()) ||
       g.summary.toLowerCase().includes(guidesSearch.toLowerCase()) ||
       g.author.toLowerCase().includes(guidesSearch.toLowerCase());
@@ -347,7 +373,7 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
           </h1>
           <p style={{ fontSize: '19px', color: '#525450', marginTop: '6px', marginBottom: '20px' }}>
             {activeTab === 'community'
-              ? 'Ask crop questions, discuss local farm prices, and receive verified recommendations from licensed agronomists.'
+              ? 'Ask crop questions, discuss local farm prices, and receive verified recommendations from licensed agronomists and peer farmers.'
               : 'Practical, step-by-step agricultural handbooks, pest identification sheets, and crop management manuals.'}
           </p>
         </div>
@@ -414,25 +440,44 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
       {activeTab === 'community' && (
         <div>
           {/* Forum Action & Filter Bar */}
-          <div className="card" style={{ padding: '20px', marginBottom: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          <div
+            className="card"
+            style={{
+              padding: '20px',
+              marginBottom: '28px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '16px',
+            }}
+          >
             {/* Category Pills */}
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {['All', 'Crop Care', 'Pest Control', 'Soil & Fertilizer', 'Market & Sales'].map((cat) => (
+              {[
+                { key: 'all', label: 'All Topics' },
+                { key: 'crop_advice', label: '🌱 Crop Care' },
+                { key: 'pest_control', label: '🐛 Pest Control' },
+                { key: 'market_talk', label: '💰 Market & Prices' },
+                { key: 'equipment', label: '🚜 Equipment' },
+                { key: 'general', label: '🌾 General' },
+              ].map((cat) => (
                 <button
-                  key={cat}
-                  onClick={() => setForumCategory(cat)}
+                  key={cat.key}
+                  onClick={() => setForumCategory(cat.key)}
                   style={{
                     padding: '8px 18px',
                     borderRadius: '20px',
-                    border: forumCategory === cat ? '2px solid #0E4A27' : '1px solid #CBD5E1',
-                    background: forumCategory === cat ? '#EAF6EE' : '#FFFFFF',
-                    color: forumCategory === cat ? '#0E4A27' : '#525450',
+                    border: forumCategory === cat.key ? '2px solid #0E4A27' : '1px solid #CBD5E1',
+                    background: forumCategory === cat.key ? '#EAF6EE' : '#FFFFFF',
+                    color: forumCategory === cat.key ? '#0E4A27' : '#525450',
                     fontWeight: 700,
                     fontSize: '15px',
                     cursor: 'pointer',
+                    transition: 'all 0.15s ease',
                   }}
                 >
-                  {cat}
+                  {cat.label}
                 </button>
               ))}
             </div>
@@ -447,59 +492,171 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
           </div>
 
           {/* Forum Feed */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-            {filteredPosts.map((post) => (
-              <div key={post.id} className="card" style={{ padding: '26px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span className="badge" style={{ background: '#F1F5F9', color: '#475569', fontSize: '13px', fontWeight: 700 }}>
-                      🏷️ {post.category}
-                    </span>
-                    <span style={{ fontSize: '15px', color: '#525450', fontWeight: 700 }}>
-                      👤 {post.author} ({post.location}) • {post.time}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <span style={{ fontSize: '15px', color: '#176B3A', fontWeight: 800 }}>
-                      💬 {post.repliesCount} replies
-                    </span>
-                    <span style={{ fontSize: '15px', color: '#525450', fontWeight: 700 }}>
-                      👍 {post.likesCount}
-                    </span>
-                  </div>
-                </div>
-
-                <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0E4A27', marginBottom: '16px', lineHeight: 1.3 }}>
-                  {post.title}
-                </h2>
-
-                {/* Verified Expert Answer Box */}
-                {post.expertAnswered && (
+          {loadingPosts ? (
+            <div className="card" style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>
+              <div style={{ fontSize: '18px', fontWeight: 600 }}>Loading community discussions...</div>
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="card" style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>
+              <div style={{ fontSize: '40px', marginBottom: '12px' }}>🌱</div>
+              <div style={{ fontSize: '20px', fontWeight: 800, color: '#0E4A27', marginBottom: '8px' }}>
+                No Discussions in this Category Yet
+              </div>
+              <p style={{ fontSize: '16px', marginBottom: '20px' }}>
+                Be the first to ask a question or start a topic with fellow farmers!
+              </p>
+              <button onClick={() => setShowAskModal(true)} className="btn btn-primary">
+                + Ask the First Question
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {posts.map((post) => {
+                const rBadge = getRoleBadge(post.authorRole);
+                const isExpert = post.authorRole === 'expert';
+                return (
                   <div
+                    key={post.id}
+                    className="card"
+                    onClick={() => navigate(`/community/posts/${post.id}`)}
                     style={{
-                      padding: '20px',
-                      borderRadius: '16px',
-                      background: '#EAF6EE',
-                      border: '2px solid #176B3A',
+                      padding: '26px',
+                      cursor: 'pointer',
+                      transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                      borderLeft: isExpert ? '6px solid #6b21a8' : '4px solid #16a34a',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '';
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                      <span className="badge badge-verified" style={{ background: '#FFFFFF', fontSize: '14px' }}>
-                        ✓ Licensed Agronomist Verified
-                      </span>
-                      <span style={{ fontSize: '16px', fontWeight: 800, color: '#0E4A27' }}>
-                        {post.expertName}
-                      </span>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '12px',
+                        flexWrap: 'wrap',
+                        gap: '10px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <span
+                          className="badge"
+                          style={{
+                            background: '#EAF6EE',
+                            color: '#0E4A27',
+                            fontSize: '13px',
+                            fontWeight: 700,
+                            border: '1px solid #C8E6D0',
+                          }}
+                        >
+                          {getCategoryLabel(post.category)}
+                        </span>
+                        <span style={{ fontSize: '15px', color: '#1A1C1A', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>👤 {post.authorName}</span>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 800,
+                              color: rBadge.color,
+                              backgroundColor: rBadge.bg,
+                              padding: '2px 8px',
+                              borderRadius: '10px',
+                            }}
+                          >
+                            {rBadge.label}
+                          </span>
+                        </span>
+                        <span style={{ fontSize: '14px', color: '#64748b' }}>
+                          • {formatTimeAgo(post.createdAt)}
+                        </span>
+                      </div>
                     </div>
-                    <p style={{ fontSize: '17px', color: '#1A1C1A', lineHeight: 1.6, margin: 0 }}>
-                      "{post.expertReply}"
-                    </p>
+
+                    <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0E4A27', marginBottom: '8px', lineHeight: 1.3 }}>
+                      {post.title}
+                    </h2>
+
+                    {post.body && (
+                      <p
+                        style={{
+                          fontSize: '16px',
+                          color: '#475569',
+                          lineHeight: 1.6,
+                          marginBottom: '18px',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {post.body}
+                      </p>
+                    )}
+
+                    {/* Footer Actions */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        borderTop: '1px solid #F1F5F9',
+                        paddingTop: '16px',
+                        flexWrap: 'wrap',
+                        gap: '12px',
+                      }}
+                    >
+                      <button
+                        onClick={(e) => handleToggleUpvote(e, post.id)}
+                        style={{
+                          padding: '6px 16px',
+                          borderRadius: '20px',
+                          fontWeight: 700,
+                          fontSize: '14px',
+                          border: post.isUpvotedByMe ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
+                          cursor: 'pointer',
+                          backgroundColor: post.isUpvotedByMe ? '#dcfce7' : '#fff',
+                          color: post.isUpvotedByMe ? '#166534' : '#475569',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <span>▲</span> {post.upvotes} Upvotes
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/community/posts/${post.id}`);
+                        }}
+                        style={{
+                          padding: '8px 18px',
+                          borderRadius: '12px',
+                          backgroundColor: '#EAF6EE',
+                          color: '#0E4A27',
+                          border: '1.5px solid #176B3A',
+                          fontWeight: 800,
+                          fontSize: '15px',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        💬 View Thread & Replies ({post.commentsCount}) →
+                      </button>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -675,14 +832,15 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
                 <label className="form-label">Category</label>
                 <select
                   value={questionCategory}
-                  onChange={(e) => setQuestionCategory(e.target.value)}
+                  onChange={(e) => setQuestionCategory(e.target.value as PostCategory)}
                   className="form-input"
                   style={{ fontSize: '17px' }}
                 >
-                  <option value="Crop Care">Crop Care & Health</option>
-                  <option value="Pest Control">Pest & Disease Control</option>
-                  <option value="Soil & Fertilizer">Soil & Fertilizer</option>
-                  <option value="Market & Sales">Market Prices & Bulk Selling</option>
+                  <option value="crop_advice">🌱 Crop Care & Health</option>
+                  <option value="pest_control">🐛 Pest & Disease Control</option>
+                  <option value="market_talk">💰 Market Prices & Bulk Selling</option>
+                  <option value="equipment">🚜 Tools & Farm Equipment</option>
+                  <option value="general">🌾 General Farming</option>
                 </select>
               </div>
 
@@ -691,7 +849,7 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
                 <textarea
                   value={questionDetails}
                   onChange={(e) => setQuestionDetails(e.target.value)}
-                  placeholder="Provide details to help licensed agronomists accurately diagnose..."
+                  placeholder="Provide details to help licensed agronomists and fellow farmers accurately diagnose..."
                   rows={4}
                   className="form-input"
                   style={{ fontSize: '17px', resize: 'vertical' }}
@@ -702,8 +860,8 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
                 <button type="button" onClick={() => setShowAskModal(false)} className="btn btn-secondary btn-large" style={{ flex: 1 }}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary btn-large" style={{ flex: 2 }}>
-                  Post Question →
+                <button type="submit" disabled={submittingQuestion} className="btn btn-primary btn-large" style={{ flex: 2 }}>
+                  {submittingQuestion ? 'Posting...' : 'Post Question →'}
                 </button>
               </div>
             </form>

@@ -60,24 +60,23 @@ func (s *AdminService) ListUsers(ctx context.Context, requesterID string, roleFi
 			filter["role"] = bson.M{"$ne": models.RoleSuperAdmin}
 		}
 	} else if requester.Role == models.RoleLGUStaff {
-		// LGU Staff can only see users in their region (and province/municipality if assigned)
-		if requester.Region == "" {
-			return nil, errors.New("LGU Staff account has no region assigned")
+		// LGU Staff can ONLY see users in their assigned Municipality & Region.
+		// Never allow client query parameters to override the officer's assigned jurisdiction.
+		region := requester.Region
+		if region == "" {
+			region = "Region X - Northern Mindanao"
 		}
+		filter["region"] = region
 
-		filter["region"] = requester.Region
 		if requester.Province != "" {
 			filter["province"] = requester.Province
-		} else if provinceFilter != "" && provinceFilter != "all" {
-			filter["province"] = provinceFilter
 		}
 
 		if requester.Municipality != "" {
 			filter["municipality"] = requester.Municipality
-		} else if municipalityFilter != "" && municipalityFilter != "all" {
-			filter["municipality"] = municipalityFilter
 		}
 
+		// LGU Staff governs the whole Municipality, but can optionally filter by barangay within their town
 		if barangayFilter != "" && barangayFilter != "all" {
 			filter["barangay"] = barangayFilter
 		}

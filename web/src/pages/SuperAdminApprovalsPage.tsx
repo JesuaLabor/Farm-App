@@ -220,10 +220,10 @@ export const SuperAdminApprovalsPage: React.FC = () => {
               const statusLabel = isApproved ? '✓ Approved' : isRejected ? '✕ Rejected' : '⏳ Pending';
 
               const roleColors: Record<string, { bg: string; text: string }> = {
-                farmer:    { bg: '#E8F5E9', text: '#1B5E20' },
-                buyer:     { bg: '#E3F2FD', text: '#1565C0' },
-                supplier:  { bg: '#FFF3E0', text: '#E65100' },
-                expert:    { bg: '#F3E5F5', text: '#6A1B9A' },
+                farmer: { bg: '#E8F5E9', text: '#1B5E20' },
+                buyer: { bg: '#E3F2FD', text: '#1565C0' },
+                supplier: { bg: '#FFF3E0', text: '#E65100' },
+                expert: { bg: '#F3E5F5', text: '#6A1B9A' },
                 lgu_staff: { bg: '#E0F2F1', text: '#00695C' },
                 super_admin: { bg: '#FCE4EC', text: '#880E4F' },
               };

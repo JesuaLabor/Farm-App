@@ -44,6 +44,11 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID string, req mode
 		return nil, fmt.Errorf("invalid user ID: %w", err)
 	}
 
+	existingUser, err := s.repo.FindByID(ctx, oid)
+	if err != nil {
+		return nil, fmt.Errorf("user not found: %w", err)
+	}
+
 	update := bson.M{}
 	if req.FirstName != nil {
 		update["first_name"] = *req.FirstName
@@ -54,18 +59,26 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID string, req mode
 	if req.Phone != nil {
 		update["phone"] = *req.Phone
 	}
-	if req.Region != nil {
-		update["region"] = *req.Region
+
+	// LGU Staff jurisdiction (Region, Province, Municipality) is locked to prevent data leaks.
+	// Barangay is explicitly excluded/cleared for LGU Staff since their jurisdiction covers the entire Municipality.
+	if existingUser.Role == models.RoleLGUStaff {
+		update["barangay"] = "" // LGU Staff represents the entire Municipality, no specific barangay
+	} else {
+		if req.Region != nil {
+			update["region"] = *req.Region
+		}
+		if req.Province != nil {
+			update["province"] = *req.Province
+		}
+		if req.Municipality != nil {
+			update["municipality"] = *req.Municipality
+		}
+		if req.Barangay != nil {
+			update["barangay"] = *req.Barangay
+		}
 	}
-	if req.Province != nil {
-		update["province"] = *req.Province
-	}
-	if req.Municipality != nil {
-		update["municipality"] = *req.Municipality
-	}
-	if req.Barangay != nil {
-		update["barangay"] = *req.Barangay
-	}
+
 	if req.Address != nil {
 		update["address"] = *req.Address
 	}

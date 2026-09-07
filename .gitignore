@@ -22,3 +22,7 @@ build/
 backend/backend
 backend/server
 *.log
+
+# Uploaded files
+backend/uploads/
+

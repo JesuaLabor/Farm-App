@@ -16,6 +16,7 @@ interface LocationSelectorProps {
   layout?: 'stacked' | 'grid';
   showNumbers?: boolean;
   fontSize?: string;
+  excludeBarangay?: boolean;
 }
 
 export const LocationSelector: React.FC<LocationSelectorProps> = ({
@@ -28,6 +29,7 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
   layout = 'stacked',
   showNumbers = true,
   fontSize,
+  excludeBarangay = false,
 }) => {
   const regions = getRegions();
   const currentRegion = regions.includes(region) ? region : regions[0];
@@ -167,26 +169,28 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
         </select>
       </div>
 
-      {/* 4. Barangay Dropdown */}
-      <div className="form-group">
-        <label htmlFor="select-barangay" className="form-label">
-          {showNumbers ? '4. Barangay' : 'Barangay'}
-        </label>
-        <select
-          id="select-barangay"
-          className="form-input"
-          value={currentBarangay}
-          disabled={disabled || barangays.length === 0}
-          style={inputStyle}
-          onChange={(e) => handleBarangayChange(e.target.value)}
-        >
-          {barangays.map((b) => (
-            <option key={b} value={b}>
-              {b}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* 4. Barangay Dropdown (Hidden if excluded e.g. for LGU Staff) */}
+      {!excludeBarangay && (
+        <div className="form-group">
+          <label htmlFor="select-barangay" className="form-label">
+            {showNumbers ? '4. Barangay' : 'Barangay'}
+          </label>
+          <select
+            id="select-barangay"
+            className="form-input"
+            value={currentBarangay}
+            disabled={disabled || barangays.length === 0}
+            style={inputStyle}
+            onChange={(e) => handleBarangayChange(e.target.value)}
+          >
+            {barangays.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   );
 };

@@ -25,4 +25,9 @@ export const adminApi = {
     const res = await apiClient.put<{ message: string }>(`/api/admin/users/${userId}/reject`);
     return res.data;
   },
+
+  deleteUser: async (userId: string): Promise<{ message: string }> => {
+    const res = await apiClient.delete<{ message: string }>(`/api/admin/users/${userId}`);
+    return res.data;
+  },
 };

@@ -1,6 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { adminApi } from '../api/admin';
+import { produceApi } from '../api/produce';
+import { priceApi } from '../api/price';
+import type { MarketPrice } from '../types/price';
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
@@ -17,39 +21,207 @@ export const DashboardPage: React.FC = () => {
     super_admin: 'Super Admin',
   };
 
-  const userName = user
+  const rawName = user
     ? user.firstName || user.lastName || roleNameMap[role] || 'User'
     : 'User';
+  const userName = rawName.trim();
 
   const subtitleMap: Record<string, string> = {
     farmer: 'How can AgriConnect help your farm today?',
     buyer: 'Source fresh wholesale produce directly from local verified farmers.',
     supplier: 'Manage your agricultural supply inventory and customer orders.',
     expert: 'Provide agronomic advice, answer queries, and share crop guides.',
-    lgu_staff: `Local Agriculture Office • ${user?.municipality ? `${user.municipality}, ` : ''}${user?.region || 'Regional Jurisdiction'}`,
+    lgu_staff: 'Local Agriculture Office • Regional Monitoring & Governance',
     super_admin: 'Platform governance, staff approvals, and regional agricultural monitoring.',
   };
+
+  // Real LGU & Admin Dynamic Metrics State
+  const [lguStats, setLguStats] = useState({
+    farmersCount: 0,
+    listingsCount: 0,
+    pendingCount: 0,
+    loaded: false,
+  });
+
+  const [adminStats, setAdminStats] = useState({
+    totalUsers: 0,
+    pendingUsers: 0,
+    totalListings: 0,
+    loaded: false,
+  });
+
+  const [farmerStats, setFarmerStats] = useState({
+    activeListings: 0,
+    pendingOrders: 0,
+    loaded: false,
+  });
+
+  // Real Market Prices State
+  const [marketPrices, setMarketPrices] = useState<MarketPrice[]>([]);
+  const [pricesLoaded, setPricesLoaded] = useState(false);
+
+  useEffect(() => {
+    // 1. Fetch real LGU overview data
+    if (role === 'lgu_staff') {
+      const fetchLguData = async () => {
+        try {
+          const [usersRes, listingsRes] = await Promise.allSettled([
+            adminApi.listUsers(),
+            produceApi.listListings(),
+          ]);
+
+          let farmers = 0;
+          let pending = 0;
+          if (usersRes.status === 'fulfilled' && Array.isArray(usersRes.value)) {
+            const users = usersRes.value;
+            // The backend automatically filters users to this LGU's jurisdiction!
+            farmers = users.filter((u) => u.role === 'farmer' && u.status === 'approved').length;
+            pending = users.filter((u) => u.status === 'pending').length;
+          }
+
+          let listings = 0;
+          if (listingsRes.status === 'fulfilled' && Array.isArray(listingsRes.value)) {
+            const mun = (user?.municipality || '').toLowerCase();
+            listings = listingsRes.value.filter((l) => {
+              if (l.status !== 'available') return false;
+              if (!mun) return true;
+              return (l.location || '').toLowerCase().includes(mun);
+            }).length;
+          }
+
+          setLguStats({
+            farmersCount: farmers,
+            listingsCount: listings,
+            pendingCount: pending,
+            loaded: true,
+          });
+        } catch (e) {
+          console.error('Failed to load real LGU overview data:', e);
+          setLguStats({ farmersCount: 0, listingsCount: 0, pendingCount: 0, loaded: true });
+        }
+      };
+
+      fetchLguData();
+    }
+
+    // 2. Fetch real Super Admin overview data
+    if (role === 'super_admin') {
+      const fetchAdminData = async () => {
+        try {
+          const [usersRes, listingsRes] = await Promise.allSettled([
+            adminApi.listUsers(),
+            produceApi.listListings(),
+          ]);
+
+          let total = 0;
+          let pending = 0;
+          if (usersRes.status === 'fulfilled' && Array.isArray(usersRes.value)) {
+            total = usersRes.value.length;
+            pending = usersRes.value.filter((u) => u.status === 'pending').length;
+          }
+
+          let activeListings = 0;
+          if (listingsRes.status === 'fulfilled' && Array.isArray(listingsRes.value)) {
+            activeListings = listingsRes.value.filter((l) => l.status === 'available').length;
+          }
+
+          setAdminStats({
+            totalUsers: total,
+            pendingUsers: pending,
+            totalListings: activeListings,
+            loaded: true,
+          });
+        } catch (e) {
+          console.error('Failed to load admin overview data:', e);
+          setAdminStats({ totalUsers: 0, pendingUsers: 0, totalListings: 0, loaded: true });
+        }
+      };
+
+      fetchAdminData();
+    }
+
+    // 3. Fetch real Farmer overview data
+    if (role === 'farmer' && user?.id) {
+      const fetchFarmerData = async () => {
+        try {
+          const [listingsRes, ordersRes] = await Promise.allSettled([
+            produceApi.listListings({ farmerId: user.id }),
+            produceApi.listTransactions(),
+          ]);
+
+          let activeCount = 0;
+          if (listingsRes.status === 'fulfilled' && Array.isArray(listingsRes.value)) {
+            activeCount = listingsRes.value.filter((l) => l.status === 'available').length;
+          }
+
+          let pendingCount = 0;
+          if (ordersRes.status === 'fulfilled' && Array.isArray(ordersRes.value)) {
+            pendingCount = ordersRes.value.filter(
+              (t) => t.farmerId === user.id && t.status === 'pending'
+            ).length;
+          }
+
+          setFarmerStats({
+            activeListings: activeCount,
+            pendingOrders: pendingCount,
+            loaded: true,
+          });
+        } catch (e) {
+          console.error('Failed to load farmer data:', e);
+          setFarmerStats({ activeListings: 0, pendingOrders: 0, loaded: true });
+        }
+      };
+
+      fetchFarmerData();
+    }
+
+    // 4. Fetch real Market Prices
+    const fetchMarketPrices = async () => {
+      try {
+        const records = await priceApi.listHistory();
+        if (Array.isArray(records)) {
+          // Get latest distinct crops
+          const distinct: MarketPrice[] = [];
+          const seen = new Set<string>();
+          for (const r of records) {
+            if (!seen.has(r.cropName)) {
+              seen.add(r.cropName);
+              distinct.push(r);
+            }
+            if (distinct.length >= 5) break;
+          }
+          setMarketPrices(distinct);
+        }
+      } catch (e) {
+        console.error('Failed to fetch real market prices:', e);
+      } finally {
+        setPricesLoaded(true);
+      }
+    };
+
+    fetchMarketPrices();
+  }, [role, user?.id, user?.municipality]);
 
   const actionCards = (() => {
     switch (role) {
       case 'super_admin':
         return [
           {
-            title: '1. Staff & Account Approvals',
+            title: 'Staff & Account Approvals',
             subtitle: 'Review pending LGU staff, supplier, and expert accounts',
             icon: '🛡️',
             bg: '#176B3A',
             path: '/admin/approvals',
           },
           {
-            title: '2. LGU Regional Monitoring',
+            title: 'LGU Regional Monitoring',
             subtitle: 'Inspect province & municipal agricultural activity',
             icon: '🏛️',
             bg: '#0E4A27',
             path: '/lgu/dashboard',
           },
           {
-            title: '3. Manage Government Programs',
+            title: 'Manage Government Programs',
             subtitle: 'Publish subsidies and agricultural assistance programs',
             icon: '📜',
             bg: '#2B72B3',
@@ -59,22 +231,22 @@ export const DashboardPage: React.FC = () => {
       case 'lgu_staff':
         return [
           {
-            title: '1. Account Approvals',
-            subtitle: `Verify farmers, buyers, and suppliers in ${user?.municipality || 'your jurisdiction'}`,
+            title: 'Account Approvals',
+            subtitle: 'Verify local farmers, buyers, and suppliers',
             icon: '📋',
             bg: '#176B3A',
             path: '/lgu/approvals',
           },
           {
-            title: '2. Regional Farm Dashboard',
-            subtitle: 'Track local crop harvests, yields, and food security',
+            title: 'Regional Dashboard',
+            subtitle: 'Track crop harvests, yields, and food security',
             icon: '🏛️',
             bg: '#0E4A27',
             path: '/lgu/dashboard',
           },
           {
-            title: '3. Manage Municipal Programs',
-            subtitle: 'Publish agricultural assistance and subsidies',
+            title: 'Manage Programs',
+            subtitle: 'Publish agricultural assistance & subsidies',
             icon: '📜',
             bg: '#2B72B3',
             path: '/programs/manage',
@@ -83,21 +255,21 @@ export const DashboardPage: React.FC = () => {
       case 'supplier':
         return [
           {
-            title: '1. Manage Supply Products',
+            title: 'Manage Supply Products',
             subtitle: 'Add and update seeds, fertilizers, and machinery items',
             icon: '🚜',
             bg: '#176B3A',
             path: '/supply/manage',
           },
           {
-            title: '2. Customer Supply Orders',
+            title: 'Customer Supply Orders',
             subtitle: 'View and fulfill pending supply purchases from farmers',
             icon: '📦',
             bg: '#0E4A27',
             path: '/supply/orders',
           },
           {
-            title: '3. Check Produce Marketplace',
+            title: 'Check Produce Marketplace',
             subtitle: 'Explore local farms and prevailing commodity rates',
             icon: '📈',
             bg: '#2B72B3',
@@ -107,21 +279,21 @@ export const DashboardPage: React.FC = () => {
       case 'buyer':
         return [
           {
-            title: '1. Browse Produce Marketplace',
+            title: 'Browse Produce Marketplace',
             subtitle: 'Order fresh vegetables, grains, and fruits from farms',
             icon: '🥦',
             bg: '#176B3A',
             path: '/produce',
           },
           {
-            title: '2. Track Purchase Orders',
+            title: 'Track Purchase Orders',
             subtitle: 'Monitor delivery progress and order confirmations',
             icon: '📦',
             bg: '#0E4A27',
             path: '/produce/orders',
           },
           {
-            title: '3. Check Daily Market Prices',
+            title: 'Check Daily Market Prices',
             subtitle: 'Review prevailing price benchmarks and trends',
             icon: '📈',
             bg: '#2B72B3',
@@ -131,21 +303,21 @@ export const DashboardPage: React.FC = () => {
       case 'expert':
         return [
           {
-            title: '1. Answer Farmer Inquiries',
+            title: 'Answer Farmer Inquiries',
             subtitle: 'Provide technical answers and diagnosis in Community',
             icon: '💬',
             bg: '#176B3A',
             path: '/community',
           },
           {
-            title: '2. Publish Guides & Tips',
+            title: 'Publish Guides & Tips',
             subtitle: 'Share agronomic best practices and disease alerts',
             icon: '📖',
             bg: '#0E4A27',
             path: '/community#guides',
           },
           {
-            title: '3. Review Market & Programs',
+            title: 'Review Market & Programs',
             subtitle: 'Check government programs and commodity prices',
             icon: '🏛️',
             bg: '#2B72B3',
@@ -155,21 +327,21 @@ export const DashboardPage: React.FC = () => {
       default: // farmer
         return [
           {
-            title: '1. Sell My Crops',
+            title: 'Sell My Crops',
             subtitle: 'Add a crop listing to sell to buyers',
             icon: '🥦',
             bg: '#176B3A',
             path: '/produce/manage?action=new',
           },
           {
-            title: '2. Check Market Prices',
+            title: 'Check Market Prices',
             subtitle: "See today's crop prices in Northern Mindanao",
             icon: '📈',
             bg: '#0E4A27',
             path: '/market-prices',
           },
           {
-            title: '3. View My Orders',
+            title: 'View My Orders',
             subtitle: 'See buyers who want to buy your crops',
             icon: '📦',
             bg: '#2B72B3',
@@ -185,58 +357,114 @@ export const DashboardPage: React.FC = () => {
         return {
           title: 'Platform Governance Summary',
           cards: [
-            { label: '🛡️ Registered Users', value: '1,420', sub: 'Across 17 Philippine regions', color: '#176B3A' },
-            { label: '🏛️ Active LGUs', value: '38 Offices', sub: 'Monitoring local agriculture', color: '#2B72B3' },
-            { label: '📜 Assistance Programs', value: '14 Active', sub: 'National & regional subsidies', color: '#B26A00' },
+            {
+              label: 'Registered Users',
+              value: adminStats.loaded ? `${adminStats.totalUsers}` : '...',
+              sub: 'Across all Philippine regions',
+              color: '#176B3A',
+            },
+            {
+              label: 'Active Produce Listings',
+              value: adminStats.loaded ? `${adminStats.totalListings} Harvests` : '...',
+              sub: 'Available on platform marketplace',
+              color: '#2B72B3',
+            },
+            {
+              label: 'Pending Approvals',
+              value: adminStats.loaded ? `${adminStats.pendingUsers} Accounts` : '...',
+              sub: adminStats.pendingUsers > 0 ? 'Awaiting verification' : 'All accounts up to date',
+              color: adminStats.pendingUsers > 0 ? '#BA3C3C' : '#176B3A',
+            },
           ],
         };
       case 'lgu_staff':
         return {
           title: 'Local Jurisdiction Overview',
           cards: [
-            { label: '🧑‍🌾 Registered Farmers', value: '184', sub: `In ${user?.municipality || 'your municipality'}`, color: '#176B3A' },
-            { label: '🥦 Active Crop Listings', value: '52 Harvests', sub: 'Available for wholesale trade', color: '#2B72B3' },
-            { label: '⏳ Pending Approvals', value: '6 Accounts', sub: 'Awaiting your verification', color: '#BA3C3C' },
+            {
+              label: 'Registered Farmers',
+              value: lguStats.loaded ? `${lguStats.farmersCount}` : '...',
+              sub: `In ${user?.municipality || 'your municipality'}`,
+              color: '#176B3A',
+            },
+            {
+              label: 'Active Crop Listings',
+              value: lguStats.loaded ? `${lguStats.listingsCount} Harvests` : '...',
+              sub: lguStats.listingsCount > 0 ? 'Available for wholesale trade' : `No active harvests in ${user?.municipality || 'town'} yet`,
+              color: '#2B72B3',
+            },
+            {
+              label: 'Pending Approvals',
+              value: lguStats.loaded ? `${lguStats.pendingCount} Accounts` : '...',
+              sub: lguStats.pendingCount > 0 ? 'Awaiting your verification' : 'All accounts verified',
+              color: lguStats.pendingCount > 0 ? '#BA3C3C' : '#176B3A',
+            },
           ],
         };
       case 'supplier':
         return {
           title: 'Your Supply Business Summary',
           cards: [
-            { label: '🚜 Products in Catalog', value: '24 Items', sub: 'Seeds, fertilizer, tools', color: '#176B3A' },
-            { label: '📦 Orders to Fulfill', value: '8 Orders', sub: 'Ready for shipping/pickup', color: '#2B72B3' },
-            { label: '💰 Revenue (This Month)', value: '₱56,200', sub: '↑ 18.2% vs last month', color: '#1E7E45' },
+            { label: 'Supply Products', value: 'Catalog Active', sub: 'Seeds, fertilizer, tools', color: '#176B3A' },
+            { label: 'Customer Orders', value: 'Live', sub: 'Fulfillment & deliveries', color: '#2B72B3' },
+            { label: 'Market Benchmarks', value: 'Monitored', sub: 'Direct from DA Region X', color: '#1E7E45' },
           ],
         };
       case 'buyer':
         return {
           title: 'Your Wholesale Purchasing Summary',
           cards: [
-            { label: '📦 Active Orders', value: '4 Shipments', sub: 'In transit from local farms', color: '#2B72B3' },
-            { label: '🥦 Produce Sourced', value: '1,850 kg', sub: 'This month across 6 farms', color: '#176B3A' },
-            { label: '💰 Total Purchased', value: '₱92,400', sub: 'Direct from verified farmers', color: '#0E4A27' },
+            { label: 'Marketplace Produce', value: 'Available', sub: 'Fresh harvest from verified farms', color: '#2B72B3' },
+            { label: 'Purchase Orders', value: 'Live Tracking', sub: 'Direct from farmers', color: '#176B3A' },
+            { label: 'Commodity Prices', value: 'Monitored', sub: 'Official regional benchmarks', color: '#0E4A27' },
           ],
         };
       case 'expert':
         return {
           title: 'Your Advisory Activity',
           cards: [
-            { label: '💬 Questions Answered', value: '47 Answers', sub: 'Helping local crop growers', color: '#176B3A' },
-            { label: '📖 Guides Published', value: '6 Guides', sub: 'Pest control & soil nutrition', color: '#2B72B3' },
-            { label: '⭐ Expert Rating', value: '4.9 / 5.0', sub: 'From verified farmer reviews', color: '#B26A00' },
+            { label: 'Community Forum', value: 'Live Q&A', sub: 'Diagnose and help local crop growers', color: '#176B3A' },
+            { label: 'Field Guides', value: 'Handbooks Active', sub: 'Pest control & soil nutrition', color: '#2B72B3' },
+            { label: 'Status', value: 'Licensed Expert', sub: 'Verified agronomist credentials', color: '#B26A00' },
           ],
         };
       default: // farmer
         return {
           title: 'Your Farm Summary',
           cards: [
-            { label: '💚 Money Earned (This Month)', value: '₱24,850', sub: '↑ 12.4% higher than last month', color: '#176B3A' },
-            { label: '🥦 Active Crops for Sale', value: '12 Crops', sub: '3 selling actively today', color: '#2B72B3' },
-            { label: '💸 Money Spent (Expenses)', value: '₱8,420', sub: 'Spent on seeds & fertilizer', color: '#BA3C3C' },
+            {
+              label: 'Active Crops for Sale',
+              value: farmerStats.loaded ? `${farmerStats.activeListings} Crops` : '...',
+              sub: farmerStats.activeListings > 0 ? 'Selling actively today' : 'No active crop listings yet',
+              color: '#2B72B3',
+            },
+            {
+              label: 'Pending Orders',
+              value: farmerStats.loaded ? `${farmerStats.pendingOrders} Orders` : '...',
+              sub: farmerStats.pendingOrders > 0 ? 'Awaiting your fulfillment' : 'All orders fulfilled',
+              color: farmerStats.pendingOrders > 0 ? '#BA3C3C' : '#176B3A',
+            },
+            {
+              label: 'Market Monitoring',
+              value: 'Active',
+              sub: "Today's prices in Region X",
+              color: '#0E4A27',
+            },
           ],
         };
     }
   })();
+
+  const getCropIcon = (cropName: string) => {
+    const c = cropName.toLowerCase();
+    if (c.includes('corn') || c.includes('mais')) return '🌽';
+    if (c.includes('rice') || c.includes('palay')) return '🌾';
+    if (c.includes('tomato') || c.includes('kamatis')) return '🍅';
+    if (c.includes('eggplant') || c.includes('talong')) return '🍆';
+    if (c.includes('banana') || c.includes('saging')) return '🍌';
+    if (c.includes('mango') || c.includes('mangga')) return '🥭';
+    return '🌱';
+  };
 
   return (
     <div className="app-container" style={{ paddingBottom: '40px' }}>
@@ -247,20 +475,20 @@ export const DashboardPage: React.FC = () => {
           flexWrap: 'wrap',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '16px',
+          gap: '12px',
           background: '#FFFFFF',
-          padding: '28px 32px',
-          borderRadius: '24px',
-          border: '2.5px solid #E4E2DC',
-          marginBottom: '32px',
-          boxShadow: '0 4px 14px rgba(26, 28, 26, 0.04)',
+          padding: '16px 20px',
+          borderRadius: '16px',
+          border: '1px solid #E2E8F0',
+          marginBottom: '20px',
+          boxShadow: '0 1px 4px rgba(0, 0, 0, 0.03)',
         }}
       >
         <div>
-          <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27', lineHeight: 1.2 }}>
+          <h1 style={{ fontSize: '20px', fontWeight: 800, color: '#0E4A27', margin: 0, lineHeight: 1.2 }}>
             Hello, {userName}! 👋
           </h1>
-          <p style={{ fontSize: '20px', color: '#525450', marginTop: '6px', fontWeight: 600 }}>
+          <p style={{ fontSize: '13px', color: '#64748B', marginTop: '4px', margin: '4px 0 0 0', fontWeight: 500 }}>
             {subtitleMap[role] || subtitleMap.farmer}
           </p>
         </div>
@@ -269,14 +497,14 @@ export const DashboardPage: React.FC = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
-            padding: '12px 22px',
-            background: '#EAF6EE',
-            borderRadius: '30px',
-            fontSize: '18px',
-            fontWeight: 800,
-            color: '#176B3A',
-            border: '2px solid rgba(23, 107, 58, 0.3)',
+            gap: '8px',
+            padding: '5px 12px',
+            background: '#F0FDF4',
+            borderRadius: '20px',
+            fontSize: '12px',
+            fontWeight: 700,
+            color: '#166534',
+            border: '1px solid #BBF7D0',
           }}
         >
           <span>📍</span>
@@ -290,17 +518,17 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ─── Section 1: THREE BIG PRIMARY ACTION CARDS ─── */}
-      <section style={{ marginBottom: '40px' }}>
-        <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#1A1C1A', marginBottom: '20px' }}>
-          What would you like to do?
+      {/* ─── Section 1: PRIMARY ACTION CARDS ─── */}
+      <section style={{ marginBottom: '28px' }}>
+        <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', marginBottom: '12px' }}>
+          Quick Actions & Tools
         </h2>
 
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '24px',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '12px',
           }}
         >
           {actionCards.map((card, idx) => (
@@ -312,37 +540,50 @@ export const DashboardPage: React.FC = () => {
               <div className="big-action-icon-box" style={{ background: card.bg }}>
                 {card.icon}
               </div>
-              <div>
+              <div style={{ flex: 1 }}>
                 <div className="big-action-title">{card.title}</div>
                 <div className="big-action-subtitle">{card.subtitle}</div>
               </div>
+              <span style={{ color: '#CBD5E1', fontSize: '15px', fontWeight: 700 }}>→</span>
             </button>
           ))}
         </div>
       </section>
 
-      {/* ─── Section 2: SUMMARY SECTION (Adaptive Plain Blocks) ─── */}
-      <section style={{ marginBottom: '40px' }}>
-        <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#1A1C1A', marginBottom: '20px' }}>
+      {/* ─── Section 2: SUMMARY STATS SECTION (REAL LIVE DATA) ─── */}
+      <section style={{ marginBottom: '28px' }}>
+        <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', marginBottom: '12px' }}>
           {summary.title}
         </h2>
 
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-            gap: '24px',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '12px',
           }}
         >
           {summary.cards.map((c, idx) => (
-            <div key={idx} className="card" style={{ borderLeft: `8px solid ${c.color}`, background: '#FFFFFF' }}>
-              <div style={{ fontSize: '16px', fontWeight: 800, color: '#525450', textTransform: 'uppercase' }}>
+            <div
+              key={idx}
+              className="card"
+              style={{
+                borderLeft: `4px solid ${c.color}`,
+                border: '1px solid #E2E8F0',
+                borderLeftWidth: '4px',
+                background: '#FFFFFF',
+                borderRadius: '16px',
+                padding: '18px 20px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+              }}
+            >
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                 {c.label}
               </div>
-              <div style={{ fontSize: '38px', fontWeight: 800, color: '#0E4A27', margin: '8px 0 4px 0' }}>
+              <div style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27', margin: '6px 0 2px 0', lineHeight: 1.2 }}>
                 {c.value}
               </div>
-              <div style={{ fontSize: '17px', color: c.color, fontWeight: 800 }}>
+              <div style={{ fontSize: '12px', color: c.color, fontWeight: 600 }}>
                 {c.sub}
               </div>
             </div>
@@ -350,59 +591,69 @@ export const DashboardPage: React.FC = () => {
         </div>
       </section>
 
-      {/* ─── Section 3: TODAY'S CROP PRICES ─── */}
-      <section style={{ marginBottom: '40px' }}>
-        <div className="card" style={{ padding: '28px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+      {/* ─── Section 3: REAL CROP PRICES ─── */}
+      <section style={{ marginBottom: '32px' }}>
+        <div className="card" style={{ padding: '22px 24px', borderRadius: '18px', border: '1px solid #E2E8F0', background: '#FFFFFF' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
             <div>
-              <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
                 Today's Crop Prices
               </h2>
-              <p style={{ fontSize: '17px', color: '#525450', marginTop: '2px' }}>
-                Verified prices from Department of Agriculture Region X
+              <p style={{ fontSize: '13px', color: '#64748B', margin: '2px 0 0 0' }}>
+                Verified official prices recorded across Department of Agriculture trading posts
               </p>
             </div>
-            <Link to="/market-prices" className="btn btn-secondary" style={{ fontSize: '17px' }}>
+            <Link
+              to="/market-prices"
+              className="btn btn-secondary"
+              style={{ fontSize: '13px', padding: '7px 16px', borderRadius: '10px', fontWeight: 700 }}
+            >
               View All Prices →
             </Link>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {[
-              { crop: 'Tomato (Kamatis)', price: '₱65 per kg', trend: '↑ Price Going UP by 8%', color: '#1E7E45', icon: '🍅' },
-              { crop: 'Corn (Mais)', price: '₱42 per kg', trend: '↓ Price Going DOWN by 3%', color: '#BA3C3C', icon: '🌽' },
-              { crop: 'Rice (Palay)', price: '₱52 per kg', trend: '↑ Price Going UP by 2%', color: '#1E7E45', icon: '🌾' },
-              { crop: 'Mango (Mangga)', price: '₱95 per kg', trend: '→ Price STABLE at 0%', color: '#525450', icon: '🥭' },
-              { crop: 'Eggplant (Talong)', price: '₱48 per kg', trend: '↑ Price Going UP by 1%', color: '#1E7E45', icon: '🍆' },
-            ].map((item, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px 20px',
-                  borderRadius: '16px',
-                  background: '#F8F7F3',
-                  border: '2px solid #E4E2DC',
-                  flexWrap: 'wrap',
-                  gap: '12px',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <span style={{ fontSize: '32px' }}>{item.icon}</span>
-                  <div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#1A1C1A' }}>{item.crop}</div>
-                    <div style={{ fontSize: '16px', color: item.color, fontWeight: 800, marginTop: '2px' }}>{item.trend}</div>
+          {!pricesLoaded ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
+              Loading today's price benchmarks...
+            </div>
+          ) : marketPrices.length === 0 ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
+              <p style={{ margin: 0, fontSize: '14px' }}>No price records published yet for today.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {marketPrices.map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 18px',
+                    borderRadius: '12px',
+                    background: '#F8FAFC',
+                    border: '1px solid #E2E8F0',
+                    flexWrap: 'wrap',
+                    gap: '8px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '22px' }}>{getCropIcon(item.cropName)}</span>
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>{item.cropName}</div>
+                      <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>
+                        📍 {item.marketLocation || item.region}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: '16px', fontWeight: 800, color: '#0E4A27' }}>
+                    ₱{item.price} / {item.unit || 'kg'}
                   </div>
                 </div>
-
-                <div style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27' }}>
-                  {item.price}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -410,36 +661,28 @@ export const DashboardPage: React.FC = () => {
       <section>
         <div
           style={{
-            padding: '28px',
-            borderRadius: '24px',
-            background: '#EAF6EE',
-            border: '3px solid #176B3A',
+            padding: '20px 24px',
+            borderRadius: '18px',
+            background: '#F0FDF4',
+            border: '1.5px solid #86EFAC',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
-            gap: '20px',
+            gap: '16px',
           }}
         >
           <div>
-            <div style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27' }}>
+            <div style={{ fontSize: '16px', fontWeight: 800, color: '#14532D' }}>
               📞 Need Help Over the Phone?
             </div>
-            <div style={{ fontSize: '18px', color: '#1A1C1A', marginTop: '6px', fontWeight: 600 }}>
-              Speak directly to our friendly support team. We assist in Tagalog & Bisaya.
+            <div style={{ fontSize: '13px', color: '#166534', marginTop: '2px', fontWeight: 500 }}>
+              Speak directly to our friendly support team. We assist in Tagalog, Bisaya & English.
             </div>
-            <div style={{ fontSize: '22px', fontWeight: 800, color: '#176B3A', marginTop: '8px' }}>
-              Call Hotline: 0917-123-4567 (Free Toll)
+            <div style={{ fontSize: '15px', fontWeight: 800, color: '#15803D', marginTop: '4px' }}>
+              Hotline: 0917-123-4567 (Toll Free)
             </div>
           </div>
-
-          <button
-            onClick={() => alert('Calling AgriConnect Farmer Hotline 0917-123-4567...')}
-            className="btn btn-primary btn-large"
-            style={{ fontSize: '20px' }}
-          >
-            📞 Call Support Now
-          </button>
         </div>
       </section>
     </div>

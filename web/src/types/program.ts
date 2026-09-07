@@ -25,6 +25,7 @@ export interface ProgramApplication {
   farmerRegion?: string;
   farmSizeHectares: number;
   cropsGrown: string[];
+  rsbsaNumber?: string;
   submittedDocs: string[];
   status: ApplicationStatus;
   remarks?: string;
@@ -45,6 +46,7 @@ export interface CreateProgramPayload {
 }
 
 export interface SubmitApplicationPayload {
+  rsbsaNumber?: string;
   farmSizeHectares: number;
   cropsGrown: string[];
   submittedDocs: string[];

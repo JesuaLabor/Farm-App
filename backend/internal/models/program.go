@@ -45,8 +45,11 @@ type ProgramApplication struct {
 	FarmerName     string            `bson:"farmer_name"           json:"farmerName"`
 	FarmerPhone    string            `bson:"farmer_phone"          json:"farmerPhone"`
 	FarmerRegion   string            `bson:"farmer_region"         json:"farmerRegion"`
+	FarmerProvince string            `bson:"farmer_province,omitempty" json:"farmerProvince,omitempty"`
+	FarmerMunicipality string        `bson:"farmer_municipality,omitempty" json:"farmerMunicipality,omitempty"`
 	FarmSizeHectares float64          `bson:"farm_size_hectares"    json:"farmSizeHectares"`
 	CropsGrown     []string          `bson:"crops_grown"           json:"cropsGrown"`
+	RSBSANumber    string            `bson:"rsbsa_number,omitempty" json:"rsbsaNumber,omitempty"`
 	SubmittedDocs  []string          `bson:"submitted_docs"        json:"submittedDocs"` // File paths or document titles
 	Status         ApplicationStatus `bson:"status"                json:"status"`        // "submitted", "under_review", "approved", "rejected"
 	Remarks        string            `bson:"remarks,omitempty"     json:"remarks,omitempty"`
@@ -71,6 +74,7 @@ type CreateProgramRequest struct {
 
 // SubmitApplicationRequest payload
 type SubmitApplicationRequest struct {
+	RSBSANumber      string   `json:"rsbsaNumber,omitempty"`
 	FarmSizeHectares float64  `json:"farmSizeHectares"`
 	CropsGrown       []string `json:"cropsGrown"`
 	SubmittedDocs    []string `json:"submittedDocs"`

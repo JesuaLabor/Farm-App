@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { ToastProvider } from './contexts/ToastContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AppLayout } from './components/AppLayout';
 import { LoginPage } from './pages/LoginPage';
@@ -30,248 +31,260 @@ export const App: React.FC = () => {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <DashboardPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <ProfilePage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/settings"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <SettingsPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
+        <ToastProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <DashboardPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ProfilePage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <SettingsPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Produce Marketplace */}
-          <Route
-            path="/produce"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <ProduceMarketplacePage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/produce/manage"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <ManageProduceListingsPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/produce/orders"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <ProduceTransactionsPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
+            {/* Produce Marketplace */}
+            <Route
+              path="/produce"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ProduceMarketplacePage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/produce/manage"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ManageProduceListingsPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/produce/orders"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ProduceTransactionsPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Agri-Supply Store */}
-          <Route
-            path="/supply"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <SupplyStorePage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/supply/cart"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <SupplyCartPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/supply/manage"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <ManageSupplyProductsPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/supply/orders"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <SupplyOrdersPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
+            {/* Agri-Supply Store */}
+            <Route
+              path="/supply"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <SupplyStorePage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/supply/cart"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <SupplyCartPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/supply/manage"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ManageSupplyProductsPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/supply/orders"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <SupplyOrdersPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Market Price Monitoring */}
-          <Route
-            path="/market-prices"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <MarketPriceMonitoringPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/price-trends"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <MarketPriceMonitoringPage initialTab="trends" />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/market-prices/manage"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <ManageMarketPricesPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
+            {/* Market Price Monitoring */}
+            <Route
+              path="/market-prices"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <MarketPriceMonitoringPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/price-trends"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <MarketPriceMonitoringPage initialTab="trends" />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/market-prices/manage"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ManageMarketPricesPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Farm Financial Tracker */}
-          <Route
-            path="/finances"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <FarmFinancialTrackerPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
+            {/* Farm Financial Tracker */}
+            <Route
+              path="/finances"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <FarmFinancialTrackerPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Government Programs */}
-          <Route
-            path="/programs"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <GovernmentProgramsPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/programs/manage"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <ManageGovernmentProgramsPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
+            {/* Government Programs */}
+            <Route
+              path="/programs"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <GovernmentProgramsPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/programs/manage"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ManageGovernmentProgramsPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Community Hub */}
-          <Route
-            path="/community"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <CommunityHubPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/guides"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <CommunityHubPage initialTab="guides" />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/community/posts/:id"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <CommunityPostDetailPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
+            {/* Community Hub */}
+            <Route
+              path="/community"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <CommunityHubPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/guides"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <CommunityHubPage initialTab="guides" />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/community/posts/:id"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <CommunityPostDetailPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/community/post/:id"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <CommunityPostDetailPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* LGU Regional Monitoring Dashboard */}
-          <Route
-            path="/lgu/dashboard"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <LGUDashboardPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
+            {/* LGU Regional Monitoring Dashboard */}
+            <Route
+              path="/lgu/dashboard"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <LGUDashboardPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Super Admin & LGU Account Approvals */}
-          <Route
-            path="/admin/approvals"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <SuperAdminApprovalsPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/lgu/approvals"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <LGUAccountApprovalsPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
+            {/* Super Admin & LGU Account Approvals */}
+            <Route
+              path="/admin/approvals"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <SuperAdminApprovalsPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/lgu/approvals"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <LGUAccountApprovalsPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
 
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   );

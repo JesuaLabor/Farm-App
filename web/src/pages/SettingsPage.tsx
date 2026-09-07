@@ -6,9 +6,9 @@ import { api } from '../api';
 type FontSize = 'default' | 'large' | 'extra-large';
 
 const fontSizeOptions: { key: FontSize; label: string; description: string; rootSize: string }[] = [
-  { key: 'default', label: 'Default', description: '18px — Standard readability', rootSize: '18px' },
-  { key: 'large', label: 'Large', description: '20px — Easier to read', rootSize: '20px' },
-  { key: 'extra-large', label: 'Extra Large', description: '22px — Maximum clarity', rootSize: '22px' },
+  { key: 'default', label: 'Default', description: '16px — Standard readability', rootSize: '16px' },
+  { key: 'large', label: 'Large', description: '18px — Easier to read', rootSize: '18px' },
+  { key: 'extra-large', label: 'Extra Large', description: '20px — Maximum clarity', rootSize: '20px' },
 ];
 
 type Theme = 'light' | 'dark';
