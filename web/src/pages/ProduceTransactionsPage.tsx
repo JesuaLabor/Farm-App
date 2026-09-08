@@ -848,7 +848,7 @@ export const ProduceTransactionsPage: React.FC = () => {
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    {ord.status === 'Pending' && (
+                    {ord.status === 'Pending' && isFarmer && (
                       <button
                         type="button"
                         disabled={isUpdatingStatus}
@@ -869,8 +869,27 @@ export const ProduceTransactionsPage: React.FC = () => {
                         }}
                       >
                         <span>✓</span>
-                        <span>Confirm Order</span>
+                        <span>Accept & Confirm Order</span>
                       </button>
+                    )}
+
+                    {ord.status === 'Pending' && isBuyer && (
+                      <span
+                        style={{
+                          fontSize: '13px',
+                          fontWeight: 700,
+                          color: '#D97706',
+                          backgroundColor: '#FEF3C7',
+                          padding: '8px 14px',
+                          borderRadius: '10px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <span>⏳</span>
+                        <span>Waiting for Farmer Confirmation</span>
+                      </span>
                     )}
 
                     {ord.status === 'Confirmed' && (
@@ -1552,7 +1571,7 @@ export const ProduceTransactionsPage: React.FC = () => {
                     </a>
                   )}
 
-                  {isPending && (
+                  {isPending && isFarmer && (
                     <button
                       type="button"
                       disabled={isUpdatingStatus}
@@ -1577,6 +1596,25 @@ export const ProduceTransactionsPage: React.FC = () => {
                       <span>✓</span>
                       <span>{isUpdatingStatus ? 'Confirming...' : 'Accept & Confirm Order'}</span>
                     </button>
+                  )}
+
+                  {isPending && isBuyer && (
+                    <span
+                      style={{
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        color: '#D97706',
+                        backgroundColor: '#FEF3C7',
+                        padding: '8px 14px',
+                        borderRadius: '10px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <span>⏳</span>
+                      <span>Awaiting Farmer Acceptance</span>
+                    </span>
                   )}
 
                   {isConfirmed && (

@@ -267,11 +267,16 @@ func (s *ProduceService) UpdateTransactionStatus(ctx context.Context, userID str
 	// Enforce role-based status transition rules
 	if !isAdmin {
 		if isBuyer && !isFarmer {
-			if status != models.TxCancelled {
-				return nil, errors.New("buyers can only cancel their pending orders")
-			}
-			if tx.Status != models.TxPending {
-				return nil, errors.New("cannot cancel an order that has already been confirmed or processed")
+			if status == models.TxCompleted {
+				if tx.Status != models.TxConfirmed {
+					return nil, errors.New("order must be confirmed by the farmer before you can confirm delivery receipt")
+				}
+			} else if status == models.TxCancelled {
+				if tx.Status != models.TxPending {
+					return nil, errors.New("cannot cancel an order that has already been confirmed or processed")
+				}
+			} else {
+				return nil, errors.New("buyers cannot accept orders; only the farmer can confirm an order")
 			}
 		} else if isFarmer {
 			if tx.Status == models.TxCompleted || tx.Status == models.TxCancelled {
