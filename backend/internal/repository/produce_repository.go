@@ -186,11 +186,15 @@ func (r *ProduceRepository) ListTransactions(ctx context.Context, userID string,
 		return nil, fmt.Errorf("invalid user id: %w", err)
 	}
 
+	// For farmers: use $or so they see BOTH:
+	//   - transactions where they are the seller (farmer_id = them)
+	//   - transactions where they bought from another farmer (buyer_id = them)
+	// For buyers: only show their purchases (buyer_id = them)
 	query := bson.M{}
 	if role == "buyer" {
 		query["buyer_id"] = oid
 	} else if role == "farmer" {
-		query["farmer_id"] = oid
+		query["$or"] = []bson.M{{"buyer_id": oid}, {"farmer_id": oid}}
 	} else {
 		query["$or"] = []bson.M{{"buyer_id": oid}, {"farmer_id": oid}}
 	}

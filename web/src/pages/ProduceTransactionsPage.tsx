@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { useChat } from '../contexts/ChatContext';
 import { produceApi } from '../api/produce';
 import { getImageUrl } from '../api';
 
 export interface OrderItem {
   id: string;
   isBackend?: boolean;
+  buyerId?: string;
+  farmerId?: string;
   buyerName: string;
   buyerLocation: string;
   farmerName?: string;
@@ -106,9 +109,35 @@ export function formatOrderId(id: string): string {
 export const ProduceTransactionsPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { openChatWith } = useChat();
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const isFarmer = user?.role === 'farmer';
   const isBuyer = user?.role === 'buyer';
+
+  // viewMode: 'sales' = farmer selling to buyers, 'purchases' = farmer buying from other farmers
+  const [viewMode, setViewMode] = useState<'sales' | 'purchases'>('sales');
+  const isViewingPurchases = isFarmer && viewMode === 'purchases';
+
+  const handleChatOrderParty = (ord: OrderItem) => {
+    // When viewing farmer's own purchases, chat target is the seller (farmerId)
+    // When viewing sales orders, chat target is the buyer (buyerId)
+    const targetUserId = isViewingPurchases ? ord.farmerId : (isFarmer ? ord.buyerId : ord.farmerId);
+    if (!targetUserId) {
+      toastError('Account Unavailable', 'Contact information is currently unavailable for this user.');
+      return;
+    }
+    openChatWith(
+      targetUserId,
+      {
+        type: 'produce_order',
+        referenceId: ord.id,
+        title: `Order #${ord.id.slice(-6).toUpperCase()} - ${ord.product}`,
+        image: ord.photo ? getImageUrl(ord.photo) : undefined,
+        price: ord.total,
+      },
+      `Hi! Inquiring regarding order #${ord.id.slice(-6).toUpperCase()} (${ord.product}, total ₱${ord.total?.toLocaleString()}).`
+    );
+  };
 
   const [selectedTab, setSelectedTab] = useState<'All Orders' | 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled'>('All Orders');
   const [searchQuery, setSearchQuery] = useState('');
@@ -159,6 +188,8 @@ export const ProduceTransactionsPage: React.FC = () => {
           return {
             id: t.id,
             isBackend: true,
+            buyerId: t.buyerId,
+            farmerId: t.farmerId,
             buyerName: t.buyerName || 'Buyer',
             buyerLocation: parsedContact.fulfillment || 'Northern Mindanao',
             farmerName: t.farmerName,
@@ -227,14 +258,32 @@ export const ProduceTransactionsPage: React.FC = () => {
     .filter((o) => o.status === 'Confirmed' || o.status === 'Completed')
     .reduce((sum, o) => sum + o.total, 0);
 
+  // Split orders into sales (farmer as seller) and purchases (farmer as buyer)
+  const salesOrders = isFarmer
+    ? orders.filter((o) => o.farmerId === user?.id)
+    : orders;
+  const purchaseOrders = isFarmer
+    ? orders.filter((o) => o.buyerId === user?.id)
+    : [];
+
+  // Which pool of orders to show based on viewMode
+  const activeOrders = isViewingPurchases ? purchaseOrders : salesOrders;
+
+  // KPI recalculations based on active pool
+  const activePendingCount = activeOrders.filter((o) => o.status === 'Pending').length;
+  const activeConfirmedCount = activeOrders.filter((o) => o.status === 'Confirmed').length;
+  const activeCompletedCount = activeOrders.filter((o) => o.status === 'Completed').length;
+  const activeCancelledCount = activeOrders.filter((o) => o.status === 'Cancelled').length;
+
   // Filtering
-  const filteredOrders = orders.filter((ord) => {
+  const filteredOrders = activeOrders.filter((ord) => {
     const matchesTab = selectedTab === 'All Orders' || ord.status.toLowerCase() === selectedTab.toLowerCase();
     const query = searchQuery.trim().toLowerCase();
     const matchesSearch =
       query === '' ||
       ord.product.toLowerCase().includes(query) ||
       ord.buyerName.toLowerCase().includes(query) ||
+      (ord.farmerName && ord.farmerName.toLowerCase().includes(query)) ||
       ord.id.toLowerCase().includes(query) ||
       (ord.contactMessage && ord.contactMessage.toLowerCase().includes(query));
     return matchesTab && matchesSearch;
@@ -294,36 +343,74 @@ export const ProduceTransactionsPage: React.FC = () => {
     <div className="app-container" style={{ paddingBottom: '60px' }}>
       {/* ─── Order Category Navigation Switcher ─── */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '22px', flexWrap: 'wrap' }}>
+
+        {/* Sales Orders tab (farmer's default view) / Buyer Produce Purchases */}
         <button
           type="button"
-          onClick={() => navigate('/produce/orders')}
+          onClick={() => { setViewMode('sales'); setSelectedTab('All Orders'); }}
           style={{
             padding: '10px 22px',
             borderRadius: '24px',
-            border: '2px solid #176B3A',
-            backgroundColor: '#EAF6EE',
-            color: '#0E4A27',
-            fontWeight: 800,
+            border: `2px solid ${!isViewingPurchases ? '#176B3A' : '#e2e8f0'}`,
+            backgroundColor: !isViewingPurchases ? '#EAF6EE' : '#ffffff',
+            color: !isViewingPurchases ? '#0E4A27' : '#64748b',
+            fontWeight: !isViewingPurchases ? 800 : 700,
             fontSize: '15px',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            boxShadow: '0 2px 8px rgba(23, 107, 58, 0.12)',
+            boxShadow: !isViewingPurchases ? '0 2px 8px rgba(23, 107, 58, 0.12)' : 'none',
+            transition: 'all 0.15s ease',
           }}
         >
           <span>{isFarmer ? '🌾 Crop Sales Orders' : '🌱 My Produce Purchases'}</span>
           <span style={{
-            backgroundColor: '#176B3A',
+            backgroundColor: !isViewingPurchases ? '#176B3A' : '#cbd5e1',
             color: '#ffffff',
             fontSize: '11px',
             fontWeight: 800,
             padding: '2px 8px',
             borderRadius: '10px',
           }}>
-            {orders.length}
+            {salesOrders.length}
           </span>
         </button>
+
+        {/* My Crop Purchases tab — only visible for Farmers */}
+        {isFarmer && (
+          <button
+            type="button"
+            onClick={() => { setViewMode('purchases'); setSelectedTab('All Orders'); }}
+            style={{
+              padding: '10px 22px',
+              borderRadius: '24px',
+              border: `2px solid ${isViewingPurchases ? '#7C3AED' : '#e2e8f0'}`,
+              backgroundColor: isViewingPurchases ? '#F5F3FF' : '#ffffff',
+              color: isViewingPurchases ? '#4C1D95' : '#64748b',
+              fontWeight: isViewingPurchases ? 800 : 700,
+              fontSize: '15px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: isViewingPurchases ? '0 2px 8px rgba(124, 58, 237, 0.12)' : 'none',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <span>🛒 My Crop Purchases</span>
+            <span style={{
+              backgroundColor: isViewingPurchases ? '#7C3AED' : '#cbd5e1',
+              color: '#ffffff',
+              fontSize: '11px',
+              fontWeight: 800,
+              padding: '2px 8px',
+              borderRadius: '10px',
+            }}>
+              {purchaseOrders.length}
+            </span>
+          </button>
+        )}
 
         <button
           type="button"
@@ -360,15 +447,17 @@ export const ProduceTransactionsPage: React.FC = () => {
       <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
-            <span style={{ fontSize: '32px' }}>{isFarmer ? '🌾' : '🛒'}</span>
-            <h1 style={{ fontSize: '32px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
-              {isFarmer ? 'Crop Sales & Buyer Orders' : 'My Produce Purchases'}
+            <span style={{ fontSize: '32px' }}>{isViewingPurchases ? '🛒' : (isFarmer ? '🌾' : '🛒')}</span>
+            <h1 style={{ fontSize: '32px', fontWeight: 800, color: isViewingPurchases ? '#4C1D95' : '#0E4A27', margin: 0 }}>
+              {isViewingPurchases ? 'My Crop Purchases' : (isFarmer ? 'Crop Sales & Buyer Orders' : 'My Produce Purchases')}
             </h1>
           </div>
           <p style={{ fontSize: '16px', color: '#525450', margin: 0 }}>
-            {isFarmer
-              ? 'Review incoming purchase requests from buyers for your harvests, confirm fulfillment, and track payments.'
-              : 'Track fresh farm harvests you ordered from local farmers across Northern Mindanao.'}
+            {isViewingPurchases
+              ? 'Track produce you purchased from other farmers. View order status and contact the seller.'
+              : (isFarmer
+                ? 'Review incoming purchase requests from buyers for your harvests, confirm fulfillment, and track payments.'
+                : 'Track fresh farm harvests you ordered from local farmers across Northern Mindanao.')}
           </p>
         </div>
 
@@ -405,16 +494,16 @@ export const ProduceTransactionsPage: React.FC = () => {
           </div>
           <div>
             <div style={{ fontSize: '13px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Orders</div>
-            <div style={{ fontSize: '26px', fontWeight: 800, color: '#0F172A' }}>{totalOrdersCount}</div>
+            <div style={{ fontSize: '26px', fontWeight: 800, color: '#0F172A' }}>{activeOrders.length}</div>
           </div>
         </div>
 
         <div
           style={{
-            background: pendingCount > 0 ? '#FEFCE8' : '#FFFFFF',
+            background: activePendingCount > 0 ? '#FEFCE8' : '#FFFFFF',
             borderRadius: '16px',
             padding: '20px',
-            border: `1.5px solid ${pendingCount > 0 ? '#FDE047' : '#E2E8F0'}`,
+            border: `1.5px solid ${activePendingCount > 0 ? '#FDE047' : '#E2E8F0'}`,
             boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
             display: 'flex',
             alignItems: 'center',
@@ -425,11 +514,11 @@ export const ProduceTransactionsPage: React.FC = () => {
             ⏳
           </div>
           <div>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: pendingCount > 0 ? '#A16207' : '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: activePendingCount > 0 ? '#A16207' : '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Pending Action
             </div>
-            <div style={{ fontSize: '26px', fontWeight: 800, color: pendingCount > 0 ? '#A16207' : '#0F172A' }}>
-              {pendingCount}
+            <div style={{ fontSize: '26px', fontWeight: 800, color: activePendingCount > 0 ? '#A16207' : '#0F172A' }}>
+              {activePendingCount}
             </div>
           </div>
         </div>
@@ -451,7 +540,7 @@ export const ProduceTransactionsPage: React.FC = () => {
           </div>
           <div>
             <div style={{ fontSize: '13px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Active Deliveries</div>
-            <div style={{ fontSize: '26px', fontWeight: 800, color: '#1E40AF' }}>{confirmedCount}</div>
+            <div style={{ fontSize: '26px', fontWeight: 800, color: '#1E40AF' }}>{activeConfirmedCount}</div>
           </div>
         </div>
 
@@ -496,11 +585,11 @@ export const ProduceTransactionsPage: React.FC = () => {
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: '4px' }}>
           {tabs.map((tab) => {
             const isSelected = selectedTab === tab;
-            let count = totalOrdersCount;
-            if (tab === 'Pending') count = pendingCount;
-            if (tab === 'Confirmed') count = confirmedCount;
-            if (tab === 'Completed') count = completedCount;
-            if (tab === 'Cancelled') count = cancelledCount;
+            let count = activeOrders.length;
+            if (tab === 'Pending') count = activePendingCount;
+            if (tab === 'Confirmed') count = activeConfirmedCount;
+            if (tab === 'Completed') count = activeCompletedCount;
+            if (tab === 'Cancelled') count = activeCancelledCount;
 
             return (
               <button
@@ -827,15 +916,22 @@ export const ProduceTransactionsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Right Column: Buyer & Structured Logistics Information */}
+                  {/* Right Column: Buyer / Seller Info depending on viewMode */}
                   <div style={{ backgroundColor: '#F8FAFC', padding: '16px', borderRadius: '14px', border: '1px solid #E2E8F0' }}>
-                    {/* Buyer Identity */}
+                    {/* Party Identity */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#0E4A27', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800 }}>
-                        {ord.buyerName.charAt(0).toUpperCase()}
+                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: isViewingPurchases ? '#4C1D95' : '#0E4A27', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800 }}>
+                        {isViewingPurchases
+                          ? (ord.farmerName || 'S').charAt(0).toUpperCase()
+                          : ord.buyerName.charAt(0).toUpperCase()}
                       </div>
-                      <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
-                        {ord.buyerName}
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: isViewingPurchases ? '#6D28D9' : '#64748B', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                          {isViewingPurchases ? 'Selling Farmer' : 'Buyer'}
+                        </div>
+                        <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
+                          {isViewingPurchases ? (ord.farmerName || 'Unknown Farmer') : ord.buyerName}
+                        </div>
                       </div>
                     </div>
 
@@ -893,7 +989,32 @@ export const ProduceTransactionsPage: React.FC = () => {
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    {ord.status === 'Pending' && isFarmer && (
+                    {/* Chat with other party */}
+                    {((isViewingPurchases && ord.farmerId) || (isFarmer && !isViewingPurchases && ord.buyerId) || (isBuyer && ord.farmerId)) && (
+                      <button
+                        type="button"
+                        onClick={() => handleChatOrderParty(ord)}
+                        style={{
+                          padding: '10px 16px',
+                          borderRadius: '10px',
+                          backgroundColor: '#EFFDF5',
+                          color: '#0E4A27',
+                          fontWeight: 700,
+                          fontSize: '14px',
+                          border: '1.5px solid #16A34A',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                        title={isViewingPurchases ? `Chat with Farmer (${ord.farmerName || 'Farmer'})` : (isFarmer ? `Chat with Buyer (${ord.buyerName})` : `Chat with Farmer (${ord.farmerName || 'Farmer'})`)}
+                      >
+                        <span>💬</span>
+                        <span>{isViewingPurchases ? 'Chat Farmer' : (isFarmer ? 'Chat Buyer' : 'Chat Farmer')}</span>
+                      </button>
+                    )}
+
+                    {ord.status === 'Pending' && isFarmer && !isViewingPurchases && (
                       <button
                         type="button"
                         disabled={isUpdatingStatus}
@@ -918,7 +1039,7 @@ export const ProduceTransactionsPage: React.FC = () => {
                       </button>
                     )}
 
-                    {ord.status === 'Pending' && isBuyer && (
+                    {ord.status === 'Pending' && (isBuyer || isViewingPurchases) && (
                       <span
                         style={{
                           fontSize: '13px',
@@ -945,7 +1066,7 @@ export const ProduceTransactionsPage: React.FC = () => {
                         style={{
                           padding: '10px 20px',
                           borderRadius: '10px',
-                          backgroundColor: isFarmer ? '#16A34A' : '#2563EB',
+                          backgroundColor: (isFarmer && !isViewingPurchases) ? '#16A34A' : '#2563EB',
                           color: '#FFFFFF',
                           fontWeight: 700,
                           fontSize: '14px',
@@ -954,16 +1075,16 @@ export const ProduceTransactionsPage: React.FC = () => {
                           display: 'flex',
                           alignItems: 'center',
                           gap: '6px',
-                          boxShadow: isFarmer
+                          boxShadow: (isFarmer && !isViewingPurchases)
                             ? '0 2px 6px rgba(22,163,74,0.25)'
                             : '0 2px 6px rgba(37,99,235,0.25)',
                         }}
                       >
-                        <span>{isFarmer ? '💵' : '✓'}</span>
+                        <span>{(isFarmer && !isViewingPurchases) ? '💵' : '✓'}</span>
                         <span>
                           {isUpdatingStatus
                             ? 'Updating...'
-                            : isFarmer
+                            : (isFarmer && !isViewingPurchases)
                             ? `Confirm Payment Received (₱${ord.total.toLocaleString()})`
                             : 'Confirm Produce Received & Paid'}
                         </span>
@@ -1512,7 +1633,7 @@ export const ProduceTransactionsPage: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Buyer & Contact Details */}
+                  {/* Party & Contact Details */}
                   <div
                     style={{
                       backgroundColor: '#F8FAFC',
@@ -1524,13 +1645,13 @@ export const ProduceTransactionsPage: React.FC = () => {
                       gap: '6px',
                     }}
                   >
-                    <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748B', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: isViewingPurchases ? '#6D28D9' : '#64748B', display: 'flex', alignItems: 'center', gap: '5px' }}>
                       <span>👤</span>
-                      <span>Customer & Payment</span>
+                      <span>{isViewingPurchases ? 'Selling Farmer' : 'Customer & Payment'}</span>
                     </div>
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>{selectedOrder.buyerName}</span>
+                        <span>{isViewingPurchases ? (selectedOrder.farmerName || 'Verified Farmer') : selectedOrder.buyerName}</span>
                         <span style={{ fontSize: '10px', fontWeight: 700, color: '#16A34A', backgroundColor: '#DCFCE7', padding: '1px 6px', borderRadius: '4px' }}>
                           Verified
                         </span>
@@ -1633,11 +1754,11 @@ export const ProduceTransactionsPage: React.FC = () => {
                       }}
                     >
                       <span>📞</span>
-                      <span>Call Buyer</span>
+                      <span>{isViewingPurchases ? 'Call Farmer' : 'Call Buyer'}</span>
                     </a>
                   )}
 
-                  {isPending && isFarmer && (
+                  {isPending && isFarmer && !isViewingPurchases && (
                     <button
                       type="button"
                       disabled={isUpdatingStatus}
@@ -1664,7 +1785,7 @@ export const ProduceTransactionsPage: React.FC = () => {
                     </button>
                   )}
 
-                  {isPending && isBuyer && (
+                  {isPending && (isBuyer || isViewingPurchases) && (
                     <span
                       style={{
                         fontSize: '13px',
@@ -1694,7 +1815,7 @@ export const ProduceTransactionsPage: React.FC = () => {
                         padding: '10px 20px',
                         borderRadius: '10px',
                         border: 'none',
-                        backgroundColor: isFarmer ? '#16A34A' : '#2563EB',
+                        backgroundColor: (isFarmer && !isViewingPurchases) ? '#16A34A' : '#2563EB',
                         color: '#FFFFFF',
                         fontWeight: 700,
                         fontSize: '14px',
@@ -1702,16 +1823,16 @@ export const ProduceTransactionsPage: React.FC = () => {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        boxShadow: isFarmer
+                        boxShadow: (isFarmer && !isViewingPurchases)
                           ? '0 2px 6px rgba(22, 163, 74, 0.25)'
                           : '0 2px 6px rgba(37, 99, 235, 0.25)',
                       }}
                     >
-                      <span>{isFarmer ? '💵' : '✓'}</span>
+                      <span>{(isFarmer && !isViewingPurchases) ? '💵' : '✓'}</span>
                       <span>
                         {isUpdatingStatus
                           ? 'Updating...'
-                          : isFarmer
+                          : (isFarmer && !isViewingPurchases)
                           ? `Confirm Payment Received (₱${selectedOrder.total.toLocaleString()})`
                           : 'Confirm Produce Received & Paid'}
                       </span>
@@ -1733,7 +1854,7 @@ export const ProduceTransactionsPage: React.FC = () => {
                       }}
                     >
                       <span>✓</span>
-                      <span>{isFarmer ? 'Payment Received · Completed' : 'Order Completed & Paid'}</span>
+                      <span>{(isFarmer && !isViewingPurchases) ? 'Payment Received · Completed' : 'Order Completed & Paid'}</span>
                     </div>
                   )}
 
