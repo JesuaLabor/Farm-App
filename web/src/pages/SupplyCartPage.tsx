@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
@@ -111,19 +111,33 @@ export const SupplyCartPage: React.FC = () => {
   const [ordering, setOrdering] = useState(false);
   const { success: toastSuccess, error: toastError, warning: toastWarning, info: toastInfo } = useToast();
 
-  const loadCart = () => {
+  const isInternalUpdate = useRef(false);
+
+  const loadCart = (isInitial: boolean = false) => {
     // 1. Load supplies cart
     const rawSupply = localStorage.getItem('agriconnect_cart');
     if (rawSupply) {
       try {
         const parsed: CartItem[] = JSON.parse(rawSupply);
         setCart(parsed);
-        setSelectedSupplyIds(new Set(parsed.map((i) => i.product.id)));
+        setSelectedSupplyIds((prev) => {
+          if (isInitial) {
+            return new Set(parsed.map((i) => i.product.id));
+          }
+          // Preserve user's existing selections for items that still exist in cart
+          const validIds = new Set(parsed.map((i) => i.product.id));
+          const retained = new Set<string>();
+          prev.forEach((id) => {
+            if (validIds.has(id)) retained.add(id);
+          });
+          return retained;
+        });
       } catch {
         setCart([]);
       }
     } else {
       setCart([]);
+      setSelectedSupplyIds(new Set());
     }
 
     // 2. Load produce cart
@@ -132,12 +146,24 @@ export const SupplyCartPage: React.FC = () => {
       try {
         const parsedProduce: ProduceCartItem[] = JSON.parse(rawProduce);
         setProduceCart(parsedProduce);
-        setSelectedProduceIds(new Set(parsedProduce.map((i) => i.id)));
+        setSelectedProduceIds((prev) => {
+          if (isInitial) {
+            return new Set(parsedProduce.map((i) => i.id));
+          }
+          // Preserve user's existing selections for items that still exist in produce cart
+          const validIds = new Set(parsedProduce.map((i) => i.id));
+          const retained = new Set<string>();
+          prev.forEach((id) => {
+            if (validIds.has(id)) retained.add(id);
+          });
+          return retained;
+        });
       } catch {
         setProduceCart([]);
       }
     } else {
       setProduceCart([]);
+      setSelectedProduceIds(new Set());
     }
   };
 
@@ -182,7 +208,14 @@ export const SupplyCartPage: React.FC = () => {
 
             if (changed) {
               saveSupplyCart(reconciled);
-              setSelectedSupplyIds(new Set(reconciled.map((i) => i.product.id)));
+              setSelectedSupplyIds((prev) => {
+                const validIds = new Set(reconciled.map((i) => i.product.id));
+                const retained = new Set<string>();
+                prev.forEach((id) => {
+                  if (validIds.has(id)) retained.add(id);
+                });
+                return retained;
+              });
               toastInfo(
                 'Cart Adjusted to Available Stock',
                 `Item quantity for "${adjustedItemName || 'cart items'}" was adjusted to match current supplier stock.`
@@ -197,9 +230,12 @@ export const SupplyCartPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadCart();
+    loadCart(true);
     reconcileCartWithLiveStock();
-    const handleSync = () => loadCart();
+    const handleSync = () => {
+      if (isInternalUpdate.current) return;
+      loadCart(false);
+    };
     window.addEventListener('cart-updated', handleSync);
     window.addEventListener('storage', handleSync);
     return () => {
@@ -218,13 +254,21 @@ export const SupplyCartPage: React.FC = () => {
   const saveSupplyCart = (newCart: CartItem[]) => {
     setCart(newCart);
     localStorage.setItem('agriconnect_cart', JSON.stringify(newCart));
+    isInternalUpdate.current = true;
     window.dispatchEvent(new Event('cart-updated'));
+    setTimeout(() => {
+      isInternalUpdate.current = false;
+    }, 50);
   };
 
   const saveProduceCart = (newCart: ProduceCartItem[]) => {
     setProduceCart(newCart);
     localStorage.setItem('agriconnect_produce_cart', JSON.stringify(newCart));
+    isInternalUpdate.current = true;
     window.dispatchEvent(new Event('cart-updated'));
+    setTimeout(() => {
+      isInternalUpdate.current = false;
+    }, 50);
   };
 
   const handleUpdateSupplyQty = (productId: string, delta: number) => {
@@ -246,6 +290,14 @@ export const SupplyCartPage: React.FC = () => {
       })
       .filter(Boolean) as CartItem[];
     saveSupplyCart(updated);
+    setSelectedSupplyIds((prev) => {
+      const validIds = new Set(updated.map((i) => i.product.id));
+      const retained = new Set<string>();
+      prev.forEach((id) => {
+        if (validIds.has(id)) retained.add(id);
+      });
+      return retained;
+    });
   };
 
   const handleRemoveSupply = (productId: string) => {
@@ -276,6 +328,14 @@ export const SupplyCartPage: React.FC = () => {
       })
       .filter(Boolean) as ProduceCartItem[];
     saveProduceCart(updated);
+    setSelectedProduceIds((prev) => {
+      const validIds = new Set(updated.map((i) => i.id));
+      const retained = new Set<string>();
+      prev.forEach((id) => {
+        if (validIds.has(id)) retained.add(id);
+      });
+      return retained;
+    });
   };
 
   const handleRemoveProduce = (id: string) => {
