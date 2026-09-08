@@ -900,20 +900,28 @@ export const ProduceTransactionsPage: React.FC = () => {
                         style={{
                           padding: '10px 20px',
                           borderRadius: '10px',
-                          backgroundColor: '#2563EB',
+                          backgroundColor: isFarmer ? '#16A34A' : '#2563EB',
                           color: '#FFFFFF',
                           fontWeight: 700,
-                          fontSize: '15px',
+                          fontSize: '14px',
                           border: 'none',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '6px',
-                          boxShadow: '0 2px 4px rgba(37,99,235,0.2)',
+                          boxShadow: isFarmer
+                            ? '0 2px 6px rgba(22,163,74,0.25)'
+                            : '0 2px 6px rgba(37,99,235,0.25)',
                         }}
                       >
-                        <span>✓</span>
-                        <span>{isBuyer ? 'Confirm Received & Paid' : 'Mark as Completed'}</span>
+                        <span>{isFarmer ? '💵' : '✓'}</span>
+                        <span>
+                          {isUpdatingStatus
+                            ? 'Updating...'
+                            : isFarmer
+                            ? `Confirm Payment Received (₱${ord.total.toLocaleString()})`
+                            : 'Confirm Produce Received & Paid'}
+                        </span>
                       </button>
                     )}
 
@@ -1628,7 +1636,7 @@ export const ProduceTransactionsPage: React.FC = () => {
                         padding: '10px 20px',
                         borderRadius: '10px',
                         border: 'none',
-                        backgroundColor: '#2563EB',
+                        backgroundColor: isFarmer ? '#16A34A' : '#2563EB',
                         color: '#FFFFFF',
                         fontWeight: 700,
                         fontSize: '14px',
@@ -1636,11 +1644,19 @@ export const ProduceTransactionsPage: React.FC = () => {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
+                        boxShadow: isFarmer
+                          ? '0 2px 6px rgba(22, 163, 74, 0.25)'
+                          : '0 2px 6px rgba(37, 99, 235, 0.25)',
                       }}
                     >
-                      <span>✓</span>
-                      <span>{isUpdatingStatus ? 'Updating...' : (isBuyer ? 'Confirm Received & Paid' : 'Mark Delivered & Completed')}</span>
+                      <span>{isFarmer ? '💵' : '✓'}</span>
+                      <span>
+                        {isUpdatingStatus
+                          ? 'Updating...'
+                          : isFarmer
+                          ? `Confirm Payment Received (₱${selectedOrder.total.toLocaleString()})`
+                          : 'Confirm Produce Received & Paid'}
+                      </span>
                     </button>
                   )}
 
@@ -1659,7 +1675,7 @@ export const ProduceTransactionsPage: React.FC = () => {
                       }}
                     >
                       <span>✓</span>
-                      <span>Order Completed</span>
+                      <span>{isFarmer ? 'Payment Received · Completed' : 'Order Completed & Paid'}</span>
                     </div>
                   )}
 
