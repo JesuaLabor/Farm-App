@@ -279,8 +279,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         title: 'TRADING',
         items: [
           { label: 'Browse Marketplace', to: '/produce', icon: icons.marketplace },
-          { label: 'My Purchase Orders', to: '/produce/orders', icon: icons.orders },
+          { label: 'My Produce Purchases', to: '/produce/orders', icon: icons.orders },
           { label: 'Supply Store', to: '/supply', icon: icons.supply },
+          { label: 'My Supply Purchases', to: '/supply/orders', icon: icons.orders },
         ],
       },
       {
@@ -342,9 +343,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         title: 'MARKETPLACE',
         items: [
           { label: 'Browse Produce', to: '/produce', icon: icons.marketplace },
-          { label: 'My Orders', to: '/produce/orders', icon: icons.orders },
           { label: 'My Listings', to: '/produce/manage', icon: icons.listings },
+          { label: 'Crop Sales Orders', to: '/produce/orders', icon: icons.orders },
           { label: 'Supply Store', to: '/supply', icon: icons.supply },
+          { label: 'My Supply Purchases', to: '/supply/orders', icon: icons.orders },
         ],
       },
       {

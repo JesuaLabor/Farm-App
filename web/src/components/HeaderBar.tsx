@@ -10,7 +10,7 @@ interface BreadcrumbInfo {
   icon?: string;
 }
 
-const getBreadcrumbs = (pathname: string): BreadcrumbInfo => {
+const getBreadcrumbs = (pathname: string, role?: string): BreadcrumbInfo => {
   if (pathname === '/dashboard') {
     return { parent: 'Dashboard', parentPath: '/dashboard', current: 'Overview', icon: '⊞' };
   }
@@ -18,7 +18,12 @@ const getBreadcrumbs = (pathname: string): BreadcrumbInfo => {
     return { parent: 'Marketplace', parentPath: '/produce', current: 'My Listings', icon: '📦' };
   }
   if (pathname === '/produce/orders') {
-    return { parent: 'Marketplace', parentPath: '/produce', current: 'Orders & Transactions', icon: '🧾' };
+    return {
+      parent: 'Marketplace',
+      parentPath: '/produce',
+      current: role === 'farmer' ? 'Crop Sales Orders' : 'My Produce Purchases',
+      icon: '🧾',
+    };
   }
   if (pathname.startsWith('/produce')) {
     return { parent: 'Marketplace', parentPath: '/produce', current: 'Browse Produce', icon: '🌾' };
@@ -45,7 +50,12 @@ const getBreadcrumbs = (pathname: string): BreadcrumbInfo => {
     return { parent: 'Agri-Supply Store', parentPath: '/supply', current: 'Manage Products', icon: '🏷️' };
   }
   if (pathname === '/supply/orders') {
-    return { parent: 'Agri-Supply Store', parentPath: '/supply', current: 'Supply Orders', icon: '📦' };
+    return {
+      parent: 'Agri-Supply Store',
+      parentPath: '/supply',
+      current: role === 'supplier' ? 'Customer Orders' : 'My Supply Purchases',
+      icon: '📦',
+    };
   }
   if (pathname.startsWith('/supply')) {
     return { parent: 'Agri-Supply Store', parentPath: '/supply', current: 'Store Catalog', icon: '🏪' };
@@ -120,12 +130,45 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const breadcrumb = getBreadcrumbs(location.pathname);
+  const breadcrumb = getBreadcrumbs(location.pathname, user?.role);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
   const searchRef = useRef<HTMLDivElement>(null);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
+
+  const calculateCartCount = () => {
+    let count = 0;
+    try {
+      const rawSupply = localStorage.getItem('agriconnect_cart');
+      if (rawSupply) {
+        const items = JSON.parse(rawSupply);
+        if (Array.isArray(items)) {
+          count += items.length;
+        }
+      }
+      const rawProduce = localStorage.getItem('agriconnect_produce_cart');
+      if (rawProduce) {
+        const items = JSON.parse(rawProduce);
+        if (Array.isArray(items)) {
+          count += items.length;
+        }
+      }
+    } catch {}
+    setCartCount(count);
+  };
+
+  useEffect(() => {
+    calculateCartCount();
+    const handleSync = () => calculateCartCount();
+    window.addEventListener('cart-updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('cart-updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -462,6 +505,58 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 
       {/* Right: Notifications & User Profile */}
       <div style={{ flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
+        {/* Shopping Cart Button (Purchasing roles only: Farmer, Buyer, Admin) */}
+        {(user?.role === 'farmer' || user?.role === 'buyer' || user?.role === 'super_admin') && (
+          <button
+            onClick={() => navigate('/supply/cart')}
+            title={`Shopping Cart (${cartCount} items)`}
+            style={{
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '40px',
+              height: '40px',
+              borderRadius: '12px',
+              background: cartCount > 0 ? '#FBF6EE' : '#F0EFEA',
+              border: `1.5px solid ${cartCount > 0 ? '#D97706' : '#E4E2DC'}`,
+              cursor: 'pointer',
+              fontSize: '18px',
+              color: '#1A1C1A',
+              transition: 'all 0.18s ease',
+              padding: 0,
+            }}
+            aria-label={`Shopping cart with ${cartCount} items`}
+          >
+            🛒
+            {cartCount > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '-5px',
+                  right: '-5px',
+                  background: '#D97706',
+                  color: '#FFFFFF',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  borderRadius: '10px',
+                  minWidth: '18px',
+                  height: '18px',
+                  padding: '0 4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 5px rgba(217, 119, 6, 0.4)',
+                  border: '1.5px solid #FFFFFF',
+                  lineHeight: 1,
+                }}
+              >
+                {cartCount > 99 ? '99+' : cartCount}
+              </span>
+            )}
+          </button>
+        )}
+
         {/* Notification Bell */}
         <NotificationBell />
 

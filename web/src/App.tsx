@@ -120,6 +120,16 @@ export const App: React.FC = () => {
               }
             />
             <Route
+              path="/cart"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <SupplyCartPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/supply/manage"
               element={
                 <ProtectedRoute>
