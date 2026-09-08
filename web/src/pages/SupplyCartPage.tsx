@@ -86,7 +86,7 @@ export const SupplyCartPage: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
 
   const [ordering, setOrdering] = useState(false);
-  const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
+  const { success: toastSuccess, error: toastError, warning: toastWarning, info: toastInfo } = useToast();
 
   const loadCart = () => {
     // 1. Load supplies cart
@@ -118,8 +118,64 @@ export const SupplyCartPage: React.FC = () => {
     }
   };
 
+  // Reconcile and clamp cart quantities against live database stock
+  const reconcileCartWithLiveStock = async () => {
+    try {
+      const rawSupply = localStorage.getItem('agriconnect_cart');
+      if (rawSupply) {
+        const parsed: CartItem[] = JSON.parse(rawSupply);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const freshProducts = await supplyApi.listProducts();
+          if (Array.isArray(freshProducts) && freshProducts.length > 0) {
+            const productMap = new Map(freshProducts.map((p) => [p.id, p]));
+            let changed = false;
+            let adjustedItemName = '';
+            const reconciled: CartItem[] = [];
+
+            for (const item of parsed) {
+              const fresh = productMap.get(item.product.id);
+              if (fresh) {
+                const maxStock = Math.max(0, fresh.stockQuantity);
+                const cappedQty = Math.min(item.quantity, maxStock);
+
+                if (cappedQty !== item.quantity || fresh.stockQuantity !== item.product.stockQuantity) {
+                  changed = true;
+                  adjustedItemName = fresh.name;
+                }
+
+                if (cappedQty > 0) {
+                  reconciled.push({ ...item, product: fresh, quantity: cappedQty });
+                } else {
+                  changed = true;
+                  toastWarning(
+                    'Item Out of Stock',
+                    `"${fresh.name}" is now out of stock and was removed from your cart.`
+                  );
+                }
+              } else {
+                reconciled.push(item);
+              }
+            }
+
+            if (changed) {
+              saveSupplyCart(reconciled);
+              setSelectedSupplyIds(new Set(reconciled.map((i) => i.product.id)));
+              toastInfo(
+                'Cart Adjusted to Available Stock',
+                `Item quantity for "${adjustedItemName || 'cart items'}" was adjusted to match current supplier stock.`
+              );
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to reconcile cart stock:', e);
+    }
+  };
+
   useEffect(() => {
     loadCart();
+    reconcileCartWithLiveStock();
     const handleSync = () => loadCart();
     window.addEventListener('cart-updated', handleSync);
     window.addEventListener('storage', handleSync);
@@ -149,13 +205,23 @@ export const SupplyCartPage: React.FC = () => {
   };
 
   const handleUpdateSupplyQty = (productId: string, delta: number) => {
-    const updated = cart.map((item) => {
-      if (item.product.id === productId) {
-        const newQty = item.quantity + delta;
-        return newQty > 0 ? { ...item, quantity: newQty } : null;
-      }
-      return item;
-    }).filter(Boolean) as CartItem[];
+    const updated = cart
+      .map((item) => {
+        if (item.product.id === productId) {
+          const maxStock = item.product.stockQuantity ?? 9999;
+          if (delta > 0 && item.quantity >= maxStock) {
+            toastWarning(
+              'Stock Limit Reached',
+              `Cannot add more. Only ${maxStock} ${item.product.unit || 'units'} available in stock.`
+            );
+            return item;
+          }
+          const newQty = Math.min(maxStock, item.quantity + delta);
+          return newQty > 0 ? { ...item, quantity: newQty } : null;
+        }
+        return item;
+      })
+      .filter(Boolean) as CartItem[];
     saveSupplyCart(updated);
   };
 
@@ -169,13 +235,23 @@ export const SupplyCartPage: React.FC = () => {
   };
 
   const handleUpdateProduceQty = (id: string, delta: number) => {
-    const updated = produceCart.map((item) => {
-      if (item.id === id) {
-        const newQty = item.quantity + delta;
-        return newQty > 0 ? { ...item, quantity: newQty } : null;
-      }
-      return item;
-    }).filter(Boolean) as ProduceCartItem[];
+    const updated = produceCart
+      .map((item) => {
+        if (item.id === id) {
+          const maxHarvest = item.listing?.quantity ?? 9999;
+          if (delta > 0 && item.quantity >= maxHarvest) {
+            toastWarning(
+              'Harvest Limit Reached',
+              `Cannot add more. Only ${maxHarvest} ${item.listing?.unit || 'kg'} available.`
+            );
+            return item;
+          }
+          const newQty = Math.min(maxHarvest, item.quantity + delta);
+          return newQty > 0 ? { ...item, quantity: newQty } : null;
+        }
+        return item;
+      })
+      .filter(Boolean) as ProduceCartItem[];
     saveProduceCart(updated);
   };
 
@@ -251,6 +327,15 @@ export const SupplyCartPage: React.FC = () => {
         toastWarning(
           'Multiple Suppliers',
           `Your selected items come from multiple suppliers (${uniqueSelectedSuppliers.join(', ')}). Please select items from only 1 supplier per order.`
+        );
+        return;
+      }
+
+      const exceedingItems = selectedSupplyItems.filter((i) => i.quantity > i.product.stockQuantity);
+      if (exceedingItems.length > 0) {
+        toastWarning(
+          'Stock Limit Exceeded',
+          `"${exceedingItems[0].product.name}" only has ${exceedingItems[0].product.stockQuantity} in stock. Please adjust your cart quantity.`
         );
         return;
       }
@@ -549,6 +634,23 @@ export const SupplyCartPage: React.FC = () => {
                         <p style={{ fontSize: '13px', color: '#64748b', margin: '2px 0 0 0' }}>
                           ₱{item.product.price.toLocaleString()} / {item.product.unit}
                         </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: item.product.stockQuantity <= 3 ? '#b45309' : '#15803d',
+                            backgroundColor: item.product.stockQuantity <= 3 ? '#fef3c7' : '#dcfce7',
+                            padding: '2px 7px',
+                            borderRadius: '6px',
+                          }}>
+                            {item.product.stockQuantity > 0 ? `Stock: ${item.product.stockQuantity}` : 'Out of Stock'}
+                          </span>
+                          {item.quantity >= item.product.stockQuantity && (
+                            <span style={{ fontSize: '11px', fontWeight: 800, color: '#d97706' }}>
+                              (Max available in stock)
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
@@ -557,7 +659,16 @@ export const SupplyCartPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleUpdateSupplyQty(item.product.id, -1)}
-                            style={{ padding: '6px 10px', border: 'none', background: '#f8fafc', cursor: 'pointer', fontWeight: 700, fontSize: '15px' }}
+                            disabled={item.quantity <= 1}
+                            style={{
+                              padding: '6px 10px',
+                              border: 'none',
+                              background: '#f8fafc',
+                              cursor: item.quantity <= 1 ? 'not-allowed' : 'pointer',
+                              fontWeight: 700,
+                              fontSize: '15px',
+                              opacity: item.quantity <= 1 ? 0.4 : 1,
+                            }}
                           >
                             −
                           </button>
@@ -567,7 +678,18 @@ export const SupplyCartPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleUpdateSupplyQty(item.product.id, 1)}
-                            style={{ padding: '6px 10px', border: 'none', background: '#f8fafc', cursor: 'pointer', fontWeight: 700, fontSize: '15px' }}
+                            disabled={item.quantity >= item.product.stockQuantity}
+                            title={item.quantity >= item.product.stockQuantity ? `Only ${item.product.stockQuantity} available in stock` : 'Add 1'}
+                            style={{
+                              padding: '6px 10px',
+                              border: 'none',
+                              background: item.quantity >= item.product.stockQuantity ? '#f1f5f9' : '#f8fafc',
+                              cursor: item.quantity >= item.product.stockQuantity ? 'not-allowed' : 'pointer',
+                              fontWeight: 700,
+                              fontSize: '15px',
+                              color: item.quantity >= item.product.stockQuantity ? '#94a3b8' : '#0f172a',
+                              opacity: item.quantity >= item.product.stockQuantity ? 0.4 : 1,
+                            }}
                           >
                             +
                           </button>
@@ -593,6 +715,7 @@ export const SupplyCartPage: React.FC = () => {
                 /* Produce Crops Items List */
                 produceCart.map((item) => {
                   const isChecked = selectedProduceIds.has(item.id);
+                  const maxHarvest = item.listing?.quantity ?? 9999;
                   return (
                     <div
                       key={item.id}
@@ -631,6 +754,23 @@ export const SupplyCartPage: React.FC = () => {
                         <p style={{ fontSize: '13px', color: '#64748b', margin: '2px 0 0 0' }}>
                           ₱{item.listing.pricePerUnit} / {item.listing.unit || 'kg'} • 📍 {item.listing.location || 'Northern Mindanao'}
                         </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: '#15803d',
+                            backgroundColor: '#dcfce7',
+                            padding: '2px 7px',
+                            borderRadius: '6px',
+                          }}>
+                            Available: {maxHarvest} {item.listing?.unit || 'kg'}
+                          </span>
+                          {item.quantity >= maxHarvest && (
+                            <span style={{ fontSize: '11px', fontWeight: 800, color: '#d97706' }}>
+                              (Max harvest reached)
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
@@ -639,7 +779,16 @@ export const SupplyCartPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleUpdateProduceQty(item.id, -5)}
-                            style={{ padding: '6px 10px', border: 'none', background: '#f8fafc', cursor: 'pointer', fontWeight: 700, fontSize: '15px' }}
+                            disabled={item.quantity <= 1}
+                            style={{
+                              padding: '6px 10px',
+                              border: 'none',
+                              background: '#f8fafc',
+                              cursor: item.quantity <= 1 ? 'not-allowed' : 'pointer',
+                              fontWeight: 700,
+                              fontSize: '15px',
+                              opacity: item.quantity <= 1 ? 0.4 : 1,
+                            }}
                           >
                             −
                           </button>
@@ -649,7 +798,18 @@ export const SupplyCartPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleUpdateProduceQty(item.id, 5)}
-                            style={{ padding: '6px 10px', border: 'none', background: '#f8fafc', cursor: 'pointer', fontWeight: 700, fontSize: '15px' }}
+                            disabled={item.quantity >= maxHarvest}
+                            title={item.quantity >= maxHarvest ? `Only ${maxHarvest}kg available` : 'Add 5kg'}
+                            style={{
+                              padding: '6px 10px',
+                              border: 'none',
+                              background: item.quantity >= maxHarvest ? '#f1f5f9' : '#f8fafc',
+                              cursor: item.quantity >= maxHarvest ? 'not-allowed' : 'pointer',
+                              fontWeight: 700,
+                              fontSize: '15px',
+                              color: item.quantity >= maxHarvest ? '#94a3b8' : '#0f172a',
+                              opacity: item.quantity >= maxHarvest ? 0.4 : 1,
+                            }}
                           >
                             +
                           </button>

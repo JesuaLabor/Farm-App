@@ -138,6 +138,37 @@ export const SupplyStorePage: React.FC = () => {
         q: search || undefined,
       });
       setProducts(data);
+
+      // Automatically clamp any cart quantities that exceed live available stock
+      try {
+        const raw = localStorage.getItem('agriconnect_cart');
+        if (raw) {
+          const cartItems: any[] = JSON.parse(raw);
+          if (Array.isArray(cartItems) && cartItems.length > 0) {
+            const productMap = new Map(data.map((p) => [p.id, p]));
+            let cartModified = false;
+            const updated = cartItems.map((c) => {
+              const fresh = productMap.get(c.product?.id);
+              if (fresh) {
+                const maxStock = Math.max(0, fresh.stockQuantity);
+                if (c.quantity > maxStock || c.product?.stockQuantity !== fresh.stockQuantity) {
+                  cartModified = true;
+                  return { ...c, product: fresh, quantity: Math.min(c.quantity, maxStock) };
+                }
+              }
+              return c;
+            }).filter((c) => c.quantity > 0);
+
+            if (cartModified) {
+              localStorage.setItem('agriconnect_cart', JSON.stringify(updated));
+              updateCartCount();
+              window.dispatchEvent(new Event('cart-updated'));
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Failed to reconcile cart in store:', e);
+      }
     } catch (err) {
       console.error('Failed to load products:', err);
     } finally {
