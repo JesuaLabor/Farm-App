@@ -280,16 +280,46 @@ func (s *SupplyService) UpdateOrderStatus(ctx context.Context, userID string, or
 		return nil, err
 	}
 
+	// When an active order is cancelled, restore stock back to products
+	if status == models.SupplyOrderCancelled && order.Status != models.SupplyOrderCancelled && order.Status != models.SupplyOrderCompleted {
+		for _, item := range order.Items {
+			_ = s.supplyRepo.RestoreStock(ctx, item.ProductID, item.Quantity)
+		}
+	}
+
 	updated, err := s.supplyRepo.GetOrderByID(ctx, oOID)
 	if err == nil && s.notifRepo != nil {
-		// Notify buyer about status change
-		_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
-			UserID:  updated.BuyerID,
-			Title:   "🚚 Order Status Updated",
-			Message: fmt.Sprintf("Your supply order from %s is now %s", updated.SupplierName, status),
-			Type:    models.NotifTypeOrderStatus,
-			Link:    "/supply/orders",
-		})
+		// Notify the appropriate party about status change
+		if status == models.SupplyOrderCancelled {
+			if userID == updated.BuyerID.Hex() {
+				// Buyer cancelled -> Notify supplier
+				_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
+					UserID:  updated.SupplierID,
+					Title:   "✕ Order Cancelled by Buyer",
+					Message: fmt.Sprintf("%s cancelled order #%s", updated.BuyerName, updated.ID.Hex()[:8]),
+					Type:    models.NotifTypeOrderStatus,
+					Link:    "/supply/orders",
+				})
+			} else {
+				// Supplier cancelled -> Notify buyer
+				_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
+					UserID:  updated.BuyerID,
+					Title:   "✕ Order Cancelled by Supplier",
+					Message: fmt.Sprintf("Supplier %s cancelled your order #%s", updated.SupplierName, updated.ID.Hex()[:8]),
+					Type:    models.NotifTypeOrderStatus,
+					Link:    "/supply/orders",
+				})
+			}
+		} else {
+			// Notify buyer about status change
+			_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
+				UserID:  updated.BuyerID,
+				Title:   "🚚 Order Status Updated",
+				Message: fmt.Sprintf("Your supply order from %s is now %s", updated.SupplierName, status),
+				Type:    models.NotifTypeOrderStatus,
+				Link:    "/supply/orders",
+			})
+		}
 	}
 
 	return updated, err

@@ -162,6 +162,20 @@ func (r *SupplyRepository) DeductStock(ctx context.Context, id bson.ObjectID, qu
 	return nil
 }
 
+// RestoreStock increases product stock quantity when an order is cancelled.
+func (r *SupplyRepository) RestoreStock(ctx context.Context, id bson.ObjectID, quantity int) error {
+	filter := bson.M{"_id": id}
+	update := bson.M{
+		"$inc": bson.M{"stock_quantity": quantity},
+		"$set": bson.M{"updated_at": time.Now()},
+	}
+	_, err := r.productsColl.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("restore stock: %w", err)
+	}
+	return nil
+}
+
 // CreateOrder inserts a new supply order.
 func (r *SupplyRepository) CreateOrder(ctx context.Context, order *models.SupplyOrder) error {
 	order.CreatedAt = time.Now()

@@ -640,6 +640,33 @@ export const SupplyOrdersPage: React.FC = () => {
                       💵 {markingPaid === order.id ? 'Confirming…' : 'Confirm COD Payment Received'}
                     </button>
                   )}
+
+                  {/* Cancel Order (Buyer or Supplier can cancel pending/processing orders) */}
+                  {(order.status === 'pending' || (isSupplier && order.status === 'processing')) && (
+                    <button
+                      onClick={async () => {
+                        if (window.confirm('Are you sure you want to cancel this supply order? Reserved supplies will be restored to inventory.')) {
+                          await handleUpdateStatus(order.id, 'cancelled');
+                        }
+                      }}
+                      disabled={updatingStatusId === order.id}
+                      style={{
+                        padding: '9px 16px',
+                        borderRadius: '9px',
+                        border: '1.5px solid #fecaca',
+                        backgroundColor: '#fef2f2',
+                        color: '#dc2626',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      ✕ Cancel Order
+                    </button>
+                  )}
                 </div>
               </div>
             );

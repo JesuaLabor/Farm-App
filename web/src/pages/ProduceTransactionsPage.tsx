@@ -896,6 +896,35 @@ export const ProduceTransactionsPage: React.FC = () => {
                       </button>
                     )}
 
+                    {/* Direct Cancel Order button for Pending Orders */}
+                    {ord.status === 'Pending' && (
+                      <button
+                        type="button"
+                        disabled={isUpdatingStatus}
+                        onClick={async () => {
+                          if (window.confirm('Are you sure you want to cancel this crop order? Reserved harvest will be returned to the marketplace.')) {
+                            await handleUpdateStatus(ord.id, 'cancelled');
+                          }
+                        }}
+                        style={{
+                          padding: '10px 16px',
+                          borderRadius: '10px',
+                          border: '1.5px solid #FECACA',
+                          backgroundColor: '#FEF2F2',
+                          color: '#DC2626',
+                          fontWeight: 700,
+                          fontSize: '14px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <span>✕</span>
+                        <span>Cancel Order</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={() => setSelectedOrder(ord)}
                       style={{
