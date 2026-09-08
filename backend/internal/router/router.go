@@ -24,6 +24,7 @@ func New(
 	notifHandler *handler.NotificationHandler,
 	adminHandler *handler.AdminHandler,
 	uploadHandler *handler.UploadHandler,
+	chatHandler *handler.ChatHandler,
 	jwtSecret string,
 	uploadDir string,
 ) http.Handler {
@@ -183,6 +184,19 @@ func New(
 	r.Route("/api/lgu", func(r chi.Router) {
 		r.Use(middleware.JWTAuth(jwtSecret))
 		r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleExpert)).Get("/dashboard", analyticsHandler.GetLGUDashboard)
+	})
+
+	// Chat routes
+	r.Route("/api/chat", func(r chi.Router) {
+		r.Use(middleware.JWTAuth(jwtSecret))
+
+		r.Post("/conversations", chatHandler.CreateConversation)
+		r.Get("/conversations", chatHandler.ListConversations)
+		r.Get("/conversations/{id}", chatHandler.GetConversation)
+		r.Get("/conversations/{id}/messages", chatHandler.ListMessages)
+		r.Post("/conversations/{id}/messages", chatHandler.SendMessage)
+		r.Put("/conversations/{id}/read", chatHandler.MarkAsRead)
+		r.Get("/unread-count", chatHandler.GetUnreadCount)
 	})
 
 	// Serve uploaded files

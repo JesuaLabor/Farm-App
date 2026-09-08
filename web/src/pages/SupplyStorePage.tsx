@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { useChat } from '../contexts/ChatContext';
 import { supplyApi } from '../api/supply';
 import { api, getImageUrl } from '../api';
 import type { SupplyProduct, DeliveryMethod, PaymentMethod, SupplyOrder } from '../types/supply';
@@ -26,7 +27,32 @@ const categoryImages: Record<string, string> = {
 export const SupplyStorePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { openChatWith } = useChat();
   const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
+
+  const handleChatWithSupplier = (item: SupplyProduct) => {
+    if (!item.supplierId) {
+      toastWarning('Contact Unavailable', 'Supplier contact information is currently unavailable for this product.');
+      return;
+    }
+    if (user?.id === item.supplierId) {
+      toastWarning('Own Product', 'You cannot chat with yourself on your own product.');
+      return;
+    }
+    const photo = item.images?.[0] || categoryImages[item.category] || '';
+    openChatWith(
+      item.supplierId,
+      {
+        type: 'supply',
+        referenceId: item.id,
+        title: item.name,
+        image: getImageUrl(photo),
+        price: item.price,
+        unit: item.unit,
+      },
+      `Hello! I'm inquiring about ${item.name} (₱${item.price}/${item.unit}).`
+    );
+  };
   const [products, setProducts] = useState<SupplyProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -477,7 +503,30 @@ export const SupplyStorePage: React.FC = () => {
                       🏪 Catalog View
                     </div>
                   ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1.1fr 1fr', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+                      {/* Chat with Supplier button */}
+                      <button
+                        type="button"
+                        onClick={() => handleChatWithSupplier(item)}
+                        className="btn btn-secondary"
+                        style={{
+                          padding: '10px 12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          cursor: 'pointer',
+                          fontWeight: 800,
+                          fontSize: '13px',
+                          borderColor: '#176B3A',
+                          color: '#0E4A27',
+                          background: '#EFFDF5',
+                        }}
+                        title={`Chat with ${item.supplierName || 'Supplier'}`}
+                      >
+                        💬 Chat
+                      </button>
+
                       {/* Add to Cart button */}
                       <button
                         type="button"
@@ -489,16 +538,16 @@ export const SupplyStorePage: React.FC = () => {
                           borderColor: isRecentlyAdded ? '#10B981' : qtyInCart > 0 ? '#176B3A' : '#D8D6CF',
                           color: isOutOfStock ? '#94A3B8' : '#0E4A27',
                           fontWeight: 800,
-                          fontSize: '14px',
-                          padding: '10px 8px',
+                          fontSize: '13px',
+                          padding: '10px 6px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '6px',
+                          gap: '4px',
                           cursor: isOutOfStock || isMaxInCart ? 'not-allowed' : 'pointer',
                         }}
                       >
-                        {isRecentlyAdded ? '✓ Added!' : isMaxInCart ? 'Max in Cart' : qtyInCart > 0 ? `🛒 Add (+1)` : '🛒 Add to Cart'}
+                        {isRecentlyAdded ? '✓ Added!' : isMaxInCart ? 'Max in Cart' : qtyInCart > 0 ? `🛒 Add (+1)` : '🛒 Cart'}
                       </button>
 
                       {/* Buy Now button */}
@@ -509,17 +558,17 @@ export const SupplyStorePage: React.FC = () => {
                         className="btn btn-primary"
                         style={{
                           fontWeight: 800,
-                          fontSize: '14px',
-                          padding: '10px 8px',
+                          fontSize: '13px',
+                          padding: '10px 6px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '4px',
+                          gap: '3px',
                           cursor: isOutOfStock ? 'not-allowed' : 'pointer',
                           opacity: isOutOfStock ? 0.5 : 1,
                         }}
                       >
-                        ⚡ Buy Now
+                        ⚡ Buy
                       </button>
                     </div>
                   )}
@@ -854,8 +903,29 @@ export const SupplyStorePage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Dual CTA Buttons (Shopee style) */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                {/* Multi CTA Buttons (Shopee style) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', gap: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleChatWithSupplier(viewProduct);
+                      setViewProduct(null);
+                    }}
+                    className="btn btn-secondary btn-large"
+                    style={{
+                      minHeight: '52px',
+                      fontSize: '15px',
+                      fontWeight: 800,
+                      padding: '0 16px',
+                      borderColor: '#176B3A',
+                      color: '#0E4A27',
+                      background: '#EFFDF5',
+                    }}
+                    title={`Chat with ${viewProduct.supplierName || 'Supplier'}`}
+                  >
+                    💬 Chat Supplier
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -864,7 +934,7 @@ export const SupplyStorePage: React.FC = () => {
                     }}
                     disabled={viewProduct.stockQuantity <= 0}
                     className="btn btn-secondary btn-large"
-                    style={{ minHeight: '52px', fontSize: '16px', fontWeight: 800 }}
+                    style={{ minHeight: '52px', fontSize: '15px', fontWeight: 800 }}
                   >
                     🛒 Add to Cart
                   </button>
@@ -874,7 +944,7 @@ export const SupplyStorePage: React.FC = () => {
                     onClick={() => handleOpenSupplyBuyNow(viewProduct, viewQuantity)}
                     disabled={viewProduct.stockQuantity <= 0}
                     className="btn btn-primary btn-large"
-                    style={{ minHeight: '52px', fontSize: '16px', fontWeight: 800 }}
+                    style={{ minHeight: '52px', fontSize: '15px', fontWeight: 800 }}
                   >
                     ⚡ Buy Now
                   </button>

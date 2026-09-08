@@ -4,6 +4,7 @@ import { getImageUrl } from '../api';
 import { produceApi } from '../api/produce';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { useChat } from '../contexts/ChatContext';
 import type { ProduceListing, ProduceTransaction } from '../types/produce';
 
 const categories = [
@@ -77,7 +78,33 @@ const sampleCropListings = [
 export const ProduceMarketplacePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { openChatWith } = useChat();
   const { success: toastSuccess, error: toastError, warning: toastWarning, info: toastInfo } = useToast();
+
+  const handleChatWithFarmer = (listing: any) => {
+    const targetFarmerId = listing.farmerId || listing.sellerId;
+    if (!targetFarmerId) {
+      toastWarning('Contact Unavailable', 'Farmer contact information is currently unavailable for this listing.');
+      return;
+    }
+    if (user?.id === targetFarmerId) {
+      toastInfo('Own Listing', 'You cannot chat with yourself on your own crop listing.');
+      return;
+    }
+    const photo = listing.photos?.[0] || listing.imageUrl;
+    openChatWith(
+      targetFarmerId,
+      {
+        type: 'produce',
+        referenceId: listing.id,
+        title: listing.cropName,
+        image: getImageUrl(photo),
+        price: listing.pricePerUnit,
+        unit: listing.unit || 'kg',
+      },
+      `Hello! I'm inquiring about your ${listing.cropName} listed at ₱${listing.pricePerUnit}/${listing.unit || 'kg'}.`
+    );
+  };
   const [listings, setListings] = useState<ProduceListing[]>([]);
   const [_loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -454,7 +481,29 @@ export const ProduceMarketplacePage: React.FC = () => {
                       🌾 View Crop Details
                     </div>
                   ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1.1fr 1fr', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() => handleChatWithFarmer(item)}
+                        className="btn btn-secondary"
+                        style={{
+                          padding: '10px 12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          cursor: 'pointer',
+                          fontWeight: 800,
+                          fontSize: '13px',
+                          borderColor: '#176B3A',
+                          color: '#0E4A27',
+                          background: '#EFFDF5',
+                        }}
+                        title={`Chat with ${item.farmerName || item.sellerName || 'Farmer'}`}
+                      >
+                        💬 Chat
+                      </button>
+
                       <button
                         type="button"
                         onClick={(e) => handleAddProduceToCart(item, 5, e)}
@@ -464,16 +513,16 @@ export const ProduceMarketplacePage: React.FC = () => {
                           borderColor: isRecentlyAdded ? '#10B981' : qtyInCart > 0 ? '#176B3A' : '#D8D6CF',
                           color: '#0E4A27',
                           fontWeight: 800,
-                          fontSize: '14px',
-                          padding: '10px 8px',
+                          fontSize: '13px',
+                          padding: '10px 6px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '6px',
+                          gap: '4px',
                           cursor: 'pointer',
                         }}
                       >
-                        {isRecentlyAdded ? '✓ Added!' : qtyInCart > 0 ? `🛒 (${qtyInCart}kg)` : '🛒 Add to Cart'}
+                        {isRecentlyAdded ? '✓ Added!' : qtyInCart > 0 ? `🛒 (${qtyInCart})` : '🛒 Cart'}
                       </button>
 
                       <button
@@ -482,16 +531,16 @@ export const ProduceMarketplacePage: React.FC = () => {
                         className="btn btn-primary"
                         style={{
                           fontWeight: 800,
-                          fontSize: '14px',
-                          padding: '10px 8px',
+                          fontSize: '13px',
+                          padding: '10px 6px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '4px',
+                          gap: '3px',
                           cursor: 'pointer',
                         }}
                       >
-                        ⚡ Buy Now
+                        ⚡ Buy
                       </button>
                     </div>
                   )}
@@ -648,8 +697,30 @@ export const ProduceMarketplacePage: React.FC = () => {
                     <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27' }}>
                       {selectedListing.cropName}
                     </h2>
-                    <div style={{ fontSize: '16px', color: '#525450', marginTop: '4px' }}>
-                      Sold by <strong>{selectedListing.sellerName || selectedListing.farmerName || 'Verified Farmer'}</strong> • 📍 {selectedListing.location || 'Northern Mindanao'}
+                    <div style={{ fontSize: '16px', color: '#525450', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <span>Sold by <strong>{selectedListing.sellerName || selectedListing.farmerName || 'Verified Farmer'}</strong> • 📍 {selectedListing.location || 'Northern Mindanao'}</span>
+                      {selectedListing.farmerId && user?.id !== selectedListing.farmerId && (
+                        <button
+                          type="button"
+                          onClick={() => handleChatWithFarmer(selectedListing)}
+                          className="btn btn-secondary"
+                          style={{
+                            padding: '4px 12px',
+                            fontSize: '12px',
+                            fontWeight: 800,
+                            borderRadius: '16px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            cursor: 'pointer',
+                            color: '#0E4A27',
+                            borderColor: '#176B3A',
+                            background: '#EFFDF5',
+                          }}
+                        >
+                          💬 Chat Farmer
+                        </button>
+                      )}
                     </div>
                   </div>
                   <button

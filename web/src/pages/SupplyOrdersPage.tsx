@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { useChat } from '../contexts/ChatContext';
 import { supplyApi } from '../api/supply';
 import { getImageUrl } from '../api';
 import type { PaymentMethod, PaymentStatus, SupplyOrder, SupplyOrderStatus } from '../types/supply';
@@ -53,8 +54,30 @@ const STEP_ORDER: SupplyOrderStatus[] = ['pending', 'processing', 'shipped_ready
 
 export const SupplyOrdersPage: React.FC = () => {
   const { user } = useAuth();
+  const { openChatWith } = useChat();
   const navigate = useNavigate();
   const { success: toastSuccess, error: toastError } = useToast();
+
+  const handleChatOrderParty = (order: SupplyOrder) => {
+    const isSupplier = user?.role === 'supplier';
+    const targetUserId = isSupplier ? order.buyerId : order.supplierId;
+    if (!targetUserId) {
+      toastError('Account Unavailable', 'Contact information is currently unavailable for this user.');
+      return;
+    }
+    const firstItem = order.items?.[0];
+    openChatWith(
+      targetUserId,
+      {
+        type: 'supply_order',
+        referenceId: order.id,
+        title: `Supply Order #${order.id.slice(-6).toUpperCase()} - ${firstItem?.productName || 'Agri Supplies'}`,
+        image: firstItem?.productImage ? getImageUrl(firstItem.productImage) : undefined,
+        price: order.totalAmount,
+      },
+      `Hi! Inquiring regarding supply order #${order.id.slice(-6).toUpperCase()} (₱${order.totalAmount?.toLocaleString()}).`
+    );
+  };
 
   const [orders, setOrders] = useState<SupplyOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -589,6 +612,31 @@ export const SupplyOrdersPage: React.FC = () => {
 
                 {/* Action Buttons for Buyer (Farmer) and Supplier */}
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap', paddingTop: '4px' }}>
+                  {/* Chat with other party */}
+                  {((isSupplier && order.buyerId) || (!isSupplier && order.supplierId)) && (
+                    <button
+                      type="button"
+                      onClick={() => handleChatOrderParty(order)}
+                      style={{
+                        padding: '9px 16px',
+                        borderRadius: '9px',
+                        backgroundColor: '#EFFDF5',
+                        color: '#0E4A27',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        border: '1.5px solid #16A34A',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                      title={isSupplier ? `Chat with Customer (${order.buyerName})` : `Chat with Supplier (${order.supplierName})`}
+                    >
+                      <span>💬</span>
+                      <span>{isSupplier ? 'Chat Customer' : 'Chat Supplier'}</span>
+                    </button>
+                  )}
+
                   {/* Farmer / Buyer can mark as received when shipped */}
                   {isBuyer && order.status === 'shipped_ready' && (
                     <button

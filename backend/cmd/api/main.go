@@ -51,6 +51,7 @@ func main() {
 	communityRepo := repository.NewCommunityRepository(db)
 	analyticsRepo := repository.NewAnalyticsRepository(db)
 	notifRepo := repository.NewNotificationRepository(db)
+	chatRepo := repository.NewChatRepository(db)
 
 	// Services
 	authService := service.NewAuthService(userRepo, cfg.JWTSecret, cfg.JWTExpiryHrs)
@@ -64,6 +65,7 @@ func main() {
 	communityService := service.NewCommunityService(communityRepo, userRepo, notifRepo)
 	analyticsService := service.NewAnalyticsService(analyticsRepo)
 	notifService := service.NewNotificationService(notifRepo)
+	chatService := service.NewChatService(chatRepo, userRepo, notifRepo)
 
 	// Seed Super Admin user if not exists
 	if err := authService.SeedSuperAdmin(context.Background()); err != nil {
@@ -85,6 +87,7 @@ func main() {
 	analyticsHandler := handler.NewAnalyticsHandler(analyticsService)
 	notifHandler := handler.NewNotificationHandler(notifService)
 	uploadHandler := handler.NewUploadHandler(cfg.UploadDir)
+	chatHandler := handler.NewChatHandler(chatService)
 
 	// Build router
 	r := router.New(
@@ -100,6 +103,7 @@ func main() {
 		notifHandler,
 		adminHandler,
 		uploadHandler,
+		chatHandler,
 		cfg.JWTSecret,
 		cfg.UploadDir,
 	)

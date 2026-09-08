@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useChat } from '../contexts/ChatContext';
 import { NotificationBell } from './NotificationBell';
 
 interface BreadcrumbInfo {
@@ -13,6 +14,9 @@ interface BreadcrumbInfo {
 const getBreadcrumbs = (pathname: string, role?: string): BreadcrumbInfo => {
   if (pathname === '/dashboard') {
     return { parent: 'Dashboard', parentPath: '/dashboard', current: 'Overview', icon: '⊞' };
+  }
+  if (pathname === '/messages') {
+    return { parent: 'Dashboard', parentPath: '/dashboard', current: 'Messages & Inquiries', icon: '💬' };
   }
   if (pathname === '/produce/manage') {
     return { parent: 'Marketplace', parentPath: '/produce', current: 'My Listings', icon: '📦' };
@@ -128,6 +132,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   onOpenOnboarding: _onOpenOnboarding,
 }) => {
   const { user, logout } = useAuth();
+  const { unreadCount } = useChat();
   const navigate = useNavigate();
   const location = useLocation();
   const breadcrumb = getBreadcrumbs(location.pathname, user?.role);
@@ -556,6 +561,64 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             )}
           </button>
         )}
+
+        {/* Messages / Chat Button */}
+        <button
+          onClick={() => navigate('/messages')}
+          style={{
+            position: 'relative',
+            background: '#F8F7F3',
+            border: '1px solid #D8D6CE',
+            borderRadius: '50%',
+            width: '40px',
+            height: '40px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            fontSize: '18px',
+            color: '#1A1C1A',
+            transition: 'all 0.15s ease',
+            minHeight: 'auto',
+          }}
+          title="Messages & Inquiries"
+          aria-label="Messages"
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#FFFFFF';
+            e.currentTarget.style.borderColor = '#176B3A';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#F8F7F3';
+            e.currentTarget.style.borderColor = '#D8D6CE';
+          }}
+        >
+          💬
+          {unreadCount > 0 && (
+            <span
+              style={{
+                position: 'absolute',
+                top: '-3px',
+                right: '-3px',
+                background: '#0E4A27',
+                color: '#FFFFFF',
+                borderRadius: '10px',
+                fontSize: '10px',
+                fontWeight: 800,
+                minWidth: '18px',
+                height: '18px',
+                padding: '0 4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 5px rgba(14, 74, 39, 0.4)',
+                border: '1.5px solid #FFFFFF',
+                lineHeight: 1,
+              }}
+            >
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </button>
 
         {/* Notification Bell */}
         <NotificationBell />

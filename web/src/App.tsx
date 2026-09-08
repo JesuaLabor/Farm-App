@@ -2,11 +2,14 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
+import { ChatProvider } from './contexts/ChatContext';
+import { FloatingChatDock } from './components/chat/FloatingChatDock';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AppLayout } from './components/AppLayout';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { MessagesPage } from './pages/MessagesPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ProduceMarketplacePage } from './pages/ProduceMarketplacePage';
@@ -32,19 +35,31 @@ export const App: React.FC = () => {
     <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <DashboardPage />
-                  </AppLayout>
-                </ProtectedRoute>
-              }
-            />
+          <ChatProvider>
+            <FloatingChatDock />
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <DashboardPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/messages"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <MessagesPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
             <Route
               path="/profile"
               element={
@@ -294,8 +309,9 @@ export const App: React.FC = () => {
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
-        </ToastProvider>
-      </AuthProvider>
+        </ChatProvider>
+      </ToastProvider>
+    </AuthProvider>
     </BrowserRouter>
   );
 };
