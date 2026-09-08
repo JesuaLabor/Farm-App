@@ -96,6 +96,7 @@ export const ProduceTransactionsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
+  const [orderToCancel, setOrderToCancel] = useState<OrderItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -123,11 +124,12 @@ export const ProduceTransactionsPage: React.FC = () => {
           const timeStr = !isNaN(d.getTime())
             ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
             : 'Just now';
+          const parsedContact = parseContactMessage(t.contactMessage);
           return {
             id: t.id,
             isBackend: true,
             buyerName: t.buyerName || 'Buyer',
-            buyerLocation: t.contactMessage || 'Northern Mindanao',
+            buyerLocation: parsedContact.fulfillment || 'Northern Mindanao',
             farmerName: t.farmerName,
             product: t.cropName || 'Farm Produce',
             quantityNum: t.quantity,
@@ -901,10 +903,9 @@ export const ProduceTransactionsPage: React.FC = () => {
                       <button
                         type="button"
                         disabled={isUpdatingStatus}
-                        onClick={async () => {
-                          if (window.confirm('Are you sure you want to cancel this crop order? Reserved harvest will be returned to the marketplace.')) {
-                            await handleUpdateStatus(ord.id, 'cancelled');
-                          }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOrderToCancel(ord);
                         }}
                         style={{
                           padding: '10px 16px',
@@ -1000,286 +1001,784 @@ export const ProduceTransactionsPage: React.FC = () => {
         const parsedModal = parseContactMessage(selectedOrder.contactMessage);
         const modalBadge = getStatusBadgeStyle(selectedOrder.status);
         const modalCropIcon = getCropIcon(selectedOrder.product);
+        const isPending = selectedOrder.status === 'Pending';
+        const isConfirmed = selectedOrder.status === 'Confirmed';
+        const isCompleted = selectedOrder.status === 'Completed';
+        const isCancelled = selectedOrder.status === 'Cancelled';
 
         return (
-          <div className="modal-backdrop" onClick={() => setSelectedOrder(null)}>
+          <div
+            className="modal-backdrop"
+            onClick={() => setSelectedOrder(null)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(8px)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px',
+            }}
+          >
             <div
               className="modal-content"
               onClick={(e) => e.stopPropagation()}
-              style={{ maxWidth: '640px', padding: '32px', borderRadius: '24px' }}
+              style={{
+                maxWidth: '620px',
+                width: '100%',
+                maxHeight: '92vh',
+                backgroundColor: '#FFFFFF',
+                borderRadius: '24px',
+                boxShadow: '0 25px 60px -15px rgba(15, 23, 42, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.06)',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                padding: 0,
+                animation: 'modalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
             >
-              {/* Modal Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+              {/* 1. Sleek Sticky Header */}
+              <div
+                style={{
+                  padding: '18px 24px',
+                  backgroundColor: '#FFFFFF',
+                  borderBottom: '1px solid #E2E8F0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '16px',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
+                }}
+              >
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-                    <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em',
+                        color: '#16A34A',
+                        backgroundColor: '#DCFCE7',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                      }}
+                    >
+                      RECEIPT & DETAILS
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={(e) => handleCopyId(selectedOrder.id, e)}
+                      title="Click to copy full Order ID"
+                      style={{
+                        fontFamily: 'monospace',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        color: '#334155',
+                        backgroundColor: '#F1F5F9',
+                        border: '1px solid #E2E8F0',
+                        borderRadius: '6px',
+                        padding: '2px 8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <span>{formatOrderId(selectedOrder.id)}</span>
+                      <span style={{ fontSize: '11px', color: '#64748B' }}>
+                        {copiedId === selectedOrder.id ? '✓' : '📋'}
+                      </span>
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h2 style={{ fontSize: '19px', fontWeight: 800, color: '#0F172A', margin: 0 }}>
                       Order Summary
                     </h2>
-                    <span style={{ fontSize: '13px', fontWeight: 800, padding: '4px 10px', borderRadius: '8px', backgroundColor: '#F1F5F9', color: '#334155', fontFamily: 'monospace' }}>
-                      {formatOrderId(selectedOrder.id)}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '14px', color: '#64748B' }}>
-                    Placed on {selectedOrder.date}
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setSelectedOrder(null)}
-                  style={{
-                    background: '#F1F5F9',
-                    border: 'none',
-                    fontSize: '20px',
-                    cursor: 'pointer',
-                    color: '#64748B',
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Lifecycle Progress Stepper */}
-              <div style={{ backgroundColor: '#F8FAFC', padding: '16px 20px', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}>
-                  {/* Step 1: Placed */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#16A34A', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 800 }}>
-                      ✓
-                    </div>
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A', marginTop: '6px' }}>Placed</span>
-                  </div>
-
-                  {/* Connecting Line 1 */}
-                  <div style={{ flex: 1, height: '3px', backgroundColor: selectedOrder.status !== 'Pending' && selectedOrder.status !== 'Cancelled' ? '#16A34A' : '#CBD5E1', margin: '0 8px 18px 8px' }} />
-
-                  {/* Step 2: Confirmed */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
-                    <div
-                      style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
-                        backgroundColor: selectedOrder.status === 'Confirmed' || selectedOrder.status === 'Completed' ? '#2563EB' : '#E2E8F0',
-                        color: selectedOrder.status === 'Confirmed' || selectedOrder.status === 'Completed' ? '#FFF' : '#64748B',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '14px',
-                        fontWeight: 800,
-                      }}
-                    >
-                      {selectedOrder.status === 'Completed' ? '✓' : '2'}
-                    </div>
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: selectedOrder.status === 'Confirmed' || selectedOrder.status === 'Completed' ? '#1E40AF' : '#64748B', marginTop: '6px' }}>
-                      Confirmed
-                    </span>
-                  </div>
-
-                  {/* Connecting Line 2 */}
-                  <div style={{ flex: 1, height: '3px', backgroundColor: selectedOrder.status === 'Completed' ? '#16A34A' : '#CBD5E1', margin: '0 8px 18px 8px' }} />
-
-                  {/* Step 3: Completed */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
-                    <div
-                      style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
-                        backgroundColor: selectedOrder.status === 'Completed' ? '#16A34A' : '#E2E8F0',
-                        color: selectedOrder.status === 'Completed' ? '#FFF' : '#64748B',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '14px',
-                        fontWeight: 800,
-                      }}
-                    >
-                      {selectedOrder.status === 'Completed' ? '✓' : '3'}
-                    </div>
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: selectedOrder.status === 'Completed' ? '#166534' : '#64748B', marginTop: '6px' }}>
-                      Fulfilled
+                    <span style={{ fontSize: '12px', color: '#64748B' }}>
+                      • 📅 {selectedOrder.date}
                     </span>
                   </div>
                 </div>
-              </div>
 
-              {/* Order Items & Calculation */}
-              <div style={{ border: '1.5px solid #E2E8F0', borderRadius: '16px', padding: '18px', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '28px' }}>{modalCropIcon}</span>
-                    <div>
-                      <div style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>{selectedOrder.product}</div>
-                      <div style={{ fontSize: '13px', color: '#64748B' }}>Quantity: <strong>{selectedOrder.quantity}</strong></div>
-                    </div>
-                  </div>
-
-                  <span style={{ padding: '4px 12px', borderRadius: '14px', backgroundColor: modalBadge.bg, color: modalBadge.color, fontWeight: 700, fontSize: '13px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '16px',
+                      backgroundColor: modalBadge.bg,
+                      color: modalBadge.color,
+                      fontWeight: 800,
+                      fontSize: '12px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {modalBadge.label}
                   </span>
-                </div>
 
-                <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '15px', color: '#64748B', fontWeight: 600 }}>Total Harvest Amount:</span>
-                  <span style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27' }}>
-                    ₱{selectedOrder.total.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-
-              {/* Customer & Delivery Card */}
-              <div style={{ backgroundColor: '#F8FAFC', borderRadius: '16px', border: '1.5px solid #E2E8F0', padding: '18px', marginBottom: '24px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '10px' }}>
-                  Customer & Delivery Details
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '16px' }}>👤</span>
-                    <span style={{ color: '#0F172A', fontWeight: 700 }}>{selectedOrder.buyerName}</span>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    <span style={{ fontSize: '16px' }}>📍</span>
-                    <span style={{ color: '#334155', fontWeight: 600 }}>{parsedModal.fulfillment}</span>
-                  </div>
-
-                  {parsedModal.phone && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '16px' }}>📞</span>
-                      <a href={`tel:${parsedModal.phone.replace(/[^0-9+]/g, '')}`} style={{ color: '#0284C7', fontWeight: 700, textDecoration: 'none' }}>
-                        {parsedModal.phone}
-                      </a>
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '16px' }}>💵</span>
-                    <span style={{ color: '#0F172A', fontWeight: 600 }}>{parsedModal.payment}</span>
-                  </div>
-
-                  {parsedModal.notes && (
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                      <span style={{ fontSize: '16px' }}>📝</span>
-                      <span style={{ color: '#475569', fontStyle: 'italic' }}>"{parsedModal.notes}"</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Modal Action Buttons */}
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                {parsedModal.phone && (
-                  <a
-                    href={`tel:${parsedModal.phone.replace(/[^0-9+]/g, '')}`}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOrder(null)}
+                    aria-label="Close modal"
                     style={{
-                      flex: 1,
-                      minWidth: '140px',
-                      padding: '12px',
-                      borderRadius: '12px',
-                      border: '1.5px solid #CBD5E1',
-                      backgroundColor: '#FFFFFF',
-                      color: '#0F172A',
-                      fontWeight: 700,
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '50%',
+                      backgroundColor: '#F1F5F9',
+                      border: '1px solid #E2E8F0',
+                      color: '#64748B',
                       fontSize: '15px',
-                      textAlign: 'center',
-                      textDecoration: 'none',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '8px',
-                    }}
-                  >
-                    <span>📞</span>
-                    <span>Call Buyer</span>
-                  </a>
-                )}
-
-                {selectedOrder.status === 'Pending' && (
-                  <button
-                    type="button"
-                    disabled={isUpdatingStatus}
-                    onClick={async () => {
-                      await handleUpdateStatus(selectedOrder.id, 'confirmed');
-                      setSelectedOrder(null);
-                    }}
-                    style={{
-                      flex: 2,
-                      minWidth: '180px',
-                      padding: '12px',
-                      borderRadius: '12px',
-                      border: 'none',
-                      backgroundColor: '#16A34A',
-                      color: '#FFFFFF',
-                      fontWeight: 700,
-                      fontSize: '15px',
                       cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#E2E8F0';
+                      e.currentTarget.style.color = '#0F172A';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#F1F5F9';
+                      e.currentTarget.style.color = '#64748B';
                     }}
                   >
-                    {isUpdatingStatus ? 'Updating...' : '✓ Confirm Order'}
+                    ✕
                   </button>
-                )}
+                </div>
+              </div>
 
-                {selectedOrder.status === 'Confirmed' && (
-                  <button
-                    type="button"
-                    disabled={isUpdatingStatus}
-                    onClick={async () => {
-                      await handleUpdateStatus(selectedOrder.id, 'completed');
-                      setSelectedOrder(null);
-                    }}
-                    style={{
-                      flex: 2,
-                      minWidth: '180px',
-                      padding: '12px',
-                      borderRadius: '12px',
-                      border: 'none',
-                      backgroundColor: '#2563EB',
-                      color: '#FFFFFF',
-                      fontWeight: 700,
-                      fontSize: '15px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {isUpdatingStatus ? 'Updating...' : '✓ Mark Completed'}
-                  </button>
-                )}
+              {/* 2. Scrollable Body */}
+              <div
+                style={{
+                  padding: '20px 24px',
+                  overflowY: 'auto',
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                }}
+              >
+                {/* ── Section A: Digital Invoice & Crop Summary Card (Prominently at the top!) ── */}
+                <div
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    border: '1.5px solid #E2E8F0',
+                    borderRadius: '16px',
+                    padding: '16px 18px',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div
+                        style={{
+                          width: '48px',
+                          height: '48px',
+                          borderRadius: '14px',
+                          backgroundColor: '#ECFDF5',
+                          border: '1.5px solid #A7F3D0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '26px',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {modalCropIcon}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.01em' }}>
+                          {selectedOrder.product}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                          <span>Quantity: <strong style={{ color: '#0F172A' }}>{selectedOrder.quantity}</strong></span>
+                          <span>•</span>
+                          <span>₱{(selectedOrder.unitPrice || (selectedOrder.total / (selectedOrder.quantityNum || 1))).toFixed(2)} / kg</span>
+                        </div>
+                      </div>
+                    </div>
 
-                {selectedOrder.status !== 'Cancelled' && selectedOrder.status !== 'Completed' && (
-                  <button
-                    type="button"
-                    disabled={isUpdatingStatus}
-                    onClick={async () => {
-                      if (window.confirm('Are you sure you want to cancel this order?')) {
-                        await handleUpdateStatus(selectedOrder.id, 'cancelled');
-                        setSelectedOrder(null);
-                      }
-                    }}
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '22px', fontWeight: 800, color: '#0E4A27' }}>
+                        ₱{selectedOrder.total.toLocaleString()}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          color: '#16A34A',
+                          backgroundColor: '#DCFCE7',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          display: 'inline-block',
+                          marginTop: '2px',
+                        }}
+                      >
+                        {isCompleted ? '✓ Paid' : parsedModal.payment}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Section B: Order Lifecycle Tracker with True Connecting Track Line ── */}
+                {isCancelled ? (
+                  <div
                     style={{
-                      padding: '12px 18px',
-                      borderRadius: '12px',
-                      border: '1.5px solid #FECACA',
                       backgroundColor: '#FEF2F2',
-                      color: '#DC2626',
-                      fontWeight: 700,
-                      fontSize: '15px',
-                      cursor: 'pointer',
+                      border: '1.5px solid #FECACA',
+                      borderRadius: '16px',
+                      padding: '14px 18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
                     }}
                   >
-                    Cancel
-                  </button>
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        backgroundColor: '#DC2626',
+                        color: '#FFFFFF',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '16px',
+                        fontWeight: 800,
+                        flexShrink: 0,
+                      }}
+                    >
+                      ✕
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: 800, color: '#991B1B' }}>
+                        Order Cancelled
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#B91C1C', marginTop: '2px' }}>
+                        This transaction was cancelled. Reserved harvest ({selectedOrder.quantity}) was safely restored to the listing.
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      backgroundColor: '#F8FAFC',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: '16px',
+                      padding: '14px 18px 16px 18px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748B' }}>
+                        Order Lifecycle Tracker
+                      </span>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: isCompleted ? '#16A34A' : isConfirmed ? '#2563EB' : '#D97706' }}>
+                        {isPending && '⏳ Waiting for Farmer Confirmation'}
+                        {isConfirmed && '🚚 Ready for Delivery / Pickup'}
+                        {isCompleted && '✓ Completed & Delivered'}
+                      </span>
+                    </div>
+
+                    {/* Stepper with continuous connecting bar */}
+                    <div style={{ position: 'relative', padding: '0 8px' }}>
+                      {/* Gray Background Track */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '15px',
+                          left: '32px',
+                          right: '32px',
+                          height: '3px',
+                          backgroundColor: '#E2E8F0',
+                          zIndex: 1,
+                        }}
+                      >
+                        {/* Green Active Fill Track */}
+                        <div
+                          style={{
+                            height: '100%',
+                            backgroundColor: '#16A34A',
+                            width: isCompleted ? '100%' : isConfirmed ? '66%' : '10%',
+                            transition: 'width 0.3s ease',
+                          }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', zIndex: 2 }}>
+                        {[
+                          { stepNum: 1, title: 'Placed', full: '1. Order Placed' },
+                          { stepNum: 2, title: 'Confirmed', full: '2. Confirmed' },
+                          { stepNum: 3, title: 'In Transit', full: '3. In Transit' },
+                          { stepNum: 4, title: 'Delivered', full: '4. Delivered' },
+                        ].map((s) => {
+                          const stepDone = isCompleted
+                            ? true
+                            : isConfirmed
+                            ? s.stepNum <= 3
+                            : s.stepNum === 1;
+
+                          const isCurrent = isCompleted
+                            ? s.stepNum === 4
+                            : isConfirmed
+                            ? s.stepNum === 3
+                            : s.stepNum === 1;
+
+                          return (
+                            <div
+                              key={s.stepNum}
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                width: '68px',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: '30px',
+                                  height: '30px',
+                                  borderRadius: '50%',
+                                  backgroundColor: stepDone ? (isCurrent ? '#16A34A' : '#0E4A27') : '#E2E8F0',
+                                  color: stepDone ? '#FFFFFF' : '#94A3B8',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 800,
+                                  fontSize: '12px',
+                                  boxShadow: isCurrent ? '0 0 0 3px rgba(22, 163, 74, 0.25)' : 'none',
+                                  border: '2px solid #FFFFFF',
+                                  transition: 'all 0.2s ease',
+                                }}
+                              >
+                                {stepDone ? (s.stepNum === 4 ? '✓' : (isCurrent || s.stepNum === 1 ? '✓' : s.stepNum)) : s.stepNum}
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: isCurrent ? 800 : 600,
+                                  color: isCurrent ? '#0E4A27' : stepDone ? '#166534' : '#94A3B8',
+                                  marginTop: '5px',
+                                  textAlign: 'center',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {s.title}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
                 )}
+
+                {/* ── Section C: Clean Structured Logistics & Customer Grid ── */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+                  {/* Fulfillment Details */}
+                  <div
+                    style={{
+                      backgroundColor: '#F8FAFC',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: '14px',
+                      padding: '14px 16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                    }}
+                  >
+                    <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748B', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span>📍</span>
+                      <span>Fulfillment & Logistics</span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                        {parsedModal.fulfillment.toLowerCase().includes('pickup') ? 'Farm-Gate Pickup' : 'Delivery Address'}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.4, marginTop: '2px' }}>
+                        {parsedModal.fulfillment}
+                      </div>
+                    </div>
+                    {parsedModal.notes && (
+                      <div
+                        style={{
+                          marginTop: '4px',
+                          padding: '6px 10px',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '8px',
+                          border: '1px solid #E2E8F0',
+                          fontSize: '11px',
+                          color: '#475569',
+                          fontStyle: 'italic',
+                        }}
+                      >
+                        "{parsedModal.notes}"
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Buyer & Contact Details */}
+                  <div
+                    style={{
+                      backgroundColor: '#F8FAFC',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: '14px',
+                      padding: '14px 16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                    }}
+                  >
+                    <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748B', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span>👤</span>
+                      <span>Customer & Payment</span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>{selectedOrder.buyerName}</span>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#16A34A', backgroundColor: '#DCFCE7', padding: '1px 6px', borderRadius: '4px' }}>
+                          Verified
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Phone Row with Copy */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', backgroundColor: '#FFFFFF', padding: '6px 10px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                      <span style={{ fontSize: '12px', color: '#334155', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>📞</span>
+                        <span>{parsedModal.phone || 'No phone'}</span>
+                      </span>
+                      {parsedModal.phone && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(parsedModal.phone);
+                            toastInfo('Phone Copied', `${parsedModal.phone} copied.`);
+                          }}
+                          title="Copy Phone Number"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            color: '#0284C7',
+                            padding: '2px 4px',
+                            fontWeight: 700,
+                          }}
+                        >
+                          Copy
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Sticky Action Footer */}
+              <div
+                style={{
+                  padding: '14px 24px',
+                  backgroundColor: '#F8FAFC',
+                  borderTop: '1px solid #E2E8F0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                  position: 'sticky',
+                  bottom: 0,
+                  zIndex: 10,
+                }}
+              >
+                <div>
+                  {/* Cancel Button */}
+                  {!isCancelled && !isCompleted && (
+                    <button
+                      type="button"
+                      disabled={isUpdatingStatus}
+                      onClick={() => setOrderToCancel(selectedOrder)}
+                      style={{
+                        padding: '9px 14px',
+                        borderRadius: '10px',
+                        border: '1.5px solid #FECACA',
+                        backgroundColor: '#FEF2F2',
+                        color: '#DC2626',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#FEE2E2')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FEF2F2')}
+                    >
+                      <span>✕</span>
+                      <span>Cancel Order</span>
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {parsedModal.phone && (
+                    <a
+                      href={`tel:${parsedModal.phone.replace(/[^0-9+]/g, '')}`}
+                      style={{
+                        padding: '9px 16px',
+                        borderRadius: '10px',
+                        border: '1.5px solid #CBD5E1',
+                        backgroundColor: '#FFFFFF',
+                        color: '#0F172A',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <span>📞</span>
+                      <span>Call Buyer</span>
+                    </a>
+                  )}
+
+                  {isPending && (
+                    <button
+                      type="button"
+                      disabled={isUpdatingStatus}
+                      onClick={async () => {
+                        await handleUpdateStatus(selectedOrder.id, 'confirmed');
+                      }}
+                      style={{
+                        padding: '10px 20px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        backgroundColor: '#16A34A',
+                        color: '#FFFFFF',
+                        fontWeight: 700,
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
+                      }}
+                    >
+                      <span>✓</span>
+                      <span>{isUpdatingStatus ? 'Confirming...' : 'Accept & Confirm Order'}</span>
+                    </button>
+                  )}
+
+                  {isConfirmed && (
+                    <button
+                      type="button"
+                      disabled={isUpdatingStatus}
+                      onClick={async () => {
+                        await handleUpdateStatus(selectedOrder.id, 'completed');
+                      }}
+                      style={{
+                        padding: '10px 20px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        backgroundColor: '#2563EB',
+                        color: '#FFFFFF',
+                        fontWeight: 700,
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
+                      }}
+                    >
+                      <span>✓</span>
+                      <span>{isUpdatingStatus ? 'Updating...' : (isBuyer ? 'Confirm Received & Paid' : 'Mark Delivered & Completed')}</span>
+                    </button>
+                  )}
+
+                  {isCompleted && (
+                    <div
+                      style={{
+                        padding: '9px 16px',
+                        borderRadius: '10px',
+                        backgroundColor: '#DCFCE7',
+                        color: '#166534',
+                        fontWeight: 800,
+                        fontSize: '13px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <span>✓</span>
+                      <span>Order Completed</span>
+                    </div>
+                  )}
+
+                  {isCancelled && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedOrder(null)}
+                      style={{
+                        padding: '9px 18px',
+                        borderRadius: '10px',
+                        backgroundColor: '#F1F5F9',
+                        border: '1px solid #CBD5E1',
+                        color: '#475569',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Close
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         );
       })()}
+
+      {/* ─── In-App Cancel Order Confirmation Dialog ─── */}
+      {orderToCancel && (
+        <div
+          className="modal-backdrop"
+          onClick={() => !isUpdatingStatus && setOrderToCancel(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.7)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 1100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '460px',
+              width: '100%',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '20px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+              padding: '24px',
+              animation: 'modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '18px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div
+                style={{
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '50%',
+                  backgroundColor: '#FEE2E2',
+                  color: '#DC2626',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '22px',
+                  flexShrink: 0,
+                }}
+              >
+                ⚠️
+              </div>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                  Cancel Order?
+                </h3>
+                <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
+                  Order {formatOrderId(orderToCancel.id)}
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                backgroundColor: '#FEF2F2',
+                border: '1px solid #FECACA',
+                borderRadius: '14px',
+                padding: '14px 16px',
+                fontSize: '13px',
+                color: '#991B1B',
+                lineHeight: 1.5,
+              }}
+            >
+              Are you sure you want to cancel this order for{' '}
+              <strong>{orderToCancel.quantity}</strong> of <strong>{orderToCancel.product}</strong>?
+              <div style={{ marginTop: '8px', color: '#B91C1C', fontWeight: 600 }}>
+                🌾 Reserved harvest will be immediately returned to the marketplace listing for other buyers.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '4px' }}>
+              <button
+                type="button"
+                disabled={isUpdatingStatus}
+                onClick={() => setOrderToCancel(null)}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '10px',
+                  border: '1.5px solid #CBD5E1',
+                  backgroundColor: '#FFFFFF',
+                  color: '#334155',
+                  fontWeight: 700,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                }}
+              >
+                Nevermind, Keep Order
+              </button>
+
+              <button
+                type="button"
+                disabled={isUpdatingStatus}
+                onClick={async () => {
+                  const id = orderToCancel.id;
+                  await handleUpdateStatus(id, 'cancelled');
+                  if (selectedOrder && selectedOrder.id === id) {
+                    setSelectedOrder((prev) => (prev ? { ...prev, status: 'Cancelled' } : null));
+                  }
+                  setOrderToCancel(null);
+                }}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: '#DC2626',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 8px rgba(220, 38, 38, 0.3)',
+                }}
+              >
+                <span>✕</span>
+                <span>{isUpdatingStatus ? 'Cancelling...' : 'Yes, Cancel Order'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
