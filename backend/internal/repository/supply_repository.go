@@ -188,7 +188,7 @@ func (r *SupplyRepository) ListOrders(ctx context.Context, userID string, role s
 	query := bson.M{}
 	if role == "supplier" {
 		query["supplier_id"] = oid
-	} else if role == "farmer" {
+	} else if role == "farmer" || role == "buyer" {
 		query["buyer_id"] = oid
 	} else {
 		query["$or"] = []bson.M{{"buyer_id": oid}, {"supplier_id": oid}}

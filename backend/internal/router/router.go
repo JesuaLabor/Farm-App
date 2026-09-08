@@ -112,7 +112,7 @@ func New(
 			r.With(middleware.RequireRole(models.RoleSupplier)).Put("/products/{id}", supplyHandler.UpdateProduct)
 			r.With(middleware.RequireRole(models.RoleSupplier)).Delete("/products/{id}", supplyHandler.DeleteProduct)
 
-			r.With(middleware.RequireRole(models.RoleFarmer)).Post("/orders", supplyHandler.CreateOrder)
+			r.With(middleware.RequireRole(models.RoleFarmer, models.RoleBuyer, models.RoleSuperAdmin)).Post("/orders", supplyHandler.CreateOrder)
 
 			r.Get("/orders", supplyHandler.ListOrders)
 			r.Put("/orders/{id}/status", supplyHandler.UpdateOrderStatus)

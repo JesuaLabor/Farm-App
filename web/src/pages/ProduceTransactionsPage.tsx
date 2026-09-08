@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { produceApi } from '../api/produce';
 
 export interface OrderItem {
@@ -82,52 +85,16 @@ export function formatOrderId(id: string): string {
   return `#ORD-${id}`;
 }
 
-const sampleOrders: OrderItem[] = [
-  {
-    id: '1042',
-    buyerName: 'Maria Santos',
-    buyerLocation: 'Fulfillment: Delivery to CDO Public Market • Phone: +63 917 555 1234 • Payment: Cash on Delivery (COD)',
-    product: 'Sweet Yellow Corn (Mais)',
-    quantityNum: 120,
-    quantity: '120 kg',
-    unitPrice: 42,
-    total: 5040,
-    status: 'Pending',
-    date: '10 mins ago',
-    contactMessage: 'Fulfillment: Delivery to CDO Public Market • Phone: +63 917 555 1234 • Payment: Cash on Delivery (COD)',
-  },
-  {
-    id: '1041',
-    buyerName: 'Juanito Store Owner',
-    buyerLocation: 'Fulfillment: Farm-Gate Pickup • Phone: +63 920 888 7766 • Payment: Cash on Delivery (COD)',
-    product: 'Fresh Red Tomatoes (Kamatis)',
-    quantityNum: 75,
-    quantity: '75 kg',
-    unitPrice: 65,
-    total: 4875,
-    status: 'Confirmed',
-    date: '1 hour ago',
-    contactMessage: 'Fulfillment: Farm-Gate Pickup • Phone: +63 920 888 7766 • Payment: Cash on Delivery (COD)',
-  },
-  {
-    id: '1035',
-    buyerName: 'CDO Supermarket',
-    buyerLocation: 'Fulfillment: Delivery to Lapasan Highway, CDO • Phone: +63 908 111 2233 • Payment: GCash / Maya',
-    product: 'Carabao Mangoes (Mangga)',
-    quantityNum: 50,
-    quantity: '50 kg',
-    unitPrice: 95,
-    total: 4750,
-    status: 'Completed',
-    date: '2 hours ago',
-    contactMessage: 'Fulfillment: Delivery to Lapasan Highway, CDO • Phone: +63 908 111 2233 • Payment: GCash / Maya',
-  },
-];
-
 export const ProduceTransactionsPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
+  const isFarmer = user?.role === 'farmer';
+  const isBuyer = user?.role === 'buyer';
+
   const [selectedTab, setSelectedTab] = useState<'All Orders' | 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled'>('All Orders');
   const [searchQuery, setSearchQuery] = useState('');
-  const [orders, setOrders] = useState<OrderItem[]>(sampleOrders);
+  const [orders, setOrders] = useState<OrderItem[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
@@ -143,7 +110,7 @@ export const ProduceTransactionsPage: React.FC = () => {
 
   useEffect(() => {
     loadTransactions();
-  }, []);
+  }, [user?.id]);
 
   const loadTransactions = async () => {
     setLoading(true);
@@ -162,7 +129,7 @@ export const ProduceTransactionsPage: React.FC = () => {
             buyerName: t.buyerName || 'Buyer',
             buyerLocation: t.contactMessage || 'Northern Mindanao',
             farmerName: t.farmerName,
-            product: t.cropName || 'Produce',
+            product: t.cropName || 'Farm Produce',
             quantityNum: t.quantity,
             quantity: `${t.quantity} kg`,
             unitPrice: t.unitPrice || (t.totalPrice / (t.quantity || 1)),
@@ -172,10 +139,13 @@ export const ProduceTransactionsPage: React.FC = () => {
             contactMessage: t.contactMessage,
           };
         });
-        setOrders([...mapped, ...sampleOrders]);
+        setOrders(mapped);
+      } else {
+        setOrders([]);
       }
-    } catch {
-      // Keep sample orders on fallback
+    } catch (err) {
+      console.error('Failed to load transactions', err);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -195,8 +165,10 @@ export const ProduceTransactionsPage: React.FC = () => {
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder((prev) => (prev ? { ...prev, status: capStatus } : null));
       }
+      toastSuccess('Order Status Updated', `Order #${orderId.slice(-6).toUpperCase()} marked as ${capStatus}.`);
     } catch (err) {
       console.error('Failed to update status', err);
+      toastError('Update Failed', 'Failed to update order status');
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -206,6 +178,7 @@ export const ProduceTransactionsPage: React.FC = () => {
     e.stopPropagation();
     navigator.clipboard.writeText(id);
     setCopiedId(id);
+    toastInfo('Copied to Clipboard', `Order ID #${id.slice(-6).toUpperCase()} copied.`);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -285,17 +258,83 @@ export const ProduceTransactionsPage: React.FC = () => {
 
   return (
     <div className="app-container" style={{ paddingBottom: '60px' }}>
+      {/* ─── Order Category Navigation Switcher ─── */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '22px', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => navigate('/produce/orders')}
+          style={{
+            padding: '10px 22px',
+            borderRadius: '24px',
+            border: '2px solid #176B3A',
+            backgroundColor: '#EAF6EE',
+            color: '#0E4A27',
+            fontWeight: 800,
+            fontSize: '15px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 2px 8px rgba(23, 107, 58, 0.12)',
+          }}
+        >
+          <span>{isFarmer ? '🌾 Crop Sales Orders' : '🌱 My Produce Purchases'}</span>
+          <span style={{
+            backgroundColor: '#176B3A',
+            color: '#ffffff',
+            fontSize: '11px',
+            fontWeight: 800,
+            padding: '2px 8px',
+            borderRadius: '10px',
+          }}>
+            {orders.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/supply/orders')}
+          style={{
+            padding: '10px 22px',
+            borderRadius: '24px',
+            border: '2px solid #e2e8f0',
+            backgroundColor: '#ffffff',
+            color: '#64748b',
+            fontWeight: 700,
+            fontSize: '15px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#ca8a04';
+            e.currentTarget.style.color = '#854d0e';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = '#e2e8f0';
+            e.currentTarget.style.color = '#64748b';
+          }}
+        >
+          <span>🏪 My Supply Purchases</span>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8' }}>→</span>
+        </button>
+      </div>
+
       {/* ─── Page Header ─── */}
       <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
-            <span style={{ fontSize: '32px' }}>📦</span>
+            <span style={{ fontSize: '32px' }}>{isFarmer ? '🌾' : '🛒'}</span>
             <h1 style={{ fontSize: '32px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
-              Crop Orders & Fulfillment
+              {isFarmer ? 'Crop Sales & Buyer Orders' : 'My Produce Purchases'}
             </h1>
           </div>
-          <p style={{ fontSize: '17px', color: '#525450', margin: 0 }}>
-            Manage incoming buyer orders, review delivery addresses, and update fulfillment progress.
+          <p style={{ fontSize: '16px', color: '#525450', margin: 0 }}>
+            {isFarmer
+              ? 'Review incoming purchase requests from buyers for your harvests, confirm fulfillment, and track payments.'
+              : 'Track fresh farm harvests you ordered from local farmers across Northern Mindanao.'}
           </p>
         </div>
 
@@ -604,6 +643,95 @@ export const ProduceTransactionsPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* ─── Live Fulfillment Timeline (Shopee Style) ─── */}
+                {ord.status !== 'Cancelled' && (
+                  <div
+                    style={{
+                      backgroundColor: '#F8FAFC',
+                      padding: '16px 20px',
+                      borderRadius: '14px',
+                      border: '1px solid #E2E8F0',
+                      marginBottom: '20px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Live Crop Order Timeline
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#0E4A27', fontWeight: 700 }}>
+                        {ord.status === 'Pending' && '⏳ Waiting for Farmer Confirmation'}
+                        {ord.status === 'Confirmed' && '🚚 Harvest Confirmed · Ready for Pickup / Delivery'}
+                        {ord.status === 'Completed' && '✓ Successfully Delivered & Completed'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
+                      {[
+                        { stepNum: 1, title: '1. Order Placed' },
+                        { stepNum: 2, title: '2. Harvest Confirmed' },
+                        { stepNum: 3, title: '3. In Transit / Ready' },
+                        { stepNum: 4, title: '4. Delivered & Paid' },
+                      ].map((s) => {
+                        const stepDone = ord.status === 'Completed'
+                          ? true
+                          : ord.status === 'Confirmed'
+                          ? s.stepNum <= 3
+                          : s.stepNum === 1;
+
+                        const isCurrent = ord.status === 'Completed'
+                          ? s.stepNum === 4
+                          : ord.status === 'Confirmed'
+                          ? s.stepNum === 3
+                          : s.stepNum === 1;
+
+                        return (
+                          <div
+                            key={s.stepNum}
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              flex: 1,
+                              position: 'relative',
+                              zIndex: 2,
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                backgroundColor: stepDone ? (isCurrent ? '#16A34A' : '#0E4A27') : '#E2E8F0',
+                                color: stepDone ? '#FFFFFF' : '#94A3B8',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 800,
+                                fontSize: '13px',
+                                boxShadow: isCurrent ? '0 0 0 4px rgba(22, 163, 74, 0.25)' : 'none',
+                                transition: 'all 0.2s ease',
+                              }}
+                            >
+                              {stepDone ? (s.stepNum === 4 ? '✓' : s.stepNum) : s.stepNum}
+                            </div>
+                            <span
+                              style={{
+                                fontSize: '12px',
+                                fontWeight: isCurrent ? 800 : 600,
+                                color: isCurrent ? '#0E4A27' : stepDone ? '#166534' : '#94A3B8',
+                                marginTop: '6px',
+                                textAlign: 'center',
+                              }}
+                            >
+                              {s.title}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Order Card Main Content Grid */}
                 <div
                   style={{
@@ -764,7 +892,7 @@ export const ProduceTransactionsPage: React.FC = () => {
                         }}
                       >
                         <span>✓</span>
-                        <span>Mark as Completed</span>
+                        <span>{isBuyer ? 'Confirm Received & Paid' : 'Mark as Completed'}</span>
                       </button>
                     )}
 
@@ -807,9 +935,11 @@ export const ProduceTransactionsPage: React.FC = () => {
           <p style={{ fontSize: '16px', color: '#64748B', maxWidth: '480px', margin: '0 auto 20px auto' }}>
             {searchQuery
               ? `No match found for "${searchQuery}". Try clearing your search query.`
-              : 'When buyers request to purchase your harvest on AgriConnect, their order slips will appear here.'}
+              : isFarmer
+              ? 'No incoming crop orders yet. When buyers request to purchase your harvest on AgriConnect, their order slips and delivery requests will appear here.'
+              : 'You have not ordered any fresh crops yet. Connect directly with local farmers across Northern Mindanao.'}
           </p>
-          {searchQuery && (
+          {searchQuery ? (
             <button
               onClick={() => setSearchQuery('')}
               style={{
@@ -823,6 +953,14 @@ export const ProduceTransactionsPage: React.FC = () => {
               }}
             >
               Clear Search Query
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate(isFarmer ? '/produce/manage' : '/produce')}
+              className="btn btn-primary btn-large"
+              style={{ padding: '12px 24px', fontSize: '15px', fontWeight: 800 }}
+            >
+              {isFarmer ? 'View My Crop Listings →' : 'Browse Produce Marketplace →'}
             </button>
           )}
         </div>
