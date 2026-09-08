@@ -21,6 +21,7 @@ build/
 # Go binaries
 backend/backend
 backend/server
+backend/bin/
 *.log
 
 # Uploaded files
