@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getImageUrl } from '../api';
 import { produceApi } from '../api/produce';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import type { ProduceListing, ProduceTransaction } from '../types/produce';
 
 const categories = [
@@ -76,12 +77,17 @@ const sampleCropListings = [
 export const ProduceMarketplacePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { success: toastSuccess, error: toastError, warning: toastWarning, info: toastInfo } = useToast();
   const [listings, setListings] = useState<ProduceListing[]>([]);
   const [_loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Crops');
 
-  // Checkout modal states
+  // Produce Cart state (Shopee-style)
+  const [produceCartMap, setProduceCartMap] = useState<Record<string, number>>({});
+  const [produceRecentlyAddedId, setProduceRecentlyAddedId] = useState<string | null>(null);
+
+  // Checkout modal states (Buy Now flow)
   const [selectedListing, setSelectedListing] = useState<any | null>(null);
   const [buyQuantity, setBuyQuantity] = useState(10);
   const [fulfillmentType, setFulfillmentType] = useState<'delivery' | 'pickup'>('delivery');
@@ -90,12 +96,84 @@ export const ProduceMarketplacePage: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'gcash'>('cod');
   const [buyerNotes, setBuyerNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [orderError, setOrderError] = useState('');
-  const [placedOrder, setPlacedOrder] = useState<ProduceTransaction | null>(null);
+  const [placedOrder, setPlacedOrder] = useState<any | null>(null);
+
+  // Purchasing privilege: Farmers and Buyers can purchase produce; suppliers sell supplies only
+  const isPurchaser = user?.role === 'buyer' || user?.role === 'farmer' || user?.role === 'super_admin';
+
+  const updateProduceCartMap = () => {
+    try {
+      const raw = localStorage.getItem('agriconnect_produce_cart');
+      if (raw) {
+        const items = JSON.parse(raw);
+        if (Array.isArray(items)) {
+          const map: Record<string, number> = {};
+          items.forEach((i: any) => {
+            map[i.id] = (map[i.id] || 0) + (i.quantity || 0);
+          });
+          setProduceCartMap(map);
+          return;
+        }
+      }
+    } catch {}
+    setProduceCartMap({});
+  };
 
   useEffect(() => {
     fetchListings();
+    updateProduceCartMap();
+    const handleCartSync = () => updateProduceCartMap();
+    window.addEventListener('cart-updated', handleCartSync);
+    window.addEventListener('storage', handleCartSync);
+    return () => {
+      window.removeEventListener('cart-updated', handleCartSync);
+      window.removeEventListener('storage', handleCartSync);
+    };
   }, []);
+
+  const handleAddProduceToCart = (item: any, qty: number = 5, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!isPurchaser) {
+      toastError('Purchasing Restricted', 'Suppliers cannot make purchases. Shopping cart is reserved for Farmers and Buyers.');
+      return;
+    }
+    const raw = localStorage.getItem('agriconnect_produce_cart');
+    let items: { id: string; listing: any; quantity: number }[] = [];
+    if (raw) {
+      try { items = JSON.parse(raw); } catch {}
+    }
+
+    const idx = items.findIndex((i) => i.id === item.id);
+    let newQty = qty;
+    if (idx > -1) {
+      const current = items[idx].quantity;
+      if (item.quantity && current + qty > item.quantity) {
+        toastWarning(
+          'Maximum Harvest in Cart',
+          `You already have ${current} ${item.unit || 'kg'} in your cart. Only ${item.quantity} ${item.unit || 'kg'} available.`
+        );
+        return;
+      }
+      items[idx].quantity += qty;
+      newQty = items[idx].quantity;
+    } else {
+      items.push({ id: item.id, listing: item, quantity: qty });
+    }
+
+    localStorage.setItem('agriconnect_produce_cart', JSON.stringify(items));
+    updateProduceCartMap();
+    window.dispatchEvent(new Event('cart-updated'));
+
+    setProduceRecentlyAddedId(item.id);
+    setTimeout(() => {
+      setProduceRecentlyAddedId((prev) => (prev === item.id ? null : prev));
+    }, 1500);
+
+    toastSuccess(
+      'Added to Crop Cart! 🧺',
+      `${qty} ${item.unit || 'kg'} of "${item.cropName}" added to your cart (${newQty}${item.unit || 'kg'} total).`
+    );
+  };
 
   const fetchListings = async () => {
     setLoading(true);
@@ -122,7 +200,6 @@ export const ProduceMarketplacePage: React.FC = () => {
     setContactPhone(user?.phone || '');
     setPaymentMethod('cod');
     setBuyerNotes('');
-    setOrderError('');
     setPlacedOrder(null);
   };
 
@@ -139,29 +216,32 @@ export const ProduceMarketplacePage: React.FC = () => {
 
   const handleBuyNow = async () => {
     if (!selectedListing) return;
+    if (!isPurchaser) {
+      toastError('Purchasing Restricted', 'Suppliers cannot make purchases. Ordering is reserved for Farmers and Buyers.');
+      return;
+    }
     if (user && ((selectedListing as any).farmerId === user.id || selectedListing.farmerName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase())) {
-      setOrderError('You cannot purchase your own produce listing.');
+      toastError('Cannot Purchase Own Produce', 'You cannot purchase your own produce listing.');
       return;
     }
     if (buyQuantity <= 0) {
-      setOrderError('Please enter a valid quantity greater than zero.');
+      toastWarning('Invalid Quantity', 'Please enter a valid quantity greater than zero.');
       return;
     }
     if (buyQuantity > selectedListing.quantity) {
-      setOrderError(`Quantity cannot exceed available harvest of ${selectedListing.quantity} ${selectedListing.unit || 'kg'}.`);
+      toastWarning('Harvest Limit', `Quantity cannot exceed available harvest of ${selectedListing.quantity} ${selectedListing.unit || 'kg'}.`);
       return;
     }
     if (fulfillmentType === 'delivery' && !deliveryAddress.trim()) {
-      setOrderError('Please provide your delivery address or barangay.');
+      toastWarning('Address Required', 'Please provide your delivery address or barangay.');
       return;
     }
     if (!contactPhone.trim()) {
-      setOrderError('Please provide your contact phone number so the seller can reach you.');
+      toastWarning('Contact Required', 'Please provide your contact phone number so the seller can reach you.');
       return;
     }
 
     setIsSubmitting(true);
-    setOrderError('');
 
     const contactMsg = `Fulfillment: ${fulfillmentType === 'delivery' ? `Delivery to ${deliveryAddress.trim()}` : 'Farm-Gate Pickup'} • Phone: ${contactPhone.trim()} • Payment: ${paymentMethod === 'gcash' ? 'GCash / Maya' : 'Cash on Delivery (COD)'}${buyerNotes.trim() ? ` • Notes: ${buyerNotes.trim()}` : ''}`;
 
@@ -275,74 +355,150 @@ export const ProduceMarketplacePage: React.FC = () => {
             gap: '28px',
           }}
         >
-          {filteredListings.map((item: any) => (
-            <div key={item.id} className="card card-interactive" style={{ padding: '0', overflow: 'hidden' }}>
-              <div style={{ position: 'relative', height: '200px', background: '#EAF6EE' }}>
-                <img
-                  src={getImageUrl(item.photos?.[0] || item.imageUrl, 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80')}
-                  alt={item.cropName}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              </div>
+          {filteredListings.map((item: any) => {
+            const qtyInCart = produceCartMap[item.id] || 0;
+            const isRecentlyAdded = produceRecentlyAddedId === item.id;
+            const isOwnListing = Boolean(user && ((item as any).farmerId === user.id || item.farmerName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase()));
 
-              <div style={{ padding: '24px' }}>
-                {Boolean(user && ((item as any).farmerId === user.id || item.farmerName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase())) && (
-                  <div style={{
-                    display: 'inline-block',
-                    padding: '3px 8px',
-                    backgroundColor: '#e2e8f0',
-                    color: '#475569',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    marginBottom: '8px',
-                  }}>
-                    Your Harvest Listing
+            return (
+              <div
+                key={item.id}
+                className="card card-interactive"
+                style={{ padding: '0', overflow: 'hidden', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
+                onClick={() => handleOpenCheckout(item)}
+              >
+                <div style={{ position: 'relative', height: '200px', background: '#EAF6EE' }}>
+                  <img
+                    src={getImageUrl(item.photos?.[0] || item.imageUrl, 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80')}
+                    alt={item.cropName}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                  {qtyInCart > 0 && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '12px',
+                        right: '12px',
+                        background: '#176B3A',
+                        color: '#FFFFFF',
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        fontSize: '13px',
+                        fontWeight: 800,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                      }}
+                    >
+                      🛒 {qtyInCart}{item.unit || 'kg'} in cart
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  {isOwnListing && (
+                    <div style={{
+                      display: 'inline-block',
+                      padding: '3px 8px',
+                      backgroundColor: '#e2e8f0',
+                      color: '#475569',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      marginBottom: '8px',
+                    }}>
+                      Your Harvest Listing
+                    </div>
+                  )}
+                  <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#1A1C1A', marginBottom: '6px' }}>
+                    {item.cropName}
+                  </h3>
+
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', marginBottom: '6px' }}>
+                    ₱{item.pricePerUnit} <span style={{ fontSize: '15px', color: '#525450', fontWeight: 600 }}>per {item.unit || 'kg'}</span>
                   </div>
-                )}
-                <h3 style={{ fontSize: '22px', fontWeight: 800, color: '#1A1C1A', marginBottom: '8px' }}>
-                  {item.cropName}
-                </h3>
 
-                <div style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27', marginBottom: '8px' }}>
-                  ₱{item.pricePerUnit} <span style={{ fontSize: '16px', color: '#525450', fontWeight: 600 }}>per {item.unit || 'kg'}</span>
-                </div>
-
-                <div style={{ fontSize: '15px', color: '#166534', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '6px 10px', borderRadius: '8px', marginBottom: '10px', fontWeight: 700 }}>
-                  🌾 Total Harvest Batch: ₱{((item.quantity || 0) * (item.pricePerUnit || 0)).toLocaleString()}
-                </div>
-
-                <div style={{ fontSize: '16px', color: '#525450', marginBottom: '10px', fontWeight: 600 }}>
-                  📦 {item.quantity} {item.unit || 'kg'} available for order
-                </div>
-
-                <div style={{ fontSize: '16px', color: '#1A1C1A', fontWeight: 700, marginBottom: '20px' }}>
-                  📍 {item.location || 'Northern Mindanao'}
-                </div>
-
-                {Boolean(user && ((item as any).farmerId === user.id || item.farmerName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase())) ? (
-                  <div style={{
-                    padding: '12px',
-                    textAlign: 'center',
-                    backgroundColor: '#f1f5f9',
-                    borderRadius: '10px',
-                    fontWeight: 700,
-                    color: '#64748b',
-                    fontSize: '15px',
-                  }}>
-                    🌱 Your Listing
+                  <div style={{ fontSize: '14px', color: '#166534', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '6px 10px', borderRadius: '8px', marginBottom: '10px', fontWeight: 700 }}>
+                    🌾 Harvest Batch: ₱{((item.quantity || 0) * (item.pricePerUnit || 0)).toLocaleString()}
                   </div>
-                ) : (
-                  <button
-                    onClick={() => handleOpenCheckout(item)}
-                    className="btn btn-primary btn-full btn-large"
-                  >
-                    See Details & Buy →
-                  </button>
-                )}
+
+                  <div style={{ fontSize: '15px', color: '#525450', marginBottom: '6px', fontWeight: 600 }}>
+                    📦 {item.quantity} {item.unit || 'kg'} available
+                  </div>
+
+                  <div style={{ fontSize: '15px', color: '#1A1C1A', fontWeight: 700, marginBottom: '16px', flex: 1 }}>
+                    📍 {item.location || 'Northern Mindanao'}
+                  </div>
+
+                  {isOwnListing ? (
+                    <div style={{
+                      padding: '10px',
+                      textAlign: 'center',
+                      backgroundColor: '#f1f5f9',
+                      borderRadius: '10px',
+                      fontWeight: 700,
+                      color: '#64748b',
+                      fontSize: '14px',
+                    }}>
+                      🌱 Your Listing
+                    </div>
+                  ) : !isPurchaser ? (
+                    <div style={{
+                      padding: '10px',
+                      textAlign: 'center',
+                      backgroundColor: '#f8fafc',
+                      borderRadius: '10px',
+                      fontWeight: 700,
+                      color: '#64748b',
+                      fontSize: '14px',
+                      border: '1.5px solid #e2e8f0',
+                    }}>
+                      🌾 View Crop Details
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={(e) => handleAddProduceToCart(item, 5, e)}
+                        className="btn btn-secondary"
+                        style={{
+                          backgroundColor: isRecentlyAdded ? '#EAF6EE' : '#F8F7F3',
+                          borderColor: isRecentlyAdded ? '#10B981' : qtyInCart > 0 ? '#176B3A' : '#D8D6CF',
+                          color: '#0E4A27',
+                          fontWeight: 800,
+                          fontSize: '14px',
+                          padding: '10px 8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {isRecentlyAdded ? '✓ Added!' : qtyInCart > 0 ? `🛒 (${qtyInCart}kg)` : '🛒 Add to Cart'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCheckout(item)}
+                        className="btn btn-primary"
+                        style={{
+                          fontWeight: 800,
+                          fontSize: '14px',
+                          padding: '10px 8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ⚡ Buy Now
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="card" style={{ padding: '60px', textAlign: 'center' }}>
@@ -547,248 +703,276 @@ export const ProduceMarketplacePage: React.FC = () => {
                     ✓ Verified
                   </span>
                 </div>
-
-                {/* Error Banner */}
-                {orderError && (
-                  <div
-                    style={{
-                      padding: '14px 18px',
-                      background: '#FDE8E8',
-                      border: '2px solid #E02424',
-                      color: '#9B1C1C',
+                {!isPurchaser ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '16px' }}>
+                    <div style={{
+                      padding: '16px 20px',
                       borderRadius: '12px',
+                      backgroundColor: '#f8fafc',
+                      border: '1.5px solid #e2e8f0',
+                      color: '#475569',
                       fontWeight: 700,
-                      fontSize: '16px',
-                      marginBottom: '20px',
-                    }}
-                  >
-                    ⚠️ {orderError}
+                      fontSize: '14px',
+                      textAlign: 'center',
+                      lineHeight: 1.5,
+                    }}>
+                      ℹ️ Purchasing fresh produce is reserved for registered Buyers and Farmers. Suppliers manage and sell supplies on AgriConnect.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedListing(null)}
+                      className="btn btn-secondary btn-large"
+                      style={{ minHeight: '48px', fontSize: '15px', fontWeight: 800 }}
+                    >
+                      Close Details
+                    </button>
                   </div>
-                )}
-
-                {/* 1. Quantity & Total Calculation */}
-                <div style={{ marginBottom: '22px' }}>
-                  <label style={{ fontSize: '17px', fontWeight: 800, color: '#1A1C1A', display: 'block', marginBottom: '8px' }}>
-                    1. How many kilograms do you want to order?
-                  </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setBuyQuantity((prev) => Math.max(1, prev - 5))}
-                      style={{
-                        width: '52px',
-                        height: '52px',
-                        borderRadius: '14px',
-                        border: '2px solid #D8D6CF',
-                        background: '#FFFFFF',
-                        fontSize: '24px',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      -
-                    </button>
-                    <input
-                      type="number"
-                      value={buyQuantity}
-                      onChange={(e) => setBuyQuantity(Math.max(1, Number(e.target.value) || 0))}
-                      min="1"
-                      max={selectedListing.quantity}
-                      className="form-input"
-                      style={{
-                        fontSize: '22px',
-                        fontWeight: 800,
-                        textAlign: 'center',
-                        maxWidth: '160px',
-                        minHeight: '52px',
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setBuyQuantity((prev) => Math.min(selectedListing.quantity, prev + 5))}
-                      style={{
-                        width: '52px',
-                        height: '52px',
-                        borderRadius: '14px',
-                        border: '2px solid #D8D6CF',
-                        background: '#FFFFFF',
-                        fontSize: '24px',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      +
-                    </button>
-                    <div style={{ flex: 1, textAlign: 'right' }}>
-                      <div style={{ fontSize: '14px', color: '#525450', fontWeight: 700 }}>Estimated Subtotal:</div>
-                      <div style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27' }}>
-                        ₱{(buyQuantity * (selectedListing.pricePerUnit || 0)).toLocaleString()}
+                ) : (
+                  <>
+                    {/* 1. Quantity & Total Calculation */}
+                    <div style={{ marginBottom: '22px' }}>
+                      <label style={{ fontSize: '17px', fontWeight: 800, color: '#1A1C1A', display: 'block', marginBottom: '8px' }}>
+                        1. How many kilograms do you want to order?
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setBuyQuantity((prev) => Math.max(1, prev - 5))}
+                          style={{
+                            width: '52px',
+                            height: '52px',
+                            borderRadius: '14px',
+                            border: '2px solid #D8D6CF',
+                            background: '#FFFFFF',
+                            fontSize: '24px',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          value={buyQuantity}
+                          onChange={(e) => setBuyQuantity(Math.max(1, Number(e.target.value) || 0))}
+                          min="1"
+                          max={selectedListing.quantity}
+                          className="form-input"
+                          style={{
+                            fontSize: '22px',
+                            fontWeight: 800,
+                            textAlign: 'center',
+                            maxWidth: '160px',
+                            minHeight: '52px',
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setBuyQuantity((prev) => Math.min(selectedListing.quantity, prev + 5))}
+                          style={{
+                            width: '52px',
+                            height: '52px',
+                            borderRadius: '14px',
+                            border: '2px solid #D8D6CF',
+                            background: '#FFFFFF',
+                            fontSize: '24px',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          +
+                        </button>
+                        <div style={{ flex: 1, textAlign: 'right' }}>
+                          <div style={{ fontSize: '14px', color: '#525450', fontWeight: 700 }}>Estimated Subtotal:</div>
+                          <div style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27' }}>
+                            ₱{(buyQuantity * (selectedListing.pricePerUnit || 0)).toLocaleString()}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* 2. Fulfillment Type */}
-                <div style={{ marginBottom: '22px' }}>
-                  <label style={{ fontSize: '17px', fontWeight: 800, color: '#1A1C1A', display: 'block', marginBottom: '8px' }}>
-                    2. Fulfillment Method
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setFulfillmentType('delivery')}
-                      style={{
-                        padding: '14px 16px',
-                        borderRadius: '14px',
-                        border: `2.5px solid ${fulfillmentType === 'delivery' ? '#176B3A' : '#D8D6CF'}`,
-                        background: fulfillmentType === 'delivery' ? '#EAF6EE' : '#FFFFFF',
-                        color: fulfillmentType === 'delivery' ? '#0E4A27' : '#1A1C1A',
-                        fontWeight: 800,
-                        fontSize: '16px',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                      }}
-                    >
-                      🚚 Delivery to Address
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFulfillmentType('pickup')}
-                      style={{
-                        padding: '14px 16px',
-                        borderRadius: '14px',
-                        border: `2.5px solid ${fulfillmentType === 'pickup' ? '#176B3A' : '#D8D6CF'}`,
-                        background: fulfillmentType === 'pickup' ? '#EAF6EE' : '#FFFFFF',
-                        color: fulfillmentType === 'pickup' ? '#0E4A27' : '#1A1C1A',
-                        fontWeight: 800,
-                        fontSize: '16px',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                      }}
-                    >
-                      🚜 Farm-Gate Pickup
-                    </button>
-                  </div>
-                </div>
+                    {/* 2. Fulfillment Type */}
+                    <div style={{ marginBottom: '22px' }}>
+                      <label style={{ fontSize: '17px', fontWeight: 800, color: '#1A1C1A', display: 'block', marginBottom: '8px' }}>
+                        2. Fulfillment Method
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setFulfillmentType('delivery')}
+                          style={{
+                            padding: '14px 16px',
+                            borderRadius: '14px',
+                            border: `2.5px solid ${fulfillmentType === 'delivery' ? '#176B3A' : '#D8D6CF'}`,
+                            background: fulfillmentType === 'delivery' ? '#EAF6EE' : '#FFFFFF',
+                            color: fulfillmentType === 'delivery' ? '#0E4A27' : '#1A1C1A',
+                            fontWeight: 800,
+                            fontSize: '16px',
+                            cursor: 'pointer',
+                            textAlign: 'center',
+                          }}
+                        >
+                          🚚 Delivery to Address
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFulfillmentType('pickup')}
+                          style={{
+                            padding: '14px 16px',
+                            borderRadius: '14px',
+                            border: `2.5px solid ${fulfillmentType === 'pickup' ? '#176B3A' : '#D8D6CF'}`,
+                            background: fulfillmentType === 'pickup' ? '#EAF6EE' : '#FFFFFF',
+                            color: fulfillmentType === 'pickup' ? '#0E4A27' : '#1A1C1A',
+                            fontWeight: 800,
+                            fontSize: '16px',
+                            cursor: 'pointer',
+                            textAlign: 'center',
+                          }}
+                        >
+                          🚜 Farm-Gate Pickup
+                        </button>
+                      </div>
+                    </div>
 
-                {/* 3. Address & Phone */}
-                <div style={{ marginBottom: '22px' }}>
-                  {fulfillmentType === 'delivery' && (
-                    <div style={{ marginBottom: '14px' }}>
+                    {/* 3. Address & Phone */}
+                    <div style={{ marginBottom: '22px' }}>
+                      {fulfillmentType === 'delivery' && (
+                        <div style={{ marginBottom: '14px' }}>
+                          <label style={{ fontSize: '16px', fontWeight: 800, color: '#1A1C1A', display: 'block', marginBottom: '6px' }}>
+                            Delivery Address / Barangay *
+                          </label>
+                          <input
+                            type="text"
+                            value={deliveryAddress}
+                            onChange={(e) => setDeliveryAddress(e.target.value)}
+                            placeholder="e.g. Purok 4, Poblacion, Valencia City, Bukidnon"
+                            className="form-input"
+                            style={{ fontSize: '16px' }}
+                          />
+                        </div>
+                      )}
+
+                      <div>
+                        <label style={{ fontSize: '16px', fontWeight: 800, color: '#1A1C1A', display: 'block', marginBottom: '6px' }}>
+                          Contact Phone Number (for delivery/pickup updates) *
+                        </label>
+                        <input
+                          type="tel"
+                          value={contactPhone}
+                          onChange={(e) => setContactPhone(e.target.value)}
+                          placeholder="e.g. 0917-123-4567"
+                          className="form-input"
+                          style={{ fontSize: '16px' }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* 4. Payment Method */}
+                    <div style={{ marginBottom: '22px' }}>
+                      <label style={{ fontSize: '16px', fontWeight: 800, color: '#1A1C1A', display: 'block', marginBottom: '8px' }}>
+                        4. Payment Preference
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod('cod')}
+                          style={{
+                            padding: '14px',
+                            borderRadius: '14px',
+                            border: `2.5px solid ${paymentMethod === 'cod' ? '#176B3A' : '#D8D6CF'}`,
+                            background: paymentMethod === 'cod' ? '#EAF6EE' : '#FFFFFF',
+                            color: paymentMethod === 'cod' ? '#0E4A27' : '#1A1C1A',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            textAlign: 'center',
+                          }}
+                        >
+                          💵 Cash on Delivery (COD)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod('gcash')}
+                          style={{
+                            padding: '14px',
+                            borderRadius: '14px',
+                            border: `2.5px solid ${paymentMethod === 'gcash' ? '#176B3A' : '#D8D6CF'}`,
+                            background: paymentMethod === 'gcash' ? '#EAF6EE' : '#FFFFFF',
+                            color: paymentMethod === 'gcash' ? '#0E4A27' : '#1A1C1A',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            textAlign: 'center',
+                          }}
+                        >
+                          📱 GCash / Maya
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 5. Special Notes */}
+                    <div style={{ marginBottom: '26px' }}>
                       <label style={{ fontSize: '16px', fontWeight: 800, color: '#1A1C1A', display: 'block', marginBottom: '6px' }}>
-                        Delivery Address / Barangay *
+                        Special Instructions / Notes (Optional)
                       </label>
                       <input
                         type="text"
-                        value={deliveryAddress}
-                        onChange={(e) => setDeliveryAddress(e.target.value)}
-                        placeholder="e.g. Purok 4, Poblacion, Valencia City, Bukidnon"
+                        value={buyerNotes}
+                        onChange={(e) => setBuyerNotes(e.target.value)}
+                        placeholder="e.g. Please deliver early morning before 10 AM"
                         className="form-input"
-                        style={{ fontSize: '16px' }}
+                        style={{ fontSize: '15px' }}
                       />
                     </div>
-                  )}
 
-                  <div>
-                    <label style={{ fontSize: '16px', fontWeight: 800, color: '#1A1C1A', display: 'block', marginBottom: '6px' }}>
-                      Contact Phone Number (for delivery/pickup updates) *
-                    </label>
-                    <input
-                      type="tel"
-                      value={contactPhone}
-                      onChange={(e) => setContactPhone(e.target.value)}
-                      placeholder="e.g. 0917 123 4567"
-                      className="form-input"
-                      style={{ fontSize: '16px' }}
-                    />
-                  </div>
-                </div>
+                    {/* Action Buttons */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: '14px', marginBottom: '14px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleAddProduceToCart(selectedListing, buyQuantity);
+                          setSelectedListing(null);
+                        }}
+                        className="btn btn-secondary btn-large"
+                        style={{ minHeight: '54px', fontSize: '16px', fontWeight: 800 }}
+                      >
+                        🛒 Add to Cart ({buyQuantity}kg)
+                      </button>
 
-                {/* 4. Payment Method */}
-                <div style={{ marginBottom: '22px' }}>
-                  <label style={{ fontSize: '17px', fontWeight: 800, color: '#1A1C1A', display: 'block', marginBottom: '8px' }}>
-                    3. Payment Method
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('cod')}
-                      style={{
-                        padding: '14px 16px',
-                        borderRadius: '14px',
-                        border: `2.5px solid ${paymentMethod === 'cod' ? '#176B3A' : '#D8D6CF'}`,
-                        background: paymentMethod === 'cod' ? '#EAF6EE' : '#FFFFFF',
-                        color: paymentMethod === 'cod' ? '#0E4A27' : '#1A1C1A',
-                        fontWeight: 800,
-                        fontSize: '16px',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                      }}
-                    >
-                      💵 Cash on Delivery (COD)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('gcash')}
-                      style={{
-                        padding: '14px 16px',
-                        borderRadius: '14px',
-                        border: `2.5px solid ${paymentMethod === 'gcash' ? '#176B3A' : '#D8D6CF'}`,
-                        background: paymentMethod === 'gcash' ? '#EAF6EE' : '#FFFFFF',
-                        color: paymentMethod === 'gcash' ? '#0E4A27' : '#1A1C1A',
-                        fontWeight: 800,
-                        fontSize: '16px',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                      }}
-                    >
-                      📱 GCash / Maya
-                    </button>
-                  </div>
-                </div>
+                      <button
+                        type="button"
+                        onClick={handleBuyNow}
+                        disabled={isSubmitting}
+                        className="btn btn-primary btn-large"
+                        style={{
+                          minHeight: '54px',
+                          fontSize: '17px',
+                          fontWeight: 800,
+                          opacity: isSubmitting ? 0.7 : 1,
+                          cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        {isSubmitting ? '⏳ Placing Order...' : `⚡ Place Order (₱${(buyQuantity * (selectedListing.pricePerUnit || 0)).toLocaleString()})`}
+                      </button>
+                    </div>
 
-                {/* 5. Special Notes */}
-                <div style={{ marginBottom: '26px' }}>
-                  <label style={{ fontSize: '16px', fontWeight: 800, color: '#1A1C1A', display: 'block', marginBottom: '6px' }}>
-                    Special Instructions / Notes (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={buyerNotes}
-                    onChange={(e) => setBuyerNotes(e.target.value)}
-                    placeholder="e.g. Please deliver early morning before 10 AM"
-                    className="form-input"
-                    style={{ fontSize: '15px' }}
-                  />
-                </div>
-
-                {/* Action Buttons */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: '16px' }}>
-                  <button
-                    type="button"
-                    onClick={() => alert(`Calling seller ${selectedListing.sellerName || selectedListing.farmerName || 'Farmer'} directly...`)}
-                    className="btn btn-secondary btn-large"
-                    style={{ minHeight: '56px', fontSize: '17px' }}
-                  >
-                    📞 Call Seller
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleBuyNow}
-                    disabled={isSubmitting}
-                    className="btn btn-primary btn-large"
-                    style={{
-                      minHeight: '56px',
-                      fontSize: '18px',
-                      fontWeight: 800,
-                      opacity: isSubmitting ? 0.7 : 1,
-                      cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {isSubmitting ? '⏳ Placing Order...' : `🛒 Place Order (₱${(buyQuantity * (selectedListing.pricePerUnit || 0)).toLocaleString()})`}
-                  </button>
-                </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => toastInfo('Calling Farmer', `Initiating direct contact to ${selectedListing.sellerName || selectedListing.farmerName || 'Farmer'}...`)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#525450',
+                          fontSize: '14px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                        }}
+                      >
+                        📞 Need to talk first? Call farmer directly
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

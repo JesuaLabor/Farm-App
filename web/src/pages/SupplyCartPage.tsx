@@ -3,10 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
 import { supplyApi } from '../api/supply';
+import { produceApi } from '../api/produce';
+import { getImageUrl } from '../api';
+import { useToast } from '../contexts/ToastContext';
 import type { DeliveryMethod, PaymentMethod, SupplyProduct } from '../types/supply';
 
 interface CartItem {
   product: SupplyProduct;
+  quantity: number;
+}
+
+interface ProduceCartItem {
+  id: string;
+  listing: any;
   quantity: number;
 }
 
@@ -58,39 +67,88 @@ export const SupplyCartPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Tabs: 'supplies' or 'produce'
+  const [activeTab, setActiveTab] = useState<'supplies' | 'produce'>('supplies');
+
+  // Supplies Cart State
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [selectedSupplyIds, setSelectedSupplyIds] = useState<Set<string>>(new Set());
+
+  // Produce Cart State
+  const [produceCart, setProduceCart] = useState<ProduceCartItem[]>([]);
+  const [selectedProduceIds, setSelectedProduceIds] = useState<Set<string>>(new Set());
+
+  // Checkout Form States
+  const userAddr = user ? [user.barangay, user.municipality, user.province].filter(Boolean).join(', ') || user.address || '' : '';
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('delivery');
-  const [deliveryAddress, setDeliveryAddress] = useState(user?.address || '');
+  const [deliveryAddress, setDeliveryAddress] = useState(userAddr);
+  const [contactPhone, setContactPhone] = useState(user?.phone || '');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
 
   const [ordering, setOrdering] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  const uniqueSupplierNames = Array.from(new Set(cart.map((i) => i.product.supplierName || 'Supplier')));
-  const hasMultipleSuppliers = uniqueSupplierNames.length > 1;
+  const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
 
   const loadCart = () => {
-    const raw = localStorage.getItem('agriconnect_cart');
-    if (raw) {
-      try { setCart(JSON.parse(raw)); } catch { setCart([]); }
+    // 1. Load supplies cart
+    const rawSupply = localStorage.getItem('agriconnect_cart');
+    if (rawSupply) {
+      try {
+        const parsed: CartItem[] = JSON.parse(rawSupply);
+        setCart(parsed);
+        setSelectedSupplyIds(new Set(parsed.map((i) => i.product.id)));
+      } catch {
+        setCart([]);
+      }
+    } else {
+      setCart([]);
+    }
+
+    // 2. Load produce cart
+    const rawProduce = localStorage.getItem('agriconnect_produce_cart');
+    if (rawProduce) {
+      try {
+        const parsedProduce: ProduceCartItem[] = JSON.parse(rawProduce);
+        setProduceCart(parsedProduce);
+        setSelectedProduceIds(new Set(parsedProduce.map((i) => i.id)));
+      } catch {
+        setProduceCart([]);
+      }
+    } else {
+      setProduceCart([]);
     }
   };
 
   useEffect(() => {
-    if (user?.role === 'supplier') {
-      navigate('/supply/manage');
-      return;
-    }
     loadCart();
-  }, [user, navigate]);
+    const handleSync = () => loadCart();
+    window.addEventListener('cart-updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('cart-updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
 
-  const saveCart = (newCart: CartItem[]) => {
+  // Auto-switch to produce tab if supplies cart is empty but produce cart has items
+  useEffect(() => {
+    if (cart.length === 0 && produceCart.length > 0) {
+      setActiveTab('produce');
+    }
+  }, [cart.length, produceCart.length]);
+
+  const saveSupplyCart = (newCart: CartItem[]) => {
     setCart(newCart);
     localStorage.setItem('agriconnect_cart', JSON.stringify(newCart));
     window.dispatchEvent(new Event('cart-updated'));
   };
 
-  const handleUpdateQty = (productId: string, delta: number) => {
+  const saveProduceCart = (newCart: ProduceCartItem[]) => {
+    setProduceCart(newCart);
+    localStorage.setItem('agriconnect_produce_cart', JSON.stringify(newCart));
+    window.dispatchEvent(new Event('cart-updated'));
+  };
+
+  const handleUpdateSupplyQty = (productId: string, delta: number) => {
     const updated = cart.map((item) => {
       if (item.product.id === productId) {
         const newQty = item.quantity + delta;
@@ -98,56 +156,169 @@ export const SupplyCartPage: React.FC = () => {
       }
       return item;
     }).filter(Boolean) as CartItem[];
-    saveCart(updated);
+    saveSupplyCart(updated);
   };
 
-  const handleRemove = (productId: string) => {
-    saveCart(cart.filter((i) => i.product.id !== productId));
+  const handleRemoveSupply = (productId: string) => {
+    saveSupplyCart(cart.filter((i) => i.product.id !== productId));
+    setSelectedSupplyIds((prev) => {
+      const next = new Set(prev);
+      next.delete(productId);
+      return next;
+    });
   };
 
-  const totalAmount = cart.reduce((sum, item) => sum + item.quantity * item.product.price, 0);
+  const handleUpdateProduceQty = (id: string, delta: number) => {
+    const updated = produceCart.map((item) => {
+      if (item.id === id) {
+        const newQty = item.quantity + delta;
+        return newQty > 0 ? { ...item, quantity: newQty } : null;
+      }
+      return item;
+    }).filter(Boolean) as ProduceCartItem[];
+    saveProduceCart(updated);
+  };
+
+  const handleRemoveProduce = (id: string) => {
+    saveProduceCart(produceCart.filter((i) => i.id !== id));
+    setSelectedProduceIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  // Checkbox handlers (Shopee-style)
+  const toggleSelectSupply = (id: string) => {
+    setSelectedSupplyIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllSupplies = () => {
+    if (selectedSupplyIds.size === cart.length) {
+      setSelectedSupplyIds(new Set());
+    } else {
+      setSelectedSupplyIds(new Set(cart.map((i) => i.product.id)));
+    }
+  };
+
+  const toggleSelectProduce = (id: string) => {
+    setSelectedProduceIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllProduce = () => {
+    if (selectedProduceIds.size === produceCart.length) {
+      setSelectedProduceIds(new Set());
+    } else {
+      setSelectedProduceIds(new Set(produceCart.map((i) => i.id)));
+    }
+  };
+
+  // Calculation for SELECTED items only
+  const selectedSupplyItems = cart.filter((i) => selectedSupplyIds.has(i.product.id));
+  const supplyTotalAmount = selectedSupplyItems.reduce((sum, item) => sum + item.quantity * item.product.price, 0);
+
+  const selectedProduceItems = produceCart.filter((i) => selectedProduceIds.has(i.id));
+  const produceTotalAmount = selectedProduceItems.reduce((sum, item) => sum + item.quantity * (item.listing.pricePerUnit || 0), 0);
+
+  const uniqueSelectedSuppliers = Array.from(new Set(selectedSupplyItems.map((i) => i.product.supplierName || 'Supplier')));
+  const hasMultipleSelectedSuppliers = uniqueSelectedSuppliers.length > 1;
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (cart.length === 0) return;
 
-    if (user?.role !== 'farmer') {
-      setMessage({ type: 'error', text: 'Only registered Farmers can place supply orders.' });
-      return;
-    }
+    if (activeTab === 'supplies') {
+      if (selectedSupplyItems.length === 0) {
+        toastWarning('No Items Selected', 'Please select at least 1 supply item to checkout.');
+        return;
+      }
 
-    setOrdering(true);
-    setMessage(null);
+      if (user?.role !== 'farmer' && user?.role !== 'buyer' && user?.role !== 'super_admin') {
+        toastError('Restricted', 'Only registered Farmers or Buyers can place supply orders.');
+        return;
+      }
 
-    if (hasMultipleSuppliers) {
-      setMessage({
-        type: 'error',
-        text: `Your cart contains items from multiple suppliers (${uniqueSupplierNames.join(', ')}). Please place separate orders per supplier.`,
-      });
-      return;
-    }
+      if (hasMultipleSelectedSuppliers) {
+        toastWarning(
+          'Multiple Suppliers',
+          `Your selected items come from multiple suppliers (${uniqueSelectedSuppliers.join(', ')}). Please select items from only 1 supplier per order.`
+        );
+        return;
+      }
 
-    try {
-      await supplyApi.createOrder({
-        items: cart.map((item) => ({ productId: item.product.id, quantity: item.quantity })),
-        deliveryMethod,
-        deliveryAddress: deliveryMethod === 'delivery' ? deliveryAddress : undefined,
-        paymentMethod,
-      });
-      localStorage.removeItem('agriconnect_cart');
-      window.dispatchEvent(new Event('cart-updated'));
-      setCart([]);
-      setMessage({
-        type: 'success',
-        text: paymentMethod === 'cod'
-          ? (deliveryMethod === 'pickup' ? '✅ Order placed! Pay in cash upon in-store pickup. Track it under My Supply Orders.' : '✅ Order placed! Pay in cash upon delivery. Track it under My Supply Orders.')
-          : '✅ Order placed! Check My Supply Orders for payment instructions.',
-      });
-      setTimeout(() => navigate('/supply/orders'), 2500);
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to place order.' });
-    } finally {
-      setOrdering(false);
+      setOrdering(true);
+      try {
+        await supplyApi.createOrder({
+          items: selectedSupplyItems.map((item) => ({ productId: item.product.id, quantity: item.quantity })),
+          deliveryMethod,
+          deliveryAddress: deliveryMethod === 'delivery' ? deliveryAddress : undefined,
+          paymentMethod,
+        });
+
+        // Remove only the checked-out items from cart (Shopee style)
+        const remaining = cart.filter((i) => !selectedSupplyIds.has(i.product.id));
+        saveSupplyCart(remaining);
+        setSelectedSupplyIds(new Set(remaining.map((i) => i.product.id)));
+
+        const successText = paymentMethod === 'cod'
+          ? (deliveryMethod === 'pickup' ? 'Order placed! Pay upon in-store pickup. Redirecting to My Supply Orders…' : 'Order placed! Pay upon delivery. Redirecting to My Supply Orders…')
+          : 'Order placed! Check My Supply Orders for payment instructions.';
+        toastSuccess('Order Placed!', successText);
+        setTimeout(() => navigate('/supply/orders'), 2200);
+      } catch (err: any) {
+        toastError('Checkout Failed', err.response?.data?.error || 'Failed to place supply order.');
+      } finally {
+        setOrdering(false);
+      }
+    } else {
+      // Produce Cart Checkout
+      if (selectedProduceItems.length === 0) {
+        toastWarning('No Crops Selected', 'Please select at least 1 crop to checkout.');
+        return;
+      }
+
+      if (deliveryMethod === 'delivery' && !deliveryAddress.trim()) {
+        toastWarning('Address Required', 'Please enter your delivery address.');
+        return;
+      }
+
+      if (!contactPhone.trim()) {
+        toastWarning('Phone Required', 'Please provide your contact phone number.');
+        return;
+      }
+
+      setOrdering(true);
+      try {
+        for (const item of selectedProduceItems) {
+          const contactMsg = `Fulfillment: ${deliveryMethod === 'delivery' ? `Delivery to ${deliveryAddress.trim()}` : 'Farm-Gate Pickup'} • Phone: ${contactPhone.trim()} • Payment: ${paymentMethod === 'cod' ? 'Cash on Delivery/Pickup' : 'GCash'}`;
+          await produceApi.initiateTransaction({
+            listingId: item.id,
+            quantity: item.quantity,
+            contactMessage: contactMsg,
+          });
+        }
+
+        // Remove checked-out produce items
+        const remaining = produceCart.filter((i) => !selectedProduceIds.has(i.id));
+        saveProduceCart(remaining);
+        setSelectedProduceIds(new Set(remaining.map((i) => i.id)));
+
+        toastSuccess('Harvest Order Placed!', 'Harvest crop order placed successfully! Redirecting to My Crop Orders…');
+        setTimeout(() => navigate('/produce/orders'), 2200);
+      } catch (err: any) {
+        toastError('Checkout Failed', err.response?.data?.error || 'Failed to place crop order.');
+      } finally {
+        setOrdering(false);
+      }
     }
   };
 
@@ -158,97 +329,360 @@ export const SupplyCartPage: React.FC = () => {
   const panelBtn = (active: boolean): React.CSSProperties => ({
     padding: '10px 12px',
     borderRadius: '10px',
-    border: active ? '2px solid #ca8a04' : '1.5px solid #e2e8f0',
-    backgroundColor: active ? '#fef9c3' : '#fff',
+    border: `1.5px solid ${active ? '#15803d' : '#e2e8f0'}`,
+    backgroundColor: active ? '#f0fdf4' : '#ffffff',
+    color: active ? '#15803d' : '#475569',
     fontWeight: 700,
-    cursor: 'pointer',
     fontSize: '13px',
-    textAlign: 'left',
-    transition: 'border-color 0.15s, background 0.15s',
+    cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '6px',
+    flex: 1,
+    justifyContent: 'center',
+    transition: 'all 0.15s ease',
   });
+
+  const activeItemsCount = activeTab === 'supplies' ? cart.length : produceCart.length;
+  const currentTotalAmount = activeTab === 'supplies' ? supplyTotalAmount : produceTotalAmount;
+  const currentSelectedCount = activeTab === 'supplies' ? selectedSupplyItems.length : selectedProduceItems.length;
+
+  const isPurchaser = user?.role === 'farmer' || user?.role === 'buyer' || user?.role === 'super_admin';
+
+  if (user && !isPurchaser) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc' }}>
+        <Navbar />
+        <main style={{ maxWidth: '640px', margin: '60px auto', padding: '32px 24px', textAlign: 'center' }}>
+          <div className="card" style={{ padding: '48px 32px', borderRadius: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+            <div style={{ fontSize: '56px', marginBottom: '16px' }}>🏪</div>
+            <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a', marginBottom: '10px' }}>
+              Shopping Cart Unavailable
+            </h2>
+            <p style={{ color: '#64748b', fontSize: '15px', lineHeight: 1.6, marginBottom: '28px' }}>
+              The shopping cart and purchasing features are reserved for Farmers and Buyers. As a Supplier, your account is configured to sell agricultural inputs and fulfill customer orders.
+            </p>
+            <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button onClick={() => navigate('/supply/manage')} className="btn btn-primary" style={{ padding: '12px 20px', fontSize: '15px', fontWeight: 700 }}>
+                🏷️ Manage My Products
+              </button>
+              <button onClick={() => navigate('/supply/orders')} className="btn btn-secondary" style={{ padding: '12px 20px', fontSize: '15px', fontWeight: 700 }}>
+                📦 View Customer Orders
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc' }}>
       <Navbar />
 
-      <main style={{ maxWidth: '940px', margin: '0 auto', padding: '32px 24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
-          Agri-Supply Shopping Cart
-        </h1>
-        <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '32px' }}>
-          Review your items, choose delivery, and select how you'd like to pay.
-        </p>
+      <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 24px' }}>
+        {/* Page Title */}
+        <div style={{ marginBottom: '24px' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.5px' }}>
+            🛒 Shopping Cart & Express Checkout
+          </h1>
+          <p style={{ color: '#64748b', fontSize: '15px', marginTop: '4px' }}>
+            Review your selected farm inputs or fresh crop harvests and proceed to checkout.
+          </p>
+        </div>
 
-        {message && (
-          <div style={{
-            padding: '14px 18px',
-            borderRadius: '12px',
-            marginBottom: '24px',
-            backgroundColor: message.type === 'success' ? '#f0fdf4' : '#fef2f2',
-            color: message.type === 'success' ? '#166534' : '#991b1b',
-            fontWeight: 600,
-            fontSize: '14px',
-          }}>
-            {message.text}
-          </div>
-        )}
+        {/* Unified Cart Tabs */}
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', borderBottom: '2px solid #e2e8f0', paddingBottom: '12px' }}>
+          <button
+            type="button"
+            onClick={() => setActiveTab('supplies')}
+            style={{
+              padding: '10px 22px',
+              borderRadius: '24px',
+              border: `2px solid ${activeTab === 'supplies' ? '#ca8a04' : '#e2e8f0'}`,
+              backgroundColor: activeTab === 'supplies' ? '#fef9c3' : '#ffffff',
+              color: activeTab === 'supplies' ? '#854d0e' : '#64748b',
+              fontWeight: 800,
+              fontSize: '15px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <span>🏪 Agri-Supplies</span>
+            <span style={{
+              backgroundColor: activeTab === 'supplies' ? '#ca8a04' : '#e2e8f0',
+              color: activeTab === 'supplies' ? '#ffffff' : '#64748b',
+              padding: '2px 8px',
+              borderRadius: '12px',
+              fontSize: '12px',
+              fontWeight: 700,
+            }}>
+              {cart.length}
+            </span>
+          </button>
 
-        {cart.length === 0 ? (
+          <button
+            type="button"
+            onClick={() => setActiveTab('produce')}
+            style={{
+              padding: '10px 22px',
+              borderRadius: '24px',
+              border: `2px solid ${activeTab === 'produce' ? '#176B3A' : '#e2e8f0'}`,
+              backgroundColor: activeTab === 'produce' ? '#EAF6EE' : '#ffffff',
+              color: activeTab === 'produce' ? '#0E4A27' : '#64748b',
+              fontWeight: 800,
+              fontSize: '15px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <span>🌱 Farm Produce</span>
+            <span style={{
+              backgroundColor: activeTab === 'produce' ? '#176B3A' : '#e2e8f0',
+              color: activeTab === 'produce' ? '#ffffff' : '#64748b',
+              padding: '2px 8px',
+              borderRadius: '12px',
+              fontSize: '12px',
+              fontWeight: 700,
+            }}>
+              {produceCart.length}
+            </span>
+          </button>
+        </div>
+
+        {activeItemsCount === 0 ? (
           <div className="glass-panel" style={{ padding: '60px', borderRadius: '20px', textAlign: 'center' }}>
-            <span style={{ fontSize: '48px' }}>🛒</span>
-            <h3 style={{ marginTop: '12px', fontSize: '18px' }}>Your Cart is Empty</h3>
-            <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '20px' }}>
-              Browse the Agri-Supply Store to add fertilizers, seeds, or tools.
+            <span style={{ fontSize: '54px' }}>{activeTab === 'supplies' ? '🏪' : '🌱'}</span>
+            <h3 style={{ marginTop: '14px', fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>
+              Your {activeTab === 'supplies' ? 'Agri-Supply' : 'Farm Produce'} Cart is Empty
+            </h3>
+            <p style={{ color: '#64748b', fontSize: '15px', marginBottom: '24px' }}>
+              {activeTab === 'supplies'
+                ? 'Browse the Agri-Supply Store to add certified fertilizers, seeds, and tools.'
+                : 'Browse the Crop Marketplace to add fresh harvests from local Northern Mindanao farmers.'}
             </p>
-            <a href="/supply" style={{ padding: '10px 20px', borderRadius: '10px', backgroundColor: '#ca8a04', color: '#fff', textDecoration: 'none', fontWeight: 700 }}>
-              Go to Supply Store
-            </a>
+            <button
+              onClick={() => navigate(activeTab === 'supplies' ? '/supply' : '/produce')}
+              className="btn btn-primary btn-large"
+              style={{ padding: '12px 28px', fontSize: '16px' }}
+            >
+              {activeTab === 'supplies' ? 'Browse Supply Store →' : 'Browse Crop Marketplace →'}
+            </button>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '32px', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '28px', alignItems: 'start' }}>
 
-            {/* ── Cart Items ──────────────────────────────── */}
+            {/* ── Cart Items Column ── */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {cart.map((item) => (
-                <div key={item.product.id} className="glass-panel" style={{ padding: '18px 20px', borderRadius: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {item.product.name}
-                    </h3>
-                    <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0 0' }}>
-                      ₱{item.product.price.toLocaleString()} / {item.product.unit} · {item.product.supplierName}
-                    </p>
-                  </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
-                    {/* Qty stepper */}
-                    <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-                      <button onClick={() => handleUpdateQty(item.product.id, -1)} style={{ padding: '6px 11px', border: 'none', background: '#f8fafc', cursor: 'pointer', fontWeight: 700, fontSize: '15px' }}>−</button>
-                      <span style={{ padding: '6px 11px', fontWeight: 700, fontSize: '14px', minWidth: '28px', textAlign: 'center' }}>{item.quantity}</span>
-                      <button onClick={() => handleUpdateQty(item.product.id, 1)} style={{ padding: '6px 11px', border: 'none', background: '#f8fafc', cursor: 'pointer', fontWeight: 700, fontSize: '15px' }}>+</button>
+              {/* Shopee-style Select All Bar */}
+              <div
+                className="glass-panel"
+                style={{
+                  padding: '12px 18px',
+                  borderRadius: '14px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: '#ffffff',
+                }}
+              >
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontWeight: 700, fontSize: '14px', color: '#1A1C1A' }}>
+                  <input
+                    type="checkbox"
+                    checked={
+                      activeTab === 'supplies'
+                        ? selectedSupplyIds.size === cart.length && cart.length > 0
+                        : selectedProduceIds.size === produceCart.length && produceCart.length > 0
+                    }
+                    onChange={activeTab === 'supplies' ? toggleSelectAllSupplies : toggleSelectAllProduce}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <span>Select All ({activeItemsCount} items)</span>
+                </label>
+
+                <span style={{ fontSize: '13px', color: '#64748b' }}>
+                  {currentSelectedCount} selected
+                </span>
+              </div>
+
+              {/* Items List */}
+              {activeTab === 'supplies' ? (
+                /* Supplies Items List */
+                cart.map((item) => {
+                  const isChecked = selectedSupplyIds.has(item.product.id);
+                  return (
+                    <div
+                      key={item.product.id}
+                      className="glass-panel"
+                      style={{
+                        padding: '16px 18px',
+                        borderRadius: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '14px',
+                        background: isChecked ? '#ffffff' : '#f8fafc',
+                        border: isChecked ? '1.5px solid #ca8a04' : '1.5px solid #e2e8f0',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleSelectSupply(item.product.id)}
+                        style={{ width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0 }}
+                      />
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '12px', color: '#854d0e', fontWeight: 700 }}>
+                          {item.product.supplierName}
+                        </div>
+                        <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: '2px 0 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {item.product.name}
+                        </h3>
+                        <p style={{ fontSize: '13px', color: '#64748b', margin: '2px 0 0 0' }}>
+                          ₱{item.product.price.toLocaleString()} / {item.product.unit}
+                        </p>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                        {/* Qty Stepper */}
+                        <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', background: '#fff' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateSupplyQty(item.product.id, -1)}
+                            style={{ padding: '6px 10px', border: 'none', background: '#f8fafc', cursor: 'pointer', fontWeight: 700, fontSize: '15px' }}
+                          >
+                            −
+                          </button>
+                          <span style={{ padding: '6px 10px', fontWeight: 800, fontSize: '14px', minWidth: '28px', textAlign: 'center' }}>
+                            {item.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateSupplyQty(item.product.id, 1)}
+                            style={{ padding: '6px 10px', border: 'none', background: '#f8fafc', cursor: 'pointer', fontWeight: 700, fontSize: '15px' }}
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        <div style={{ fontSize: '16px', fontWeight: 800, color: '#ca8a04', minWidth: '80px', textAlign: 'right' }}>
+                          ₱{(item.quantity * item.product.price).toLocaleString()}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSupply(item.product.id)}
+                          title="Remove item"
+                          style={{ border: 'none', background: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '18px', padding: '4px' }}
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
+                  );
+                })
+              ) : (
+                /* Produce Crops Items List */
+                produceCart.map((item) => {
+                  const isChecked = selectedProduceIds.has(item.id);
+                  return (
+                    <div
+                      key={item.id}
+                      className="glass-panel"
+                      style={{
+                        padding: '16px 18px',
+                        borderRadius: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '14px',
+                        background: isChecked ? '#ffffff' : '#f8fafc',
+                        border: isChecked ? '1.5px solid #176B3A' : '1.5px solid #e2e8f0',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleSelectProduce(item.id)}
+                        style={{ width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0 }}
+                      />
 
-                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#ca8a04', minWidth: '76px', textAlign: 'right' }}>
-                      ₱{(item.quantity * item.product.price).toLocaleString()}
+                      <img
+                        src={getImageUrl(item.listing.photos?.[0] || item.listing.imageUrl, 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80')}
+                        alt={item.listing.cropName}
+                        style={{ width: '48px', height: '48px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }}
+                      />
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '12px', color: '#176B3A', fontWeight: 700 }}>
+                          Farmer: {item.listing.sellerName || item.listing.farmerName || 'Verified Farmer'}
+                        </div>
+                        <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: '2px 0 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {item.listing.cropName}
+                        </h3>
+                        <p style={{ fontSize: '13px', color: '#64748b', margin: '2px 0 0 0' }}>
+                          ₱{item.listing.pricePerUnit} / {item.listing.unit || 'kg'} • 📍 {item.listing.location || 'Northern Mindanao'}
+                        </p>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                        {/* Qty Stepper */}
+                        <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', background: '#fff' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateProduceQty(item.id, -5)}
+                            style={{ padding: '6px 10px', border: 'none', background: '#f8fafc', cursor: 'pointer', fontWeight: 700, fontSize: '15px' }}
+                          >
+                            −
+                          </button>
+                          <span style={{ padding: '6px 10px', fontWeight: 800, fontSize: '14px', minWidth: '34px', textAlign: 'center' }}>
+                            {item.quantity}kg
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateProduceQty(item.id, 5)}
+                            style={{ padding: '6px 10px', border: 'none', background: '#f8fafc', cursor: 'pointer', fontWeight: 700, fontSize: '15px' }}
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        <div style={{ fontSize: '16px', fontWeight: 800, color: '#176B3A', minWidth: '80px', textAlign: 'right' }}>
+                          ₱{(item.quantity * (item.listing.pricePerUnit || 0)).toLocaleString()}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveProduce(item.id)}
+                          title="Remove item"
+                          style={{ border: 'none', background: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '18px', padding: '4px' }}
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
-
-                    <button onClick={() => handleRemove(item.product.id)} title="Remove" style={{ border: 'none', background: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '16px', padding: '4px', lineHeight: 1 }}>✕</button>
-                  </div>
-                </div>
-              ))}
+                  );
+                })
+              )}
             </div>
 
-            {/* ── Order Summary Panel ─────────────────────── */}
-            <div className="glass-panel" style={{ padding: '24px', borderRadius: '20px' }}>
-              <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', marginBottom: '20px' }}>Order Summary</h2>
+            {/* ── Order Summary Panel ── */}
+            <div className="glass-panel" style={{ padding: '24px', borderRadius: '20px', position: 'sticky', top: '24px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', marginBottom: '18px' }}>
+                {activeTab === 'supplies' ? 'Supply Checkout' : 'Crop Checkout'}
+              </h2>
 
               <form onSubmit={handleCheckout}>
-
                 {/* Fulfillment Method */}
-                <div style={{ marginBottom: '20px' }}>
+                <div style={{ marginBottom: '18px' }}>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Fulfillment Method
                   </label>
@@ -257,29 +691,44 @@ export const SupplyCartPage: React.FC = () => {
                       🚚 Delivery
                     </button>
                     <button type="button" onClick={() => setDeliveryMethod('pickup')} style={panelBtn(deliveryMethod === 'pickup')}>
-                      🏪 Store Pickup
+                      {activeTab === 'supplies' ? '🏪 Pickup' : '🚜 Farm Pickup'}
                     </button>
                   </div>
                 </div>
 
                 {/* Delivery Address */}
                 {deliveryMethod === 'delivery' && (
-                  <div style={{ marginBottom: '20px' }}>
+                  <div style={{ marginBottom: '18px' }}>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Delivery Address
+                      Delivery Address *
                     </label>
                     <textarea
-                      rows={3}
+                      rows={2}
                       value={deliveryAddress}
                       onChange={(e) => setDeliveryAddress(e.target.value)}
-                      placeholder="Street, Barangay, City, Province"
+                      placeholder="Barangay, Municipality, Province"
                       required
                       style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontFamily: 'inherit', fontSize: '13px', resize: 'none', boxSizing: 'border-box' }}
                     />
                   </div>
                 )}
 
-                {/* ── Payment Method ───────────────────────── */}
+                {/* Contact Phone (for produce or delivery) */}
+                <div style={{ marginBottom: '18px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Contact Phone Number *
+                  </label>
+                  <input
+                    type="tel"
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    placeholder="e.g. 0917 123 4567"
+                    required
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontFamily: 'inherit', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                {/* Payment Method */}
                 <div style={{ marginBottom: '20px' }}>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Payment Method
@@ -297,26 +746,21 @@ export const SupplyCartPage: React.FC = () => {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '10px',
-                            padding: '11px 14px',
+                            padding: '10px 12px',
                             borderRadius: '10px',
-                            border: isActive ? '2px solid #ca8a04' : '1.5px solid #e2e8f0',
-                            backgroundColor: isActive ? '#fef9c3' : opt.comingSoon ? '#f8fafc' : '#fff',
+                            border: isActive ? `2px solid ${activeTab === 'supplies' ? '#ca8a04' : '#176B3A'}` : '1.5px solid #e2e8f0',
+                            backgroundColor: isActive ? (activeTab === 'supplies' ? '#fef9c3' : '#EAF6EE') : opt.comingSoon ? '#f8fafc' : '#fff',
                             cursor: opt.comingSoon ? 'default' : 'pointer',
                             textAlign: 'left',
-                            transition: 'border-color 0.15s, background 0.15s',
                             opacity: opt.comingSoon ? 0.6 : 1,
                           }}
                         >
-                          {/* Radio dot */}
                           <div style={{
                             width: '16px', height: '16px', borderRadius: '50%',
-                            border: isActive ? '5px solid #ca8a04' : '2px solid #cbd5e1',
+                            border: isActive ? `5px solid ${activeTab === 'supplies' ? '#ca8a04' : '#176B3A'}` : '2px solid #cbd5e1',
                             flexShrink: 0,
-                            transition: 'border 0.15s',
                           }} />
-
                           <span style={{ fontSize: '18px', lineHeight: 1 }}>{opt.icon}</span>
-
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               {opt.label}
@@ -332,19 +776,10 @@ export const SupplyCartPage: React.FC = () => {
                       );
                     })}
                   </div>
-
-                  {/* COD info note */}
-                  {paymentMethod === 'cod' && (
-                    <div style={{ marginTop: '10px', padding: '10px 12px', borderRadius: '8px', backgroundColor: '#fffbeb', border: '1px solid #fde68a', fontSize: '12px', color: '#92400e' }}>
-                      💡 <strong>{deliveryMethod === 'pickup' ? 'Cash on Pickup:' : 'Cash on Delivery:'}</strong>{' '}
-                      {deliveryMethod === 'pickup'
-                        ? 'Have exact cash ready upon picking up your order at the store.'
-                        : "Have the exact amount ready when the supplier's rider arrives. A handling fee may apply."}
-                    </div>
-                  )}
                 </div>
 
-                {hasMultipleSuppliers && (
+                {/* Multiple Suppliers Warning for Supplies */}
+                {activeTab === 'supplies' && hasMultipleSelectedSuppliers && (
                   <div style={{
                     padding: '12px 14px',
                     borderRadius: '10px',
@@ -355,42 +790,46 @@ export const SupplyCartPage: React.FC = () => {
                     marginBottom: '16px',
                     lineHeight: 1.4,
                   }}>
-                    ⚠️ <strong>Multiple Suppliers in Cart:</strong> Your cart contains items from {uniqueSupplierNames.join(', ')}. Please keep products from only 1 supplier before checking out.
+                    ⚠️ <strong>Multiple Suppliers:</strong> Selected items come from {uniqueSelectedSuppliers.join(', ')}. Please select items from only 1 supplier to checkout.
                   </div>
                 )}
 
                 {/* Order Total */}
                 <div style={{ padding: '14px', backgroundColor: '#f8fafc', borderRadius: '10px', marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Total Amount</div>
-                    <div style={{ fontSize: '10px', color: '#94a3b8' }}>
-                      {cart.length} item{cart.length !== 1 ? 's' : ''}
+                    <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Total for Selected</div>
+                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                      {currentSelectedCount} item{currentSelectedCount !== 1 ? 's' : ''} selected
                     </div>
                   </div>
-                  <span style={{ color: '#ca8a04', fontSize: '22px', fontWeight: 800 }}>
-                    ₱{totalAmount.toLocaleString()}
+                  <span style={{ color: activeTab === 'supplies' ? '#ca8a04' : '#176B3A', fontSize: '22px', fontWeight: 800 }}>
+                    ₱{currentTotalAmount.toLocaleString()}
                   </span>
                 </div>
 
                 <button
                   type="submit"
-                  disabled={ordering || hasMultipleSuppliers}
+                  disabled={ordering || currentSelectedCount === 0 || (activeTab === 'supplies' && hasMultipleSelectedSuppliers)}
                   style={{
                     width: '100%',
                     padding: '14px',
                     borderRadius: '12px',
-                    backgroundColor: ordering || hasMultipleSuppliers ? '#a3a3a3' : '#ca8a04',
+                    backgroundColor: ordering || currentSelectedCount === 0 || (activeTab === 'supplies' && hasMultipleSelectedSuppliers)
+                      ? '#a3a3a3'
+                      : activeTab === 'supplies' ? '#ca8a04' : '#176B3A',
                     color: '#fff',
                     fontWeight: 800,
                     border: 'none',
-                    cursor: ordering || hasMultipleSuppliers ? 'not-allowed' : 'pointer',
+                    cursor: ordering || currentSelectedCount === 0 || (activeTab === 'supplies' && hasMultipleSelectedSuppliers) ? 'not-allowed' : 'pointer',
                     fontSize: '15px',
                     transition: 'background 0.2s',
                   }}
                 >
                   {ordering
                     ? 'Placing Order…'
-                    : `Place Order · ${visiblePaymentOptions.find(p => p.id === paymentMethod)?.icon || '💵'} ${paymentMethod === 'cod' ? (deliveryMethod === 'pickup' ? 'Pay on Pickup' : 'Pay on Delivery') : 'Pay Now'}`
+                    : currentSelectedCount === 0
+                      ? 'Select items to checkout'
+                      : `Checkout Selected (${currentSelectedCount}) · ₱${currentTotalAmount.toLocaleString()}`
                   }
                 </button>
               </form>

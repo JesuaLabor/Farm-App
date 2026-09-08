@@ -7,12 +7,12 @@ import { Spinner } from '../components/Spinner';
 
 // ── Category config ──────────────────────────────────────────────────────────
 const CATEGORIES = [
-  { key: 'All',                           label: 'All',            icon: '🏪' },
-  { key: 'fertilizer',                    label: 'Fertilizers',    icon: '🌱' },
-  { key: 'pesticide_herbicide_fungicide', label: 'Crop Protection',icon: '🧪' },
-  { key: 'seeds_seedlings',               label: 'Seeds',          icon: '🌽' },
-  { key: 'tools',                         label: 'Tools',          icon: '🔧' },
-  { key: 'ppe',                           label: 'PPE',            icon: '🥽' },
+  { key: 'All', label: 'All', icon: '🏪' },
+  { key: 'fertilizer', label: 'Fertilizers', icon: '🌱' },
+  { key: 'pesticide_herbicide_fungicide', label: 'Crop Protection', icon: '🧪' },
+  { key: 'seeds_seedlings', label: 'Seeds', icon: '🌽' },
+  { key: 'tools', label: 'Tools', icon: '🔧' },
+  { key: 'ppe', label: 'PPE', icon: '🥽' },
 ];
 
 // ── Payment options ──────────────────────────────────────────────────────────
@@ -31,10 +31,10 @@ const getPaymentOptions = (isPickup: boolean): PaymentOption[] => [
     icon: '💵',
     desc: isPickup ? 'Pay in cash upon in-store collection.' : 'Pay in cash upon delivery.',
   },
-  { id: 'gcash',         label: 'GCash',            icon: '📱', desc: 'GCash e-wallet payment.',            comingSoon: true },
-  { id: 'maya',          label: 'Maya',             icon: '💜', desc: 'Maya (formerly PayMaya).',           comingSoon: true },
-  { id: 'bank_transfer', label: 'Bank Transfer',    icon: '🏦', desc: 'InstaPay / PESONet.',               comingSoon: true },
-  { id: 'card',          label: 'Card',             icon: '💳', desc: 'Visa / Mastercard (secure).',       comingSoon: true },
+  { id: 'gcash', label: 'GCash', icon: '📱', desc: 'GCash e-wallet payment.', comingSoon: true },
+  { id: 'maya', label: 'Maya', icon: '💜', desc: 'Maya (formerly PayMaya).', comingSoon: true },
+  { id: 'bank_transfer', label: 'Bank Transfer', icon: '🏦', desc: 'InstaPay / PESONet.', comingSoon: true },
+  { id: 'card', label: 'Card', icon: '💳', desc: 'Visa / Mastercard (secure).', comingSoon: true },
 ];
 
 // ── Cart types ───────────────────────────────────────────────────────────────
@@ -343,7 +343,7 @@ export const SupplyStoreScreen: React.FC = () => {
                 </div>
                 <div className="empty-desc" style={{ marginBottom: 10 }}>
                   {item.stockQuantity > 0
-                    ? `In Stock: ${item.stockQuantity} ${item.unit}s`
+                    ? `In Stock: ${item.stockQuantity}`
                     : 'Out of Stock'}
                 </div>
 
