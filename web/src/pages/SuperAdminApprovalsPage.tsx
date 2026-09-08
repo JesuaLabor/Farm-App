@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navbar } from '../components/Navbar';
 import { adminApi } from '../api/admin';
+import { useToast } from '../contexts/ToastContext';
 import type { User } from '../types/auth';
 import { getRegions, getProvinces, getMunicipalities } from '../data/philippineLocations';
 
@@ -14,7 +15,7 @@ export const SuperAdminApprovalsPage: React.FC = () => {
   const [regionFilter, setRegionFilter] = useState('All Regions');
   const [provinceFilter, setProvinceFilter] = useState('All Provinces');
   const [municipalityFilter, setMunicipalityFilter] = useState('All Municipalities');
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const regions = ['All Regions', ...getRegions()];
   const provinces = regionFilter !== 'All Regions'
@@ -37,11 +38,11 @@ export const SuperAdminApprovalsPage: React.FC = () => {
       setUsers(data);
     } catch (e: any) {
       console.error('Failed to list users:', e);
-      setMessage({ type: 'error', text: e.response?.data?.error || 'Failed to fetch users' });
+      toastError('Fetch Failed', e.response?.data?.error || 'Failed to fetch users');
     } finally {
       setLoading(false);
     }
-  }, [roleFilter, statusFilter, regionFilter, provinceFilter, municipalityFilter]);
+  }, [roleFilter, statusFilter, regionFilter, provinceFilter, municipalityFilter, toastError]);
 
   useEffect(() => {
     fetchUsers();
@@ -49,13 +50,12 @@ export const SuperAdminApprovalsPage: React.FC = () => {
 
   const handleApprove = async (userId: string) => {
     setActionLoading(userId);
-    setMessage(null);
     try {
       await adminApi.approveUser(userId);
-      setMessage({ type: 'success', text: 'Account approved successfully.' });
+      toastSuccess('Account Approved', 'The account has been approved successfully.');
       await fetchUsers();
     } catch (e: any) {
-      setMessage({ type: 'error', text: e.response?.data?.error || 'Failed to approve user.' });
+      toastError('Approval Failed', e.response?.data?.error || 'Failed to approve user.');
     } finally {
       setActionLoading(null);
     }
@@ -63,13 +63,12 @@ export const SuperAdminApprovalsPage: React.FC = () => {
 
   const handleReject = async (userId: string) => {
     setActionLoading(userId);
-    setMessage(null);
     try {
       await adminApi.rejectUser(userId);
-      setMessage({ type: 'success', text: 'Account rejected successfully.' });
+      toastSuccess('Account Rejected', 'The account registration has been rejected.');
       await fetchUsers();
     } catch (e: any) {
-      setMessage({ type: 'error', text: e.response?.data?.error || 'Failed to reject user.' });
+      toastError('Rejection Failed', e.response?.data?.error || 'Failed to reject user.');
     } finally {
       setActionLoading(null);
     }
@@ -90,33 +89,6 @@ export const SuperAdminApprovalsPage: React.FC = () => {
             </p>
           </div>
         </div>
-
-        {/* Action Alert Banner */}
-        {message && (
-          <div
-            style={{
-              padding: '14px 20px',
-              borderRadius: 'var(--radius-md)',
-              marginBottom: '24px',
-              backgroundColor: message.type === 'success' ? 'var(--green-50, #f0fdf4)' : '#fef2f2',
-              color: message.type === 'success' ? 'var(--green-700, #15803d)' : '#991b1b',
-              border: `1.5px solid ${message.type === 'success' ? 'var(--green-200, #bbf7d0)' : '#fecaca'}`,
-              fontWeight: 600,
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <span>{message.text}</span>
-            <button
-              onClick={() => setMessage(null)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: 'inherit' }}
-            >
-              ✕
-            </button>
-          </div>
-        )}
 
         {/* Filter Bar */}
         <div className="filter-bar" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '28px' }}>

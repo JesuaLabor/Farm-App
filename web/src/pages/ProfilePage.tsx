@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { api } from '../api';
 import { supplyApi } from '../api/supply';
 import type { SupplyOrder, PaymentMethod, PaymentStatus } from '../types/supply';
@@ -67,9 +68,9 @@ export const ProfilePage: React.FC = () => {
     }
   }, [user]);
 
+  const { success: toastSuccess, error: toastError } = useToast();
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Purchases state
   const [orders, setOrders] = useState<SupplyOrder[]>([]);
@@ -99,7 +100,6 @@ export const ProfilePage: React.FC = () => {
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    setMessage(null);
 
     try {
       await api.updateProfile({
@@ -113,9 +113,9 @@ export const ProfilePage: React.FC = () => {
         address,
       });
       await refreshProfile();
-      setMessage({ type: 'success', text: '✓ Profile updated successfully!' });
+      toastSuccess('Profile Updated', 'Your profile details have been saved successfully!');
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to update profile.' });
+      toastError('Update Failed', err.response?.data?.error || 'Failed to update profile.');
     } finally {
       setSaving(false);
     }
@@ -126,14 +126,13 @@ export const ProfilePage: React.FC = () => {
     if (!file) return;
 
     setUploading(true);
-    setMessage(null);
 
     try {
       await api.uploadPhoto(file);
       await refreshProfile();
-      setMessage({ type: 'success', text: '✓ Profile photo updated!' });
+      toastSuccess('Photo Updated', 'Your profile photo has been updated!');
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.response?.data?.error || 'Photo upload failed.' });
+      toastError('Upload Failed', err.response?.data?.error || 'Photo upload failed.');
     } finally {
       setUploading(false);
     }
@@ -164,24 +163,6 @@ export const ProfilePage: React.FC = () => {
           Manage your contact information, farm location, and view your supply purchases.
         </p>
       </div>
-
-      {/* ─── Feedback Toast Alert ─── */}
-      {message && (
-        <div
-          style={{
-            padding: '20px 24px',
-            background: message.type === 'success' ? '#EAF6EE' : '#FDF2F2',
-            border: `3px solid ${message.type === 'success' ? '#176B3A' : '#BA3C3C'}`,
-            borderRadius: '18px',
-            color: message.type === 'success' ? '#176B3A' : '#BA3C3C',
-            fontWeight: 800,
-            fontSize: '20px',
-            marginBottom: '28px',
-          }}
-        >
-          {message.text}
-        </div>
-      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
         {/* ─── Avatar & User Card ─── */}
@@ -291,6 +272,82 @@ export const ProfilePage: React.FC = () => {
           </div>
         </div>
 
+        {/* ─── Quick Actions for Farmers (Sales Orders Hub) ─── */}
+        {user.role === 'farmer' && (
+          <div
+            style={{
+              padding: '20px 24px',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '18px',
+              border: '1.5px solid #C8E6D2',
+              marginBottom: '28px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '16px',
+              boxShadow: '0 2px 8px rgba(23, 107, 58, 0.08)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <span style={{ fontSize: '36px' }}>🌾</span>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
+                  Crop Sales & Buyer Orders
+                </h3>
+                <p style={{ fontSize: '14px', color: '#525450', margin: '3px 0 0 0' }}>
+                  Check incoming orders from buyers for your harvests, confirm fulfillment, and track payments.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/produce/orders')}
+              className="btn btn-primary"
+              style={{ fontSize: '15px', fontWeight: 700, padding: '10px 20px' }}
+            >
+              View Crop Sales Orders →
+            </button>
+          </div>
+        )}
+
+        {/* ─── Quick Action for Suppliers ─── */}
+        {user.role === 'supplier' && (
+          <div
+            style={{
+              padding: '20px 24px',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '18px',
+              border: '1.5px solid #FDE68A',
+              marginBottom: '28px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '16px',
+              boxShadow: '0 2px 8px rgba(202, 138, 4, 0.08)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <span style={{ fontSize: '36px' }}>📦</span>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#854D0E', margin: 0 }}>
+                  Customer Orders & Warehouse Dispatch
+                </h3>
+                <p style={{ fontSize: '14px', color: '#525450', margin: '3px 0 0 0' }}>
+                  Fulfill incoming orders from farmers, advance the 4-step delivery timeline, and confirm COD payments.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/supply/orders')}
+              className="btn btn-primary"
+              style={{ fontSize: '15px', fontWeight: 700, padding: '10px 20px', backgroundColor: '#CA8A04' }}
+            >
+              Manage Customer Orders →
+            </button>
+          </div>
+        )}
+
         {/* ─── My Purchases Section ─── */}
         {(user.role === 'farmer' || user.role === 'buyer') && (
           <div className="card" style={{ padding: '28px' }}>
@@ -303,7 +360,7 @@ export const ProfilePage: React.FC = () => {
                 className="btn btn-secondary"
                 style={{ fontSize: '16px' }}
               >
-                View All Orders →
+                View All Purchases →
               </button>
             </div>
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { api } from '../api';
 
 type FontSize = 'default' | 'large' | 'extra-large';
@@ -25,7 +26,7 @@ export const SettingsPage: React.FC = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
-  const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
 
   // ─── Appearance state ───
   const [fontSize, setFontSize] = useState<FontSize>(() => {
@@ -59,35 +60,34 @@ export const SettingsPage: React.FC = () => {
   // ─── Password change handler ───
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setPasswordMessage(null);
 
     if (!currentPassword || !newPassword || !confirmNewPassword) {
-      setPasswordMessage({ type: 'error', text: 'All password fields are required.' });
+      toastWarning('Missing Fields', 'All password fields are required.');
       return;
     }
     if (newPassword.length < 8) {
-      setPasswordMessage({ type: 'error', text: 'New password must be at least 8 characters.' });
+      toastWarning('Password Too Short', 'New password must be at least 8 characters.');
       return;
     }
     if (newPassword !== confirmNewPassword) {
-      setPasswordMessage({ type: 'error', text: 'New passwords do not match.' });
+      toastError('Passwords Do Not Match', 'New password and confirmation do not match.');
       return;
     }
     if (currentPassword === newPassword) {
-      setPasswordMessage({ type: 'error', text: 'New password must be different from current password.' });
+      toastWarning('Identical Password', 'New password must be different from current password.');
       return;
     }
 
     setChangingPassword(true);
     try {
       await api.changePassword(currentPassword, newPassword);
-      setPasswordMessage({ type: 'success', text: '✓ Password changed successfully!' });
+      toastSuccess('Password Changed', 'Your password has been updated successfully!');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmNewPassword('');
     } catch (err: any) {
       const errorMsg = err.response?.data?.error || 'Failed to change password.';
-      setPasswordMessage({ type: 'error', text: errorMsg });
+      toastError('Change Failed', errorMsg);
     } finally {
       setChangingPassword(false);
     }
@@ -177,23 +177,6 @@ export const SettingsPage: React.FC = () => {
               </svg>
               Change Password
             </h3>
-
-            {passwordMessage && (
-              <div
-                style={{
-                  padding: '16px 20px',
-                  background: passwordMessage.type === 'success' ? '#EAF6EE' : '#FDF2F2',
-                  border: `2px solid ${passwordMessage.type === 'success' ? '#176B3A' : '#BA3C3C'}`,
-                  borderRadius: '14px',
-                  color: passwordMessage.type === 'success' ? '#176B3A' : '#BA3C3C',
-                  fontWeight: 700,
-                  fontSize: '16px',
-                  marginBottom: '20px',
-                }}
-              >
-                {passwordMessage.text}
-              </div>
-            )}
 
             <form onSubmit={handleChangePassword}>
               {/* Current Password */}

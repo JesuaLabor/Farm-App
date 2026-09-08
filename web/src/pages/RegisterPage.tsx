@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import type { Role } from '../types/auth';
 
 import { LocationSelector } from '../components/LocationSelector';
@@ -16,6 +17,7 @@ const rolesList: { role: Role; title: string; desc: string; icon: string }[] = [
 export const RegisterPage: React.FC = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
+  const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,16 +29,14 @@ export const RegisterPage: React.FC = () => {
   const [barangay, setBarangay] = useState('Santo Rosario (Poblacion)');
   const [role, setRole] = useState<Role>('farmer');
 
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [submittedPending, setSubmittedPending] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
 
     if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
+      toastWarning('Password Too Short', 'Password must be at least 8 characters.');
       return;
     }
 
@@ -45,12 +45,14 @@ export const RegisterPage: React.FC = () => {
     try {
       const res = await register({ email, password, role, firstName, lastName, region, province, municipality, barangay });
       if (res.token) {
+        toastSuccess('Registration Successful!', 'Welcome to AgriConnect!');
         navigate('/dashboard');
       } else {
+        toastSuccess('Registration Submitted', 'Your account is pending verification.');
         setSubmittedPending(true);
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+      toastError('Registration Failed', err.response?.data?.error || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -163,13 +165,6 @@ export const RegisterPage: React.FC = () => {
             Choose your role to personalize your experience
           </p>
         </div>
-
-        {error && (
-          <div className="form-error" role="alert" style={{ marginBottom: '24px' }}>
-            <span aria-hidden="true">⚠</span>
-            <span>{error}</span>
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} noValidate>
           {/* Role Selection */}

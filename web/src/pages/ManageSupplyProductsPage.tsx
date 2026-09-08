@@ -4,6 +4,7 @@ import { Navbar } from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
 import { supplyApi } from '../api/supply';
 import { api, getImageUrl } from '../api';
+import { useToast } from '../contexts/ToastContext';
 import type { SupplyCategory, SupplyProduct } from '../types/supply';
 
 const categories: { key: SupplyCategory; label: string }[] = [
@@ -36,7 +37,7 @@ export const ManageSupplyProductsPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const fetchMyProducts = async () => {
     if (!user) return;
@@ -81,7 +82,6 @@ export const ManageSupplyProductsPage: React.FC = () => {
       setImagePreview('');
     }
     setShowForm(true);
-    setMessage(null);
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -102,7 +102,6 @@ export const ManageSupplyProductsPage: React.FC = () => {
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    setMessage(null);
 
     let finalImageUrl = existingImageUrl;
     if (imageFile) {
@@ -110,7 +109,7 @@ export const ManageSupplyProductsPage: React.FC = () => {
         const uploadRes = await api.uploadImage(imageFile);
         finalImageUrl = uploadRes.url;
       } catch (err: any) {
-        setMessage({ type: 'error', text: 'Failed to upload product image: ' + (err.response?.data?.error || err.message) });
+        toastError('Upload Failed', 'Failed to upload product image: ' + (err.response?.data?.error || err.message));
         setSaving(false);
         return;
       }
@@ -129,10 +128,10 @@ export const ManageSupplyProductsPage: React.FC = () => {
     try {
       if (editingId) {
         await supplyApi.updateProduct(editingId, payload);
-        setMessage({ type: 'success', text: 'Product updated successfully!' });
+        toastSuccess('Product Updated', `"${name}" has been updated successfully!`);
       } else {
         await supplyApi.createProduct(payload);
-        setMessage({ type: 'success', text: 'New supply product added!' });
+        toastSuccess('Product Added', `"${name}" has been added to your inventory!`);
       }
       setShowForm(false);
       setImageFile(null);
@@ -140,7 +139,7 @@ export const ManageSupplyProductsPage: React.FC = () => {
       setImagePreview('');
       fetchMyProducts();
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to save product.' });
+      toastError('Save Failed', err.response?.data?.error || 'Failed to save product.');
     } finally {
       setSaving(false);
     }
@@ -151,9 +150,10 @@ export const ManageSupplyProductsPage: React.FC = () => {
 
     try {
       await supplyApi.deleteProduct(id);
+      toastSuccess('Product Deleted', 'The product has been removed.');
       fetchMyProducts();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to delete product');
+      toastError('Delete Failed', err.response?.data?.error || 'Failed to delete product');
     }
   };
 
@@ -164,53 +164,36 @@ export const ManageSupplyProductsPage: React.FC = () => {
       <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
           <div>
-            <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a' }}>Supply Inventory Catalog</h1>
-            <p style={{ color: '#64748b', fontSize: '14px' }}>Add and manage agricultural input listings.</p>
+            <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a' }}>Manage My Products</h1>
+            <p style={{ color: '#64748b', fontSize: '15px' }}>Add and update supplies you offer to farmers & buyers.</p>
           </div>
 
           <div style={{ display: 'flex', gap: '12px' }}>
             <button
-              onClick={() => navigate('/supply')}
+              onClick={() => navigate('/supply/orders')}
               style={{
-                padding: '12px 20px',
-                borderRadius: '12px',
-                backgroundColor: '#f1f5f9',
+                padding: '10px 18px',
+                borderRadius: '10px',
+                border: '1.5px solid #cbd5e1',
+                backgroundColor: '#fff',
                 color: '#334155',
                 fontWeight: 700,
-                border: '1.5px solid #cbd5e1',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
                 fontSize: '14px',
+                cursor: 'pointer',
               }}
             >
-              🏪 View Storefront
+              📦 View Orders Received
             </button>
 
             <button
               onClick={() => handleOpenForm()}
-              style={{
-                padding: '12px 24px',
-                borderRadius: '12px',
-                backgroundColor: '#ca8a04',
-                color: '#fff',
-                fontWeight: 700,
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '14px',
-              }}
+              className="btn btn-primary"
+              style={{ padding: '10px 20px', borderRadius: '10px', fontWeight: 700 }}
             >
               + Add New Product
             </button>
           </div>
         </div>
-
-        {message && (
-          <div style={{ padding: '14px', borderRadius: '12px', marginBottom: '24px', backgroundColor: message.type === 'success' ? '#f0fdf4' : '#fef2f2', color: message.type === 'success' ? '#166534' : '#991b1b' }}>
-            {message.text}
-          </div>
-        )}
 
         {/* Modal Form */}
         {showForm && (
