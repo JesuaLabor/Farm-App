@@ -196,9 +196,15 @@ func (s *ProduceService) InitiateTransaction(ctx context.Context, buyerID string
 
 	totalPrice := req.Quantity * listing.PricePerUnit
 
+	cropPhoto := ""
+	if len(listing.Photos) > 0 {
+		cropPhoto = listing.Photos[0]
+	}
+
 	tx := &models.ProduceTransaction{
 		ListingID:      listing.ID,
 		CropName:       listing.CropName,
+		CropPhoto:      cropPhoto,
 		BuyerID:        buyer.ID,
 		BuyerName:      fmt.Sprintf("%s %s", buyer.FirstName, buyer.LastName),
 		FarmerID:       listing.FarmerID,

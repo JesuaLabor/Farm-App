@@ -3,7 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { supplyApi } from '../api/supply';
+import { getImageUrl } from '../api';
 import type { PaymentMethod, PaymentStatus, SupplyOrder, SupplyOrderStatus } from '../types/supply';
+
+const getSupplyFallback = (name: string = ''): string => {
+  const n = name.toLowerCase();
+  if (n.includes('urea') || n.includes('fertilizer') || n.includes('14-14-14') || n.includes('complete') || n.includes('potash')) {
+    return 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=600&q=80';
+  }
+  if (n.includes('seed') || n.includes('binhi') || n.includes('hybrid')) {
+    return 'https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?auto=format&fit=crop&w=600&q=80';
+  }
+  if (n.includes('spray') || n.includes('insecticide') || n.includes('fungicide') || n.includes('herbicide') || n.includes('pest')) {
+    return 'https://images.unsplash.com/photo-1595974482597-4b8da8879bc5?auto=format&fit=crop&w=600&q=80';
+  }
+  if (n.includes('tool') || n.includes('shovel') || n.includes('hoe') || n.includes('rake') || n.includes('bato') || n.includes('tulo')) {
+    return 'https://images.unsplash.com/photo-1589923188900-85dae523342b?auto=format&fit=crop&w=600&q=80';
+  }
+  return 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=600&q=80';
+};
 
 // ── Fulfillment status badge config ─────────────────────────────────────────
 const statusBadges: Record<SupplyOrderStatus, { label: string; bg: string; color: string; icon: string }> = {
@@ -479,16 +497,48 @@ export const SupplyOrdersPage: React.FC = () => {
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
-                          padding: '8px 0',
+                          padding: '10px 0',
                           borderBottom: idx < order.items.length - 1 ? '1px solid #f1f5f9' : 'none',
                           fontSize: '14px',
                         }}
                       >
-                        <div>
-                          <span style={{ fontWeight: 700, color: '#0f172a' }}>{item.productName}</span>
-                          <span style={{ color: '#64748b', marginLeft: '8px', fontSize: '13px' }}>× {item.quantity}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div
+                            style={{
+                              width: '46px',
+                              height: '46px',
+                              borderRadius: '10px',
+                              backgroundColor: '#f8fafc',
+                              border: '1px solid #e2e8f0',
+                              overflow: 'hidden',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                            }}
+                          >
+                            <img
+                              src={getImageUrl(item.productImage, getSupplyFallback(item.productName))}
+                              alt={item.productName}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={(e) => {
+                                const target = e.currentTarget;
+                                target.style.display = 'none';
+                                if (target.parentElement) {
+                                  target.parentElement.innerHTML = '<span style="font-size: 20px;">📦</span>';
+                                }
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.productName}</div>
+                            <div style={{ color: '#64748b', fontSize: '12.5px', marginTop: '2px' }}>
+                              ₱{item.pricePerItem.toLocaleString()} × {item.quantity}
+                            </div>
+                          </div>
                         </div>
-                        <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '15px' }}>
                           ₱{(item.quantity * item.pricePerItem).toLocaleString()}
                         </span>
                       </div>

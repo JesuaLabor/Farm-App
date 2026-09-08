@@ -62,6 +62,7 @@ export interface CreateSupplyProductPayload {
 export interface SupplyOrderItem {
   productId: string;
   productName: string;
+  productImage?: string;
   quantity: number;
   pricePerItem: number;
 }

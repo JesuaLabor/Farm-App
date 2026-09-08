@@ -201,9 +201,14 @@ func (s *SupplyService) CreateOrder(ctx context.Context, buyerID string, req mod
 		itemTotal := float64(v.quantity) * v.product.Price
 		totalAmount += itemTotal
 
+		img := ""
+		if len(v.product.Images) > 0 {
+			img = v.product.Images[0]
+		}
 		items = append(items, models.SupplyOrderItem{
 			ProductID:    v.product.ID,
 			ProductName:  v.product.Name,
+			ProductImage: img,
 			Quantity:     v.quantity,
 			PricePerItem: v.product.Price,
 		})

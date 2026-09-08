@@ -36,6 +36,7 @@ export interface ProduceTransaction {
   id: string;
   listingId: string;
   cropName: string;
+  cropPhoto?: string;
   buyerId: string;
   buyerName: string;
   farmerId: string;

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { produceApi } from '../api/produce';
+import { getImageUrl } from '../api';
 
 export interface OrderItem {
   id: string;
@@ -11,6 +12,7 @@ export interface OrderItem {
   buyerLocation: string;
   farmerName?: string;
   product: string;
+  photo?: string;
   quantityNum: number;
   quantity: string;
   unitPrice: number;
@@ -78,6 +80,22 @@ export function getCropIcon(cropName: string = ''): string {
   return '🌱';
 }
 
+export function getCropImageFallback(cropName: string = ''): string {
+  const c = cropName.toLowerCase();
+  if (c.includes('corn') || c.includes('mais')) return 'https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&w=600&q=80';
+  if (c.includes('rice') || c.includes('palay') || c.includes('bugas') || c.includes('dinorado')) return 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=600&q=80';
+  if (c.includes('tomato') || c.includes('kamatis')) return 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80';
+  if (c.includes('mango') || c.includes('mangga')) return 'https://images.unsplash.com/photo-1553279768-865429fa0078?auto=format&fit=crop&w=600&q=80';
+  if (c.includes('banana') || c.includes('saging')) return 'https://images.unsplash.com/photo-1603833665858-e61d17a86224?auto=format&fit=crop&w=600&q=80';
+  if (c.includes('potato') || c.includes('patatas') || c.includes('cassava') || c.includes('kamote')) return 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=600&q=80';
+  if (c.includes('onion') || c.includes('sibuyas')) return 'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?auto=format&fit=crop&w=600&q=80';
+  if (c.includes('garlic') || c.includes('ahos') || c.includes('bawang')) return 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=600&q=80';
+  if (c.includes('cabbage') || c.includes('lettuce') || c.includes('pechay')) return 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=600&q=80';
+  if (c.includes('eggplant') || c.includes('talong')) return 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=600&q=80';
+  if (c.includes('chili') || c.includes('sili')) return 'https://images.unsplash.com/photo-1588252303782-cb80119abd6d?auto=format&fit=crop&w=600&q=80';
+  return 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80';
+}
+
 export function formatOrderId(id: string): string {
   if (id.length > 8) {
     return `#ORD-${id.slice(-6).toUpperCase()}`;
@@ -116,7 +134,19 @@ export const ProduceTransactionsPage: React.FC = () => {
   const loadTransactions = async () => {
     setLoading(true);
     try {
-      const res = await produceApi.listTransactions();
+      const [res, listingsRes] = await Promise.all([
+        produceApi.listTransactions(),
+        produceApi.listListings().catch(() => [] as any),
+      ]);
+      const listingMap = new Map<string, string>();
+      if (Array.isArray(listingsRes)) {
+        for (const l of listingsRes) {
+          if (l.photos && l.photos.length > 0) {
+            listingMap.set(l.id, l.photos[0]);
+          }
+        }
+      }
+
       if (res && res.length > 0) {
         const mapped: OrderItem[] = res.map((t) => {
           const capStatus = (t.status.charAt(0).toUpperCase() + t.status.slice(1).toLowerCase()) as any;
@@ -125,6 +155,7 @@ export const ProduceTransactionsPage: React.FC = () => {
             ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
             : 'Just now';
           const parsedContact = parseContactMessage(t.contactMessage);
+          const photo = t.cropPhoto || (t.listingId ? listingMap.get(t.listingId) : undefined);
           return {
             id: t.id,
             isBackend: true,
@@ -132,6 +163,7 @@ export const ProduceTransactionsPage: React.FC = () => {
             buyerLocation: parsedContact.fulfillment || 'Northern Mindanao',
             farmerName: t.farmerName,
             product: t.cropName || 'Farm Produce',
+            photo,
             quantityNum: t.quantity,
             quantity: `${t.quantity} kg`,
             unitPrice: t.unitPrice || (t.totalPrice / (t.quantity || 1)),
@@ -750,16 +782,29 @@ export const ProduceTransactionsPage: React.FC = () => {
                         width: '60px',
                         height: '60px',
                         borderRadius: '16px',
-                        backgroundColor: '#EAF6EE',
-                        border: '1.5px solid #C8E6D2',
+                        backgroundColor: '#F1F5F9',
+                        border: '1.5px solid #E2E8F0',
+                        overflow: 'hidden',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         fontSize: '30px',
                         flexShrink: 0,
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
                       }}
                     >
-                      {cropIcon}
+                      <img
+                        src={getImageUrl(ord.photo, getCropImageFallback(ord.product))}
+                        alt={ord.product}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          target.style.display = 'none';
+                          if (target.parentElement) {
+                            target.parentElement.innerHTML = `<span style="font-size: 28px;">${cropIcon}</span>`;
+                          }
+                        }}
+                      />
                     </div>
 
                     <div>
@@ -1210,19 +1255,32 @@ export const ProduceTransactionsPage: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div
                         style={{
-                          width: '48px',
-                          height: '48px',
+                          width: '52px',
+                          height: '52px',
                           borderRadius: '14px',
-                          backgroundColor: '#ECFDF5',
-                          border: '1.5px solid #A7F3D0',
+                          backgroundColor: '#F1F5F9',
+                          border: '1.5px solid #E2E8F0',
+                          overflow: 'hidden',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           fontSize: '26px',
                           flexShrink: 0,
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
                         }}
                       >
-                        {modalCropIcon}
+                        <img
+                          src={getImageUrl(selectedOrder.photo, getCropImageFallback(selectedOrder.product))}
+                          alt={selectedOrder.product}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            target.style.display = 'none';
+                            if (target.parentElement) {
+                              target.parentElement.innerHTML = `<span style="font-size: 26px;">${modalCropIcon}</span>`;
+                            }
+                          }}
+                        />
                       </div>
                       <div>
                         <div style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.01em' }}>
@@ -1772,12 +1830,37 @@ export const ProduceTransactionsPage: React.FC = () => {
                 fontSize: '13px',
                 color: '#991B1B',
                 lineHeight: 1.5,
+                display: 'flex',
+                gap: '12px',
+                alignItems: 'center',
               }}
             >
-              Are you sure you want to cancel this order for{' '}
-              <strong>{orderToCancel.quantity}</strong> of <strong>{orderToCancel.product}</strong>?
-              <div style={{ marginTop: '8px', color: '#B91C1C', fontWeight: 600 }}>
-                🌾 Reserved harvest will be immediately returned to the marketplace listing for other buyers.
+              <div
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  flexShrink: 0,
+                  border: '1px solid #FECACA',
+                  backgroundColor: '#FFFFFF',
+                }}
+              >
+                <img
+                  src={getImageUrl(orderToCancel.photo, getCropImageFallback(orderToCancel.product))}
+                  alt={orderToCancel.product}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+              <div>
+                Are you sure you want to cancel this order for{' '}
+                <strong>{orderToCancel.quantity}</strong> of <strong>{orderToCancel.product}</strong>?
+                <div style={{ marginTop: '4px', color: '#B91C1C', fontWeight: 600, fontSize: '12px' }}>
+                  🌾 Reserved harvest will be immediately returned to the marketplace listing for other buyers.
+                </div>
               </div>
             </div>
 

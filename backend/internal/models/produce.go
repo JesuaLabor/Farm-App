@@ -75,6 +75,7 @@ type ProduceTransaction struct {
 	ID             bson.ObjectID     `bson:"_id,omitempty"       json:"id"`
 	ListingID      bson.ObjectID     `bson:"listing_id"          json:"listingId"`
 	CropName       string            `bson:"crop_name"           json:"cropName"`
+	CropPhoto      string            `bson:"crop_photo,omitempty" json:"cropPhoto,omitempty"`
 	BuyerID        bson.ObjectID     `bson:"buyer_id"            json:"buyerId"`
 	BuyerName      string            `bson:"buyer_name"          json:"buyerName"`
 	FarmerID       bson.ObjectID     `bson:"farmer_id"           json:"farmerId"`

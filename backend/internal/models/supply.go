@@ -106,6 +106,7 @@ type UpdateSupplyProductRequest struct {
 type SupplyOrderItem struct {
 	ProductID    bson.ObjectID `bson:"product_id"    json:"productId"`
 	ProductName  string        `bson:"product_name"  json:"productName"`
+	ProductImage string        `bson:"product_image,omitempty" json:"productImage,omitempty"`
 	Quantity     int           `bson:"quantity"      json:"quantity"`
 	PricePerItem float64       `bson:"price_per_item" json:"pricePerItem"`
 }
