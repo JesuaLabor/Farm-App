@@ -45,10 +45,10 @@ export const CommunityPostDetailPage: React.FC = () => {
       setPost((prev) =>
         prev
           ? {
-              ...prev,
-              isUpvotedByMe: res.isUpvoted,
-              upvotes: res.isUpvoted ? prev.upvotes + 1 : Math.max(0, prev.upvotes - 1),
-            }
+            ...prev,
+            isUpvotedByMe: res.isUpvoted,
+            upvotes: res.isUpvoted ? prev.upvotes + 1 : Math.max(0, prev.upvotes - 1),
+          }
           : null
       );
     } catch (e) {
@@ -79,7 +79,7 @@ export const CommunityPostDetailPage: React.FC = () => {
       case 'farmer':
         return { label: '🌾 Farmer', bg: '#dcfce7', color: '#15803d' };
       case 'supplier':
-        return { label: '📦 Agri Supplier', bg: '#e0f2fe', color: '#0369a1' };
+        return { label: '🏪 Agri Supplier', bg: '#e0f2fe', color: '#0369a1' };
       case 'lgu':
       case 'lgu_officer':
         return { label: '🏛️ LGU Staff', bg: '#fef3c7', color: '#b45309' };

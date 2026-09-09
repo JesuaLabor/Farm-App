@@ -9,37 +9,37 @@ import type { SupplyOrder, PaymentMethod, PaymentStatus } from '../types/supply'
 import { LocationSelector } from '../components/LocationSelector';
 
 const roleLabelMap: Record<string, string> = {
-  farmer:      'Farmer Producer',
-  buyer:       'Wholesale Buyer',
-  supplier:    'Agri Supplier',
-  expert:      'Agronomist Expert',
-  lgu_staff:   'LGU Officer',
+  farmer: 'Farmer Producer',
+  buyer: 'Wholesale Buyer',
+  supplier: 'Agri Supplier',
+  expert: 'Agronomist Expert',
+  lgu_staff: 'LGU Officer',
   super_admin: 'Super Administrator',
 };
 
 type PurchaseTab = 'to_ship' | 'to_receive' | 'completed' | 'cancelled' | 'refunded';
 
 const purchaseTabs: { key: PurchaseTab; label: string; icon: string }[] = [
-  { key: 'to_ship',    label: 'To Ship',         icon: '📦' },
-  { key: 'to_receive', label: 'To Receive',      icon: '🚚' },
-  { key: 'completed',  label: 'Completed',       icon: '✅' },
-  { key: 'cancelled',  label: 'Cancelled',       icon: '❌' },
-  { key: 'refunded',   label: 'Return / Refund', icon: '↩️' },
+  { key: 'to_ship', label: 'To Ship', icon: '📦' },
+  { key: 'to_receive', label: 'To Receive', icon: '🚚' },
+  { key: 'completed', label: 'Completed', icon: '✅' },
+  { key: 'cancelled', label: 'Cancelled', icon: '❌' },
+  { key: 'refunded', label: 'Return / Refund', icon: '↩️' },
 ];
 
 const paymentMethodLabels: Record<PaymentMethod, { label: string; icon: string }> = {
-  cod:           { label: 'Cash on Delivery', icon: '💵' },
-  gcash:         { label: 'GCash',            icon: '📱' },
-  maya:          { label: 'Maya',             icon: '💜' },
-  bank_transfer: { label: 'Bank Transfer',    icon: '🏦' },
-  card:          { label: 'Card Payment',     icon: '💳' },
+  cod: { label: 'Cash on Delivery', icon: '💵' },
+  gcash: { label: 'GCash', icon: '📱' },
+  maya: { label: 'Maya', icon: '💜' },
+  bank_transfer: { label: 'Bank Transfer', icon: '🏦' },
+  card: { label: 'Card Payment', icon: '💳' },
 };
 
 const paymentStatusBadges: Record<PaymentStatus, { label: string; badgeClass: string; icon: string }> = {
   pending_payment: { label: '⏳ Awaiting Payment', badgeClass: 'badge-warning', icon: '⏳' },
-  paid:            { label: '✅ Payment Completed', badgeClass: 'badge-success', icon: '✅' },
-  failed:          { label: '❌ Payment Failed',   badgeClass: 'badge-danger',  icon: '❌' },
-  refunded:        { label: '↩️ Payment Refunded', badgeClass: 'badge-info',    icon: '↩️' },
+  paid: { label: '✅ Payment Completed', badgeClass: 'badge-success', icon: '✅' },
+  failed: { label: '❌ Payment Failed', badgeClass: 'badge-danger', icon: '❌' },
+  refunded: { label: '↩️ Payment Refunded', badgeClass: 'badge-info', icon: '↩️' },
 };
 
 export const ProfilePage: React.FC = () => {
@@ -221,30 +221,29 @@ export const ProfilePage: React.FC = () => {
                 {user.firstName} {user.lastName}
               </h2>
               <span
-                className={`badge ${
-                  user.role === 'super_admin' || user.status === 'approved'
-                    ? 'badge-verified'
-                    : user.status === 'rejected'
+                className={`badge ${user.role === 'super_admin' || user.status === 'approved'
+                  ? 'badge-verified'
+                  : user.status === 'rejected'
                     ? 'badge-danger'
                     : 'badge-warning'
-                }`}
+                  }`}
                 style={{ fontSize: '16px' }}
               >
                 {user.role === 'super_admin'
                   ? '🛡️ Verified Administrator'
                   : user.status === 'rejected'
-                  ? '❌ Rejected Account'
-                  : user.status === 'pending'
-                  ? '⏳ Pending Verification'
-                  : user.role === 'lgu_staff'
-                  ? '🏛️ Verified LGU Officer'
-                  : user.role === 'supplier'
-                  ? '🚜 Verified Agri-Supplier'
-                  : user.role === 'expert'
-                  ? '🎓 Verified Agronomist Expert'
-                  : user.role === 'buyer'
-                  ? '📦 Verified Wholesale Buyer'
-                  : '🧑‍🌾 Verified Farmer'}
+                    ? '❌ Rejected Account'
+                    : user.status === 'pending'
+                      ? '⏳ Pending Verification'
+                      : user.role === 'lgu_staff'
+                        ? '🏛️ Verified LGU Officer'
+                        : user.role === 'supplier'
+                          ? '🚜 Verified Agri-Supplier'
+                          : user.role === 'expert'
+                            ? '🎓 Verified Agronomist Expert'
+                            : user.role === 'buyer'
+                              ? '📦 Verified Wholesale Buyer'
+                              : '🧑‍🌾 Verified Farmer'}
               </span>
             </div>
 
@@ -353,7 +352,7 @@ export const ProfilePage: React.FC = () => {
           <div className="card" style={{ padding: '28px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
               <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
-                🛍️ My Supply Purchases
+                🛍️ My Purchases
               </h2>
               <button
                 onClick={() => navigate('/supply/orders')}
@@ -493,12 +492,12 @@ export const ProfilePage: React.FC = () => {
             {user.role === 'super_admin'
               ? 'Personal Information & Office Jurisdiction'
               : user.role === 'lgu_staff'
-              ? 'Personal Information & LGU Jurisdiction'
-              : user.role === 'buyer'
-              ? 'Personal Information & Business Location'
-              : user.role === 'supplier'
-              ? 'Personal Information & Supply Store Location'
-              : 'Personal Information & Farm Address'}
+                ? 'Personal Information & LGU Jurisdiction'
+                : user.role === 'buyer'
+                  ? 'Personal Information & Business Location'
+                  : user.role === 'supplier'
+                    ? 'Personal Information & Supply Store Location'
+                    : 'Personal Information & Farm Address'}
           </h2>
 
           <form onSubmit={handleUpdateProfile}>
@@ -567,8 +566,8 @@ export const ProfilePage: React.FC = () => {
                 {user.role === 'super_admin' || user.role === 'lgu_staff'
                   ? 'Office & Jurisdiction Location'
                   : user.role === 'buyer' || user.role === 'supplier'
-                  ? 'Business & Jurisdiction Location'
-                  : 'Farm & Jurisdiction Location'}
+                    ? 'Business & Jurisdiction Location'
+                    : 'Farm & Jurisdiction Location'}
               </div>
               <p style={{ color: '#525450', fontSize: '15px', marginTop: '-10px', marginBottom: '16px' }}>
                 Select your official Region, Province, Municipality, and Barangay jurisdiction.
