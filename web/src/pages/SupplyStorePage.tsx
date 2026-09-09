@@ -60,7 +60,6 @@ export const SupplyStorePage: React.FC = () => {
   const [search, setSearch] = useState('');
 
   // Cart state in localStorage
-  const [cartCount, setCartCount] = useState<number>(0);
   const [cartItemsMap, setCartItemsMap] = useState<Record<string, number>>({});
   const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null);
 
@@ -138,7 +137,6 @@ export const SupplyStorePage: React.FC = () => {
     if (raw) {
       try {
         const items = JSON.parse(raw);
-        setCartCount(Array.isArray(items) ? items.length : 0);
         const map: Record<string, number> = {};
         items.forEach((item: any) => {
           if (item.product?.id) {
@@ -147,11 +145,9 @@ export const SupplyStorePage: React.FC = () => {
         });
         setCartItemsMap(map);
       } catch (e) {
-        setCartCount(0);
         setCartItemsMap({});
       }
     } else {
-      setCartCount(0);
       setCartItemsMap({});
     }
   };
@@ -335,22 +331,13 @@ export const SupplyStorePage: React.FC = () => {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '14px' }}>
-            {user?.role === 'supplier' && (
+          {user?.role === 'supplier' && (
+            <div style={{ display: 'flex', gap: '14px' }}>
               <button className="btn btn-primary btn-large" onClick={() => setShowAddModal(true)}>
                 + Add Supply Product
               </button>
-            )}
-            {isPurchaser && (
-              <button
-                onClick={() => navigate('/supply/cart')}
-                className="btn btn-accent btn-large"
-                style={{ fontSize: '18px' }}
-              >
-                🛒 View Cart ({cartCount})
-              </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
