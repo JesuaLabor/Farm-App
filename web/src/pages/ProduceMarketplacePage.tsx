@@ -681,7 +681,7 @@ export const ProduceMarketplacePage: React.FC = () => {
                   <button
                     onClick={() => {
                       setSelectedListing(null);
-                      navigate('/produce/orders');
+                      navigate(user?.role === 'farmer' ? '/produce/orders?view=purchases' : '/produce/orders');
                     }}
                     className="btn btn-primary btn-large"
                     style={{ minHeight: '56px', fontSize: '17px' }}

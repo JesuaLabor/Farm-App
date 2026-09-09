@@ -776,7 +776,7 @@ export const SupplyOrdersPage: React.FC = () => {
                       </div>
                     )}
                     <div style={{ color: '#475569', marginTop: '2px' }}>
-                      Farmer (Buyer): <strong>{order.buyerName}</strong> {isBuyer && <span style={{ color: '#ca8a04' }}>(You)</span>}
+                      Customer / Buyer: <strong>{order.buyerName}</strong> {isBuyer && <span style={{ color: '#ca8a04' }}>(You)</span>}
                     </div>
                   </div>
 

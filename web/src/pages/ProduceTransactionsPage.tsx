@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useChat } from '../contexts/ChatContext';
@@ -112,6 +112,7 @@ export function formatOrderId(id: string): string {
 
 export const ProduceTransactionsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { openChatWith } = useChat();
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
@@ -119,13 +120,24 @@ export const ProduceTransactionsPage: React.FC = () => {
   const isBuyer = user?.role === 'buyer';
 
   // viewMode: 'sales' = farmer selling to buyers, 'purchases' = farmer buying from other farmers
-  const [viewMode, setViewMode] = useState<'sales' | 'purchases'>('sales');
+  const queryParams = new URLSearchParams(location.search);
+  const initialView = queryParams.get('view') === 'purchases' ? 'purchases' : 'sales';
+  const [viewMode, setViewMode] = useState<'sales' | 'purchases'>(initialView);
   const isViewingPurchases = isFarmer && viewMode === 'purchases';
+  // True whenever the current user is in the buyer/purchaser seat (regular buyer OR farmer buying from co-farmer)
+  const isViewingAsBuyer = isBuyer || isViewingPurchases;
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('view') === 'purchases' && isFarmer) {
+      setViewMode('purchases');
+    }
+  }, [location.search, isFarmer]);
 
   const handleChatOrderParty = (ord: OrderItem) => {
-    // When viewing farmer's own purchases, chat target is the seller (farmerId)
+    // When viewing as buyer (farmer's own purchases or general buyer), chat target is the seller (farmerId)
     // When viewing sales orders, chat target is the buyer (buyerId)
-    const targetUserId = isViewingPurchases ? ord.farmerId : (isFarmer ? ord.buyerId : ord.farmerId);
+    const targetUserId = isViewingAsBuyer ? ord.farmerId : ord.buyerId;
     if (!targetUserId) {
       toastError('Account Unavailable', 'Contact information is currently unavailable for this user.');
       return;
@@ -1013,17 +1025,17 @@ export const ProduceTransactionsPage: React.FC = () => {
                   <div style={{ backgroundColor: '#F8FAFC', padding: '16px', borderRadius: '14px', border: '1px solid #E2E8F0' }}>
                     {/* Party Identity */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: isViewingPurchases ? '#4C1D95' : '#0E4A27', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800 }}>
-                        {isViewingPurchases
+                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: isViewingAsBuyer ? '#4C1D95' : '#0E4A27', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800 }}>
+                        {isViewingAsBuyer
                           ? (ord.farmerName || 'S').charAt(0).toUpperCase()
                           : ord.buyerName.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: isViewingPurchases ? '#6D28D9' : '#64748B', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                          {isViewingPurchases ? 'Selling Farmer' : 'Buyer'}
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: isViewingAsBuyer ? '#6D28D9' : '#64748B', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                          {isViewingAsBuyer ? 'Selling Farmer' : 'Buyer'}
                         </div>
                         <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
-                          {isViewingPurchases ? (ord.farmerName || 'Unknown Farmer') : ord.buyerName}
+                          {isViewingAsBuyer ? (ord.farmerName || 'Unknown Farmer') : ord.buyerName}
                         </div>
                       </div>
                     </div>
@@ -1925,13 +1937,13 @@ export const ProduceTransactionsPage: React.FC = () => {
                       gap: '6px',
                     }}
                   >
-                    <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: isViewingPurchases ? '#6D28D9' : '#64748B', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: isViewingAsBuyer ? '#6D28D9' : '#64748B', display: 'flex', alignItems: 'center', gap: '5px' }}>
                       <span>👤</span>
-                      <span>{isViewingPurchases ? 'Selling Farmer' : 'Customer & Payment'}</span>
+                      <span>{isViewingAsBuyer ? 'Selling Farmer' : 'Customer & Payment'}</span>
                     </div>
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>{isViewingPurchases ? (selectedOrder.farmerName || 'Verified Farmer') : selectedOrder.buyerName}</span>
+                        <span>{isViewingAsBuyer ? (selectedOrder.farmerName || 'Verified Farmer') : selectedOrder.buyerName}</span>
                         <span style={{ fontSize: '10px', fontWeight: 700, color: '#16A34A', backgroundColor: '#DCFCE7', padding: '1px 6px', borderRadius: '4px' }}>
                           Verified
                         </span>
@@ -2034,7 +2046,7 @@ export const ProduceTransactionsPage: React.FC = () => {
                       }}
                     >
                       <span>📞</span>
-                      <span>{isViewingPurchases ? 'Call Farmer' : 'Call Buyer'}</span>
+                      <span>{isViewingAsBuyer ? 'Call Farmer' : 'Call Buyer'}</span>
                     </a>
                   )}
 
@@ -2647,7 +2659,7 @@ export const ProduceTransactionsPage: React.FC = () => {
                   boxShadow: '0 2px 8px rgba(22, 163, 74, 0.3)',
                 }}
               >
-                Confirm & Accept Order
+                Confirm & Send Quote to Buyer
               </button>
             </div>
           </div>
