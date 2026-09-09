@@ -307,10 +307,65 @@ export const ProduceMarketplacePage: React.FC = () => {
 
   return (
     <div className="app-container" style={{ paddingBottom: '40px' }}>
+      {/* ─── Marketplace Channel Switcher ─── */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '22px', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => navigate('/produce')}
+          style={{
+            padding: '10px 22px',
+            borderRadius: '24px',
+            border: '2px solid #176B3A',
+            backgroundColor: '#EAF6EE',
+            color: '#0E4A27',
+            fontWeight: 800,
+            fontSize: '15px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 2px 8px rgba(23, 107, 58, 0.12)',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <span>🌾 Fresh Produce & Crops</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/supply')}
+          style={{
+            padding: '10px 22px',
+            borderRadius: '24px',
+            border: '2px solid #e2e8f0',
+            backgroundColor: '#ffffff',
+            color: '#64748b',
+            fontWeight: 700,
+            fontSize: '15px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#ca8a04';
+            e.currentTarget.style.color = '#854d0e';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = '#e2e8f0';
+            e.currentTarget.style.color = '#64748b';
+          }}
+        >
+          <span>🏪 Farm Supplies & Inputs</span>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8' }}>→</span>
+        </button>
+      </div>
+
       {/* ─── Page Title ─── */}
       <div style={{ marginBottom: '20px' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', margin: 0, lineHeight: 1.2 }}>
-          Crop Marketplace
+          Fresh Produce & Harvests
         </h1>
         <p style={{ fontSize: '14px', color: '#64748B', marginTop: '4px', margin: '4px 0 0 0' }}>
           {user?.role === 'lgu_staff'

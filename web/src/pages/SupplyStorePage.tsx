@@ -319,6 +319,61 @@ export const SupplyStorePage: React.FC = () => {
 
   return (
     <div className="app-container" style={{ paddingBottom: '40px' }}>
+      {/* ─── Marketplace Channel Switcher ─── */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '22px', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => navigate('/produce')}
+          style={{
+            padding: '10px 22px',
+            borderRadius: '24px',
+            border: '2px solid #e2e8f0',
+            backgroundColor: '#ffffff',
+            color: '#64748b',
+            fontWeight: 700,
+            fontSize: '15px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#176B3A';
+            e.currentTarget.style.color = '#0E4A27';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = '#e2e8f0';
+            e.currentTarget.style.color = '#64748b';
+          }}
+        >
+          <span style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8' }}>←</span>
+          <span>🌾 Fresh Produce & Crops</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/supply')}
+          style={{
+            padding: '10px 22px',
+            borderRadius: '24px',
+            border: '2px solid #ca8a04',
+            backgroundColor: '#FBF6EE',
+            color: '#854d0e',
+            fontWeight: 800,
+            fontSize: '15px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 2px 8px rgba(202, 138, 4, 0.15)',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <span>🏪 Farm Supplies & Inputs</span>
+        </button>
+      </div>
+
       {/* ─── Page Header ─── */}
       <div style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>

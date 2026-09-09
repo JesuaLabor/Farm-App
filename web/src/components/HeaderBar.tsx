@@ -29,8 +29,19 @@ const getBreadcrumbs = (pathname: string, role?: string): BreadcrumbInfo => {
       icon: '🧾',
     };
   }
+  if (pathname === '/produce/orders') {
+    return {
+      parent: 'Marketplace',
+      parentPath: '/produce',
+      current: role === 'farmer' ? 'Orders & Sales' : 'My Orders',
+      icon: '📦',
+    };
+  }
+  if (pathname === '/produce/manage') {
+    return { parent: 'Marketplace', parentPath: '/produce', current: 'My Crop Listings', icon: '🌾' };
+  }
   if (pathname.startsWith('/produce')) {
-    return { parent: 'Marketplace', parentPath: '/produce', current: 'Browse Produce', icon: '🌾' };
+    return { parent: 'Marketplace', parentPath: '/produce', current: 'Fresh Harvests', icon: '🌾' };
   }
   if (pathname === '/market-prices') {
     return { parent: 'Market Prices', parentPath: '/market-prices', current: 'Northern Mindanao', icon: '📈' };
@@ -48,21 +59,21 @@ const getBreadcrumbs = (pathname: string, role?: string): BreadcrumbInfo => {
     return { parent: 'Government Programs', parentPath: '/programs', current: 'Available Programs', icon: '🏛️' };
   }
   if (pathname === '/supply/cart') {
-    return { parent: 'Agri-Supply Store', parentPath: '/supply', current: 'Shopping Cart', icon: '🛒' };
+    return { parent: 'Marketplace', parentPath: '/supply', current: 'Shopping Cart', icon: '🛒' };
   }
   if (pathname === '/supply/manage') {
-    return { parent: 'Agri-Supply Store', parentPath: '/supply', current: 'Manage Products', icon: '🏷️' };
+    return { parent: 'Marketplace', parentPath: '/supply', current: 'Manage Catalog', icon: '🏷️' };
   }
   if (pathname === '/supply/orders') {
     return {
-      parent: 'Agri-Supply Store',
-      parentPath: '/supply',
-      current: role === 'supplier' ? 'Customer Orders' : 'My Supply Purchases',
+      parent: 'Marketplace',
+      parentPath: '/produce',
+      current: role === 'supplier' ? 'Customer Orders' : role === 'farmer' ? 'Orders & Sales' : 'My Orders',
       icon: '📦',
     };
   }
   if (pathname.startsWith('/supply')) {
-    return { parent: 'Agri-Supply Store', parentPath: '/supply', current: 'Store Catalog', icon: '🏪' };
+    return { parent: 'Marketplace', parentPath: '/supply', current: 'Farm Supplies', icon: '🏪' };
   }
   if (pathname === '/finances') {
     return { parent: 'Farm Management', parentPath: '/finances', current: 'Financial Tracker', icon: '💰' };

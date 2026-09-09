@@ -24,8 +24,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const isItemActive = (to: string): boolean => {
     if (to === '/dashboard') return currentPath === '/dashboard';
-    if (to === '/produce') return currentPath === '/produce';
-    if (to === '/produce/orders') return currentPath === '/produce/orders';
+    if (to === '/produce') return currentPath === '/produce' || currentPath === '/supply' || currentPath === '/supply/cart';
+    if (to === '/produce/orders') return currentPath === '/produce/orders' || (role !== 'supplier' && currentPath === '/supply/orders');
     if (to === '/produce/manage') return currentPath === '/produce/manage';
     if (to === '/supply') return currentPath === '/supply' || currentPath === '/supply/cart';
     if (to === '/supply/manage') return currentPath === '/supply/manage';
@@ -192,8 +192,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {
         title: 'PLATFORM CHANNELS',
         items: [
-          { label: 'Agri-Supply Store', to: '/supply', icon: icons.supply },
-          { label: 'Produce Marketplace', to: '/produce', icon: icons.marketplace },
+          { label: 'Marketplace', to: '/produce', icon: icons.marketplace },
           { label: 'Community Hub', to: '/community', icon: icons.community },
         ],
       },
@@ -222,7 +221,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {
         title: 'COMMUNITY',
         items: [
-          { label: 'Produce Marketplace', to: '/produce', icon: icons.marketplace },
+          { label: 'Marketplace', to: '/produce', icon: icons.marketplace },
           { label: 'Community Forum', to: '/community', icon: icons.community },
         ],
       },
@@ -243,15 +242,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {
         title: 'MY BUSINESS',
         items: [
-          { label: 'Manage Products', to: '/supply/manage', icon: icons.manageProducts },
+          { label: 'Manage Catalog', to: '/supply/manage', icon: icons.manageProducts },
           { label: 'Customer Orders', to: '/supply/orders', icon: icons.orders },
         ],
       },
       {
         title: 'MARKET',
         items: [
-          { label: 'Agri-Supply Store', to: '/supply', icon: icons.supply },
-          { label: 'Produce Marketplace', to: '/produce', icon: icons.marketplace },
+          { label: 'Marketplace', to: '/produce', icon: icons.marketplace },
           { label: 'Market Prices', to: '/market-prices', icon: icons.marketPrices },
         ],
       },
@@ -278,10 +276,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {
         title: 'TRADING',
         items: [
-          { label: 'Browse Marketplace', to: '/produce', icon: icons.marketplace },
-          { label: 'My Produce Purchases', to: '/produce/orders', icon: icons.orders },
-          { label: 'Supply Store', to: '/supply', icon: icons.supply },
-          { label: 'My Supply Purchases', to: '/supply/orders', icon: icons.orders },
+          { label: 'Marketplace', to: '/produce', icon: icons.marketplace },
+          { label: 'My Orders', to: '/produce/orders', icon: icons.orders },
         ],
       },
       {
@@ -319,7 +315,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {
         title: 'RESOURCES',
         items: [
-          { label: 'Produce Marketplace', to: '/produce', icon: icons.marketplace },
+          { label: 'Marketplace', to: '/produce', icon: icons.marketplace },
           { label: 'Market Prices', to: '/market-prices', icon: icons.marketPrices },
           { label: "Gov't Programs", to: '/programs', icon: icons.programs },
         ],
@@ -342,11 +338,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {
         title: 'MARKETPLACE',
         items: [
-          { label: 'Browse Produce', to: '/produce', icon: icons.marketplace },
-          { label: 'My Listings', to: '/produce/manage', icon: icons.listings },
-          { label: 'Crop Sales Orders', to: '/produce/orders', icon: icons.orders },
-          { label: 'Supply Store', to: '/supply', icon: icons.supply },
-          { label: 'My Supply Purchases', to: '/supply/orders', icon: icons.orders },
+          { label: 'Marketplace', to: '/produce', icon: icons.marketplace },
+          { label: 'My Crop Listings', to: '/produce/manage', icon: icons.listings },
+          { label: 'Orders & Sales', to: '/produce/orders', icon: icons.orders },
         ],
       },
       {
