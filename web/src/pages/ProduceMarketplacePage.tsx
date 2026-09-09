@@ -363,15 +363,33 @@ export const ProduceMarketplacePage: React.FC = () => {
       </div>
 
       {/* ─── Page Title ─── */}
-      <div style={{ marginBottom: '20px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', margin: 0, lineHeight: 1.2 }}>
-          Fresh Produce & Harvests
-        </h1>
-        <p style={{ fontSize: '14px', color: '#64748B', marginTop: '4px', margin: '4px 0 0 0' }}>
-          {user?.role === 'lgu_staff'
-            ? 'Browse and monitor fresh harvests listed by verified local farmers in your jurisdiction.'
-            : 'Buy fresh crops directly from verified farmers in Northern Mindanao.'}
-        </p>
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0E4A27', margin: 0, lineHeight: 1.2 }}>
+              Fresh Produce & Harvests
+            </h1>
+            <p style={{ fontSize: '15px', color: '#64748B', marginTop: '6px', margin: '6px 0 0 0' }}>
+              {user?.role === 'lgu_staff'
+                ? 'Browse and monitor fresh harvests listed by verified local farmers in your jurisdiction.'
+                : user?.role === 'farmer'
+                ? 'Explore market listings, compare regional harvest prices, or post your new crops.'
+                : 'Buy fresh crops directly from verified farmers in Northern Mindanao.'}
+            </p>
+          </div>
+
+          {user?.role === 'farmer' && (
+            <div style={{ display: 'flex', gap: '14px' }}>
+              <button
+                className="btn btn-primary btn-large"
+                onClick={() => navigate('/produce/manage?action=new')}
+                style={{ fontSize: '14px', fontWeight: 800 }}
+              >
+                + Manage My Listings
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ─── Search Field & Category Pills ─── */}
@@ -384,7 +402,7 @@ export const ProduceMarketplacePage: React.FC = () => {
             placeholder="Type crop name to search (e.g. Tomato, Corn)..."
             aria-label="Search for crops or products"
             className="form-input"
-            style={{ fontSize: '14px', minHeight: '44px', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #CBD5E1' }}
+            style={{ fontSize: '15px', minHeight: '48px', padding: '10px 16px', borderRadius: '12px', border: '1.5px solid #CBD5E1' }}
           />
         </div>
 
@@ -415,7 +433,7 @@ export const ProduceMarketplacePage: React.FC = () => {
                   background: isSelected ? '#176B3A' : '#FFFFFF',
                   color: isSelected ? '#FFFFFF' : '#334155',
                   fontWeight: 700,
-                  fontSize: '13px',
+                  fontSize: '13.5px',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
                   transition: 'all 0.15s ease',
@@ -429,7 +447,6 @@ export const ProduceMarketplacePage: React.FC = () => {
         </div>
       </div>
 
-
       {/* ─── Crop Cards Grid ─── */}
       {filteredListings.length > 0 ? (
         <div
@@ -442,7 +459,13 @@ export const ProduceMarketplacePage: React.FC = () => {
           {filteredListings.map((item: any) => {
             const qtyInCart = produceCartMap[item.id] || 0;
             const isRecentlyAdded = produceRecentlyAddedId === item.id;
-            const isOwnListing = Boolean(user && ((item as any).farmerId === user.id || item.farmerName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase()));
+            const isOwnListing = Boolean(
+              user && (
+                (item as any).farmerId === user.id ||
+                item.farmerName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase() ||
+                item.sellerName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase()
+              )
+            );
 
             return (
               <div
@@ -472,135 +495,186 @@ export const ProduceMarketplacePage: React.FC = () => {
                         boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
                       }}
                     >
-                      🛒 {qtyInCart}{item.unit || 'kg'} in cart
+                      🛒 {qtyInCart} {item.unit || 'kg'} in cart
                     </div>
                   )}
                 </div>
 
                 <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  {isOwnListing && (
-                    <div style={{
-                      display: 'inline-block',
-                      padding: '3px 8px',
-                      backgroundColor: '#e2e8f0',
-                      color: '#475569',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      marginBottom: '8px',
-                    }}>
-                      Your Harvest Listing
-                    </div>
-                  )}
-                  <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#1A1C1A', marginBottom: '6px' }}>
+                  {/* Row 1: Overline Seller Identity */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '20px', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '13px', color: '#525450', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      Farmer: {item.farmerName || item.sellerName || 'Verified Farmer'}
+                    </span>
+                    {isOwnListing && (
+                      <span style={{
+                        padding: '2px 8px',
+                        backgroundColor: '#E2E8F0',
+                        color: '#475569',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap',
+                        marginLeft: '6px',
+                      }}>
+                        Your Harvest
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Row 2: Product Name */}
+                  <h3
+                    title={item.cropName}
+                    style={{
+                      fontSize: '19px',
+                      fontWeight: 800,
+                      color: '#1A1C1A',
+                      height: '48px',
+                      lineHeight: '24px',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      margin: '0 0 6px 0',
+                    }}
+                  >
                     {item.cropName}
                   </h3>
 
-                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', marginBottom: '6px' }}>
-                    ₱{item.pricePerUnit} <span style={{ fontSize: '15px', color: '#525450', fontWeight: 600 }}>per {item.unit || 'kg'}</span>
-                  </div>
-
-                  <div style={{ fontSize: '14px', color: '#166534', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '6px 10px', borderRadius: '8px', marginBottom: '10px', fontWeight: 700 }}>
-                    🌾 Harvest Batch: ₱{((item.quantity || 0) * (item.pricePerUnit || 0)).toLocaleString()}
-                  </div>
-
-                  <div style={{ fontSize: '15px', color: '#525450', marginBottom: '6px', fontWeight: 600 }}>
-                    📦 {item.quantity} {item.unit || 'kg'} available
-                  </div>
-
-                  <div style={{ fontSize: '15px', color: '#1A1C1A', fontWeight: 700, marginBottom: '16px', flex: 1 }}>
-                    📍 {item.location || 'Northern Mindanao'}
-                  </div>
-
-                  {isOwnListing ? (
-                    <div style={{
-                      padding: '10px',
-                      textAlign: 'center',
-                      backgroundColor: '#f1f5f9',
-                      borderRadius: '10px',
-                      fontWeight: 700,
-                      color: '#64748b',
-                      fontSize: '14px',
-                    }}>
-                      🌱 Your Listing
+                  {/* Row 3: Secondary Details Slot (Location & Harvest batch value) */}
+                  <div style={{ height: '40px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '3px', marginBottom: '12px' }}>
+                    <div style={{ fontSize: '13px', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span>📍</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.location || 'Northern Mindanao'}</span>
                     </div>
-                  ) : !isPurchaser ? (
-                    <div style={{
-                      padding: '10px',
-                      textAlign: 'center',
-                      backgroundColor: '#f8fafc',
-                      borderRadius: '10px',
-                      fontWeight: 700,
-                      color: '#64748b',
-                      fontSize: '14px',
-                      border: '1.5px solid #e2e8f0',
-                    }}>
-                      🌾 View Crop Details
+                    <div style={{ fontSize: '12.5px', color: '#166534', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span>🌾</span>
+                      <span>Harvest Batch: ₱{((item.quantity || 0) * (item.pricePerUnit || 0)).toLocaleString()}</span>
                     </div>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1.1fr 1fr', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+                  </div>
+
+                  {/* Row 4: Price Slot */}
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', marginBottom: '6px', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                    <span>₱{item.pricePerUnit}</span>
+                    <span style={{ fontSize: '14px', color: '#525450', fontWeight: 600 }}>/ {item.unit || 'kg'}</span>
+                  </div>
+
+                  {/* Row 5: Stock Status Badge */}
+                  <div style={{ height: '22px', display: 'flex', alignItems: 'center', fontSize: '13.5px', fontWeight: 800, marginBottom: '16px' }}>
+                    {(item.quantity || 0) > 0 ? (
+                      <span style={{ color: '#16A34A', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span>✓</span>
+                        <span>{item.quantity} {item.unit || 'kg'} available</span>
+                      </span>
+                    ) : (
+                      <span style={{ color: '#DC2626' }}>✕ Out of Stock</span>
+                    )}
+                  </div>
+
+                  {/* Row 6: Action Buttons pinned to bottom */}
+                  <div style={{ marginTop: 'auto' }} onClick={(e) => e.stopPropagation()}>
+                    {isOwnListing ? (
                       <button
                         type="button"
-                        onClick={() => handleChatWithFarmer(item)}
-                        className="btn btn-secondary"
+                        onClick={() => navigate('/produce/manage')}
                         style={{
-                          padding: '10px 12px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
+                          width: '100%',
+                          padding: '10px',
+                          textAlign: 'center',
+                          backgroundColor: '#F1F5F9',
+                          border: '1.5px solid #CBD5E1',
+                          borderRadius: '10px',
+                          fontWeight: 700,
+                          color: '#475569',
+                          fontSize: '13.5px',
                           cursor: 'pointer',
-                          fontWeight: 800,
-                          fontSize: '13px',
-                          borderColor: '#176B3A',
-                          color: '#0E4A27',
-                          background: '#EFFDF5',
+                          transition: 'all 0.15s ease',
                         }}
-                        title={`Chat with ${item.farmerName || item.sellerName || 'Farmer'}`}
                       >
-                        💬 Chat
+                        🌱 Your Listing (Manage)
                       </button>
+                    ) : !isPurchaser ? (
+                      <div style={{
+                        padding: '10px',
+                        textAlign: 'center',
+                        backgroundColor: '#F8FAFC',
+                        borderRadius: '10px',
+                        fontWeight: 700,
+                        color: '#64748B',
+                        fontSize: '13.5px',
+                        border: '1.5px solid #E2E8F0',
+                      }}>
+                        🌾 View Crop Details
+                      </div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1.1fr 1fr', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleChatWithFarmer(item)}
+                          className="btn btn-secondary"
+                          style={{
+                            padding: '10px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            cursor: 'pointer',
+                            fontWeight: 800,
+                            fontSize: '13px',
+                            borderColor: '#176B3A',
+                            color: '#0E4A27',
+                            background: '#EFFDF5',
+                          }}
+                          title={`Chat with ${item.farmerName || item.sellerName || 'Farmer'}`}
+                        >
+                          💬 Chat
+                        </button>
 
-                      <button
-                        type="button"
-                        onClick={(e) => handleAddProduceToCart(item, 5, e)}
-                        className="btn btn-secondary"
-                        style={{
-                          backgroundColor: isRecentlyAdded ? '#EAF6EE' : '#F8F7F3',
-                          borderColor: isRecentlyAdded ? '#10B981' : qtyInCart > 0 ? '#176B3A' : '#D8D6CF',
-                          color: '#0E4A27',
-                          fontWeight: 800,
-                          fontSize: '13px',
-                          padding: '10px 6px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {isRecentlyAdded ? '✓ Added!' : qtyInCart > 0 ? `🛒 (${qtyInCart})` : '🛒 Cart'}
-                      </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleAddProduceToCart(item, 5, e)}
+                          disabled={(item.quantity || 0) <= 0}
+                          className="btn btn-secondary"
+                          style={{
+                            backgroundColor: isRecentlyAdded ? '#EAF6EE' : '#F8F7F3',
+                            borderColor: isRecentlyAdded ? '#10B981' : qtyInCart > 0 ? '#176B3A' : '#D8D6CF',
+                            color: (item.quantity || 0) <= 0 ? '#94A3B8' : '#0E4A27',
+                            fontWeight: 800,
+                            fontSize: '13px',
+                            padding: '10px 6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            cursor: (item.quantity || 0) <= 0 ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {isRecentlyAdded ? '✓ Added!' : qtyInCart > 0 ? `🛒 (${qtyInCart})` : '🛒 Cart'}
+                        </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleOpenCheckout(item)}
-                        className="btn btn-primary"
-                        style={{
-                          fontWeight: 800,
-                          fontSize: '13px',
-                          padding: '10px 6px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '3px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        ⚡ Buy
-                      </button>
-                    </div>
-                  )}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenCheckout(item)}
+                          disabled={(item.quantity || 0) <= 0}
+                          className="btn btn-primary"
+                          style={{
+                            fontWeight: 800,
+                            fontSize: '13px',
+                            padding: '10px 6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '3px',
+                            cursor: (item.quantity || 0) <= 0 ? 'not-allowed' : 'pointer',
+                            opacity: (item.quantity || 0) <= 0 ? 0.5 : 1,
+                          }}
+                        >
+                          ⚡ Buy
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );

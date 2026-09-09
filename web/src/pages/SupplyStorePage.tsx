@@ -378,17 +378,25 @@ export const SupplyStorePage: React.FC = () => {
       <div style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
-            <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27' }}>
+            <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#0E4A27', margin: 0, lineHeight: 1.2 }}>
               Agri-Supply Store
             </h1>
-            <p style={{ fontSize: '20px', color: '#525450', marginTop: '4px' }}>
-              Order certified fertilizers, hybrid seeds, crop protection, and machinery directly from verified suppliers.
+            <p style={{ fontSize: '15px', color: '#64748B', marginTop: '6px', margin: '6px 0 0 0' }}>
+              {user?.role === 'supplier'
+                ? 'Manage your agricultural inputs, track buyer orders, and expand your catalog.'
+                : user?.role === 'lgu_staff'
+                ? 'Inspect available certified fertilizers, hybrid seeds, and machinery for agricultural programs.'
+                : 'Order certified fertilizers, hybrid seeds, crop protection, and machinery directly from verified suppliers.'}
             </p>
           </div>
 
           {user?.role === 'supplier' && (
             <div style={{ display: 'flex', gap: '14px' }}>
-              <button className="btn btn-primary btn-large" onClick={() => setShowAddModal(true)}>
+              <button
+                className="btn btn-primary btn-large"
+                onClick={() => setShowAddModal(true)}
+                style={{ fontSize: '14px', fontWeight: 800 }}
+              >
                 + Add Supply Product
               </button>
             </div>
@@ -397,9 +405,9 @@ export const SupplyStorePage: React.FC = () => {
       </div>
 
       {/* ─── Search Field & Category Pills ─── */}
-      <div className="card" style={{ padding: '24px', marginBottom: '32px' }}>
+      <div className="card" style={{ padding: '18px 20px', marginBottom: '24px', borderRadius: '18px', border: '1.5px solid #E2E8F0', background: '#FFFFFF' }}>
         {/* Search Field */}
-        <div style={{ marginBottom: '20px' }}>
+        <div style={{ marginBottom: '14px' }}>
           <input
             type="text"
             value={search}
@@ -407,12 +415,21 @@ export const SupplyStorePage: React.FC = () => {
             placeholder="Search for fertilizers, seeds, machinery, tools..."
             aria-label="Search supply store"
             className="form-input"
-            style={{ fontSize: '18px', minHeight: '56px' }}
+            style={{ fontSize: '15px', minHeight: '48px', padding: '10px 16px', borderRadius: '12px', border: '1.5px solid #CBD5E1' }}
           />
         </div>
 
         {/* Category Pills */}
-        <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: '8px',
+            overflowX: 'auto',
+            paddingBottom: '2px',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+          }}
+        >
           {categories.map((cat) => {
             const isSelected = activeCategory === cat.key;
             return (
@@ -422,19 +439,20 @@ export const SupplyStorePage: React.FC = () => {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  padding: '12px 24px',
-                  borderRadius: '30px',
-                  border: `2.5px solid ${isSelected ? '#176B3A' : '#D8D6CF'}`,
+                  gap: '6px',
+                  padding: '8px 18px',
+                  borderRadius: '24px',
+                  border: `1.5px solid ${isSelected ? '#176B3A' : '#CBD5E1'}`,
                   background: isSelected ? '#176B3A' : '#FFFFFF',
-                  color: isSelected ? '#FFFFFF' : '#1A1C1A',
-                  fontWeight: 800,
-                  fontSize: '18px',
+                  color: isSelected ? '#FFFFFF' : '#334155',
+                  fontWeight: 700,
+                  fontSize: '13.5px',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
+                  transition: 'all 0.15s ease',
                 }}
               >
-                <span style={{ fontSize: '22px' }}>{cat.icon}</span>
+                <span style={{ fontSize: '16px' }}>{cat.icon}</span>
                 <span>{cat.label}</span>
               </button>
             );
@@ -450,10 +468,10 @@ export const SupplyStorePage: React.FC = () => {
       ) : products.length === 0 ? (
         <div className="card" style={{ padding: '60px', textAlign: 'center' }}>
           <div style={{ fontSize: '64px', marginBottom: '12px' }}>🚜</div>
-          <h2 style={{ fontSize: '28px', fontWeight: 800, color: '#0E4A27', marginBottom: '8px' }}>
+          <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27', marginBottom: '8px' }}>
             No products found in this category
           </h2>
-          <p style={{ fontSize: '20px', color: '#525450', marginBottom: '24px' }}>
+          <p style={{ fontSize: '18px', color: '#525450', marginBottom: '24px' }}>
             Try searching for another product or select "All Inputs".
           </p>
           <button onClick={() => setActiveCategory('all')} className="btn btn-primary btn-large">
@@ -473,6 +491,13 @@ export const SupplyStorePage: React.FC = () => {
             const isRecentlyAdded = recentlyAddedId === item.id;
             const isOutOfStock = item.stockQuantity <= 0;
             const isMaxInCart = qtyInCart >= item.stockQuantity && !isOutOfStock;
+            const isOwnProduct = Boolean(
+              user?.role === 'supplier' && (
+                (item as any).supplierId === user.id ||
+                item.supplierName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase() ||
+                ((user as any).organizationName && item.supplierName?.toLowerCase() === (user as any).organizationName.toLowerCase())
+              )
+            );
 
             return (
               <div
@@ -505,42 +530,60 @@ export const SupplyStorePage: React.FC = () => {
                         boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
                       }}
                     >
-                      🛒 {qtyInCart} in cart
+                      🛒 {qtyInCart} {item.unit || 'units'} in cart
                     </div>
                   )}
                 </div>
 
                 <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ fontSize: '14px', color: '#525450', fontWeight: 700, marginBottom: '4px' }}>
-                    Supplier: {item.supplierName}
+                  {/* Row 1: Overline Seller Identity */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '20px', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '13px', color: '#525450', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      Supplier: {item.supplierName || 'Verified Supplier'}
+                    </span>
+                    {isOwnProduct && (
+                      <span style={{
+                        padding: '2px 8px',
+                        backgroundColor: '#E2E8F0',
+                        color: '#475569',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap',
+                        marginLeft: '6px',
+                      }}>
+                        Your Supply
+                      </span>
+                    )}
                   </div>
 
+                  {/* Row 2: Product Name */}
                   <h3
                     title={item.name}
                     style={{
                       fontSize: '19px',
                       fontWeight: 800,
                       color: '#1A1C1A',
-                      marginBottom: '6px',
-                      minHeight: '26px',
-                      maxHeight: '52px',
-                      lineHeight: '1.3',
+                      height: '48px',
+                      lineHeight: '24px',
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
                       WebkitBoxOrient: 'vertical',
                       overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      margin: '0 0 6px 0',
                     }}
                   >
                     {item.name}
                   </h3>
 
+                  {/* Row 3: Secondary Details Slot (Description 2-line clamp) */}
                   <p
                     title={item.description}
                     style={{
-                      fontSize: '14px',
+                      fontSize: '13.5px',
                       color: '#64748B',
-                      marginBottom: '14px',
-                      lineHeight: '1.4',
+                      lineHeight: '20px',
                       height: '40px',
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
@@ -548,102 +591,139 @@ export const SupplyStorePage: React.FC = () => {
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       wordBreak: 'break-word',
+                      margin: '0 0 12px 0',
                     }}
                   >
-                    {item.description || 'No detailed product description provided.'}
+                    {item.description || 'Certified agricultural input from verified supplier.'}
                   </p>
 
-                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', marginBottom: '6px' }}>
-                    ₱{item.price.toLocaleString()} <span style={{ fontSize: '15px', color: '#525450', fontWeight: 600 }}>/ {item.unit}</span>
+                  {/* Row 4: Price Slot */}
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', marginBottom: '6px', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                    <span>₱{item.price.toLocaleString()}</span>
+                    <span style={{ fontSize: '14px', color: '#525450', fontWeight: 600 }}>/ {item.unit}</span>
                   </div>
 
-                  <div style={{ fontSize: '15px', color: item.stockQuantity > 0 ? '#1E7E45' : '#BA3C3C', fontWeight: 800, marginBottom: '16px' }}>
-                    {item.stockQuantity > 0 ? `✓ In Stock (${item.stockQuantity})` : '✕ Out of Stock'}
+                  {/* Row 5: Stock Status Badge */}
+                  <div style={{ height: '22px', display: 'flex', alignItems: 'center', fontSize: '13.5px', fontWeight: 800, marginBottom: '16px' }}>
+                    {item.stockQuantity > 0 ? (
+                      <span style={{ color: '#16A34A', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span>✓</span>
+                        <span>In Stock ({item.stockQuantity} {item.unit})</span>
+                      </span>
+                    ) : (
+                      <span style={{ color: '#DC2626' }}>✕ Out of Stock</span>
+                    )}
                   </div>
 
-                  {!isPurchaser ? (
-                    <div style={{
-                      padding: '10px',
-                      textAlign: 'center',
-                      backgroundColor: '#f8fafc',
-                      borderRadius: '10px',
-                      fontWeight: 700,
-                      color: '#64748b',
-                      fontSize: '14px',
-                      border: '1.5px solid #e2e8f0',
-                    }}>
-                      🏪 Catalog View
-                    </div>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1.1fr 1fr', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
-                      {/* Chat with Supplier button */}
+                  {/* Row 6: Action Buttons pinned to bottom */}
+                  <div style={{ marginTop: 'auto' }} onClick={(e) => e.stopPropagation()}>
+                    {isOwnProduct ? (
                       <button
                         type="button"
-                        onClick={() => handleChatWithSupplier(item)}
-                        className="btn btn-secondary"
+                        onClick={() => {
+                          setViewProduct(item);
+                          setViewQuantity(1);
+                        }}
                         style={{
-                          padding: '10px 12px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
+                          width: '100%',
+                          padding: '10px',
+                          textAlign: 'center',
+                          backgroundColor: '#F1F5F9',
+                          border: '1.5px solid #CBD5E1',
+                          borderRadius: '10px',
+                          fontWeight: 700,
+                          color: '#475569',
+                          fontSize: '13.5px',
                           cursor: 'pointer',
-                          fontWeight: 800,
-                          fontSize: '13px',
-                          borderColor: '#176B3A',
-                          color: '#0E4A27',
-                          background: '#EFFDF5',
+                          transition: 'all 0.15s ease',
                         }}
-                        title={`Chat with ${item.supplierName || 'Supplier'}`}
                       >
-                        💬 Chat
+                        🏪 Your Product (View)
                       </button>
+                    ) : !isPurchaser ? (
+                      <div style={{
+                        padding: '10px',
+                        textAlign: 'center',
+                        backgroundColor: '#F8FAFC',
+                        borderRadius: '10px',
+                        fontWeight: 700,
+                        color: '#64748B',
+                        fontSize: '13.5px',
+                        border: '1.5px solid #E2E8F0',
+                      }}>
+                        🏪 Catalog View
+                      </div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1.1fr 1fr', gap: '6px' }}>
+                        {/* Chat with Supplier button */}
+                        <button
+                          type="button"
+                          onClick={() => handleChatWithSupplier(item)}
+                          className="btn btn-secondary"
+                          style={{
+                            padding: '10px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            cursor: 'pointer',
+                            fontWeight: 800,
+                            fontSize: '13px',
+                            borderColor: '#176B3A',
+                            color: '#0E4A27',
+                            background: '#EFFDF5',
+                          }}
+                          title={`Chat with ${item.supplierName || 'Supplier'}`}
+                        >
+                          💬 Chat
+                        </button>
 
-                      {/* Add to Cart button */}
-                      <button
-                        type="button"
-                        onClick={(e) => handleDirectAddToCart(item, 1, e)}
-                        disabled={isOutOfStock || isMaxInCart}
-                        className="btn btn-secondary"
-                        style={{
-                          backgroundColor: isRecentlyAdded ? '#EAF6EE' : '#F8F7F3',
-                          borderColor: isRecentlyAdded ? '#10B981' : qtyInCart > 0 ? '#176B3A' : '#D8D6CF',
-                          color: isOutOfStock ? '#94A3B8' : '#0E4A27',
-                          fontWeight: 800,
-                          fontSize: '13px',
-                          padding: '10px 6px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
-                          cursor: isOutOfStock || isMaxInCart ? 'not-allowed' : 'pointer',
-                        }}
-                      >
-                        {isRecentlyAdded ? '✓ Added!' : isMaxInCart ? 'Max in Cart' : qtyInCart > 0 ? `🛒 Add (+1)` : '🛒 Cart'}
-                      </button>
+                        {/* Add to Cart button */}
+                        <button
+                          type="button"
+                          onClick={(e) => handleDirectAddToCart(item, 1, e)}
+                          disabled={isOutOfStock || isMaxInCart}
+                          className="btn btn-secondary"
+                          style={{
+                            backgroundColor: isRecentlyAdded ? '#EAF6EE' : '#F8F7F3',
+                            borderColor: isRecentlyAdded ? '#10B981' : qtyInCart > 0 ? '#176B3A' : '#D8D6CF',
+                            color: isOutOfStock ? '#94A3B8' : '#0E4A27',
+                            fontWeight: 800,
+                            fontSize: '13px',
+                            padding: '10px 6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            cursor: isOutOfStock || isMaxInCart ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {isRecentlyAdded ? '✓ Added!' : isMaxInCart ? 'Max in Cart' : qtyInCart > 0 ? `🛒 Add (+1)` : '🛒 Cart'}
+                        </button>
 
-                      {/* Buy Now button */}
-                      <button
-                        type="button"
-                        onClick={(e) => handleOpenSupplyBuyNow(item, 1, e)}
-                        disabled={isOutOfStock}
-                        className="btn btn-primary"
-                        style={{
-                          fontWeight: 800,
-                          fontSize: '13px',
-                          padding: '10px 6px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '3px',
-                          cursor: isOutOfStock ? 'not-allowed' : 'pointer',
-                          opacity: isOutOfStock ? 0.5 : 1,
-                        }}
-                      >
-                        ⚡ Buy
-                      </button>
-                    </div>
-                  )}
+                        {/* Buy Now button */}
+                        <button
+                          type="button"
+                          onClick={(e) => handleOpenSupplyBuyNow(item, 1, e)}
+                          disabled={isOutOfStock}
+                          className="btn btn-primary"
+                          style={{
+                            fontWeight: 800,
+                            fontSize: '13px',
+                            padding: '10px 6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '3px',
+                            cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+                            opacity: isOutOfStock ? 0.5 : 1,
+                          }}
+                        >
+                          ⚡ Buy
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );
