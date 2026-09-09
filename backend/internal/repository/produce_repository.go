@@ -218,9 +218,20 @@ func (r *ProduceRepository) ListTransactions(ctx context.Context, userID string,
 
 // UpdateTransactionStatus updates a transaction's status.
 func (r *ProduceRepository) UpdateTransactionStatus(ctx context.Context, txID bson.ObjectID, status models.TransactionStatus) error {
+	return r.UpdateTransactionStatusWithShipping(ctx, txID, status, nil, nil)
+}
+
+// UpdateTransactionStatusWithShipping updates a transaction's status and optional shipping fee & total price.
+func (r *ProduceRepository) UpdateTransactionStatusWithShipping(ctx context.Context, txID bson.ObjectID, status models.TransactionStatus, shippingFee *float64, totalPrice *float64) error {
 	update := bson.M{
 		"status":     status,
 		"updated_at": time.Now(),
+	}
+	if shippingFee != nil {
+		update["shipping_fee"] = *shippingFee
+	}
+	if totalPrice != nil {
+		update["total_price"] = *totalPrice
 	}
 	res, err := r.transactionsColl.UpdateByID(ctx, txID, bson.M{"$set": update})
 	if err != nil {

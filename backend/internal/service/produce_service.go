@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/agriconnect/backend/internal/models"
@@ -194,7 +195,19 @@ func (s *ProduceService) InitiateTransaction(ctx context.Context, buyerID string
 		return nil, fmt.Errorf("invalid quantity: requested %.2f, available %.2f", req.Quantity, listing.Quantity)
 	}
 
-	totalPrice := req.Quantity * listing.PricePerUnit
+	subtotal := req.Quantity * listing.PricePerUnit
+	var shippingFee float64 = 0
+	totalPrice := subtotal + shippingFee
+
+	deliveryMethod := req.DeliveryMethod
+	deliveryAddress := req.DeliveryAddress
+	if deliveryMethod == "" {
+		if strings.Contains(strings.ToLower(req.ContactMessage), "pickup") {
+			deliveryMethod = "pickup"
+		} else {
+			deliveryMethod = "delivery"
+		}
+	}
 
 	cropPhoto := ""
 	if len(listing.Photos) > 0 {
@@ -202,18 +215,22 @@ func (s *ProduceService) InitiateTransaction(ctx context.Context, buyerID string
 	}
 
 	tx := &models.ProduceTransaction{
-		ListingID:      listing.ID,
-		CropName:       listing.CropName,
-		CropPhoto:      cropPhoto,
-		BuyerID:        buyer.ID,
-		BuyerName:      fmt.Sprintf("%s %s", buyer.FirstName, buyer.LastName),
-		FarmerID:       listing.FarmerID,
-		FarmerName:     listing.FarmerName,
-		Quantity:       req.Quantity,
-		UnitPrice:      listing.PricePerUnit,
-		TotalPrice:     totalPrice,
-		ContactMessage: req.ContactMessage,
-		Status:         models.TxPending,
+		ListingID:       listing.ID,
+		CropName:        listing.CropName,
+		CropPhoto:       cropPhoto,
+		BuyerID:         buyer.ID,
+		BuyerName:       fmt.Sprintf("%s %s", buyer.FirstName, buyer.LastName),
+		FarmerID:        listing.FarmerID,
+		FarmerName:      listing.FarmerName,
+		Quantity:        req.Quantity,
+		UnitPrice:       listing.PricePerUnit,
+		Subtotal:        subtotal,
+		ShippingFee:     shippingFee,
+		TotalPrice:      totalPrice,
+		DeliveryMethod:  deliveryMethod,
+		DeliveryAddress: deliveryAddress,
+		ContactMessage:  req.ContactMessage,
+		Status:          models.TxPending,
 	}
 
 	if err := s.produceRepo.CreateTransaction(ctx, tx); err != nil {
@@ -234,9 +251,9 @@ func (s *ProduceService) InitiateTransaction(ctx context.Context, buyerID string
 	if s.notifRepo != nil {
 		_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
 			UserID:  listing.FarmerID,
-			Title:   "🌾 New Produce Purchase Inquiry",
-			Message: fmt.Sprintf("%s sent an inquiry for %.2f %s of %s", tx.BuyerName, tx.Quantity, listing.Unit, listing.CropName),
-			Type:    models.NotifTypeProduceInquiry,
+			Title:   "🌾 New Produce Order",
+			Message: fmt.Sprintf("%s ordered %.1f kg of %s (₱%.2f)", buyer.FirstName, req.Quantity, listing.CropName, totalPrice),
+			Type:    models.NotifTypeOrderStatus,
 			Link:    "/produce/orders",
 		})
 	}
@@ -250,7 +267,7 @@ func (s *ProduceService) ListTransactions(ctx context.Context, userID string, ro
 }
 
 // UpdateTransactionStatus updates order status (Farmer/Buyer/Admin) with role-based checks and stock restoration.
-func (s *ProduceService) UpdateTransactionStatus(ctx context.Context, userID string, role string, txID string, status models.TransactionStatus) (*models.ProduceTransaction, error) {
+func (s *ProduceService) UpdateTransactionStatus(ctx context.Context, userID string, role string, txID string, req models.UpdateTransactionStatusRequest) (*models.ProduceTransaction, error) {
 	tOID, err := bson.ObjectIDFromHex(txID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid transaction ID: %w", err)
@@ -261,6 +278,7 @@ func (s *ProduceService) UpdateTransactionStatus(ctx context.Context, userID str
 		return nil, err
 	}
 
+	status := req.Status
 	isBuyer := tx.BuyerID.Hex() == userID
 	isFarmer := tx.FarmerID.Hex() == userID
 	isAdmin := role == string(models.RoleSuperAdmin) || role == string(models.RoleLGUStaff)
@@ -294,7 +312,23 @@ func (s *ProduceService) UpdateTransactionStatus(ctx context.Context, userID str
 		}
 	}
 
-	if err := s.produceRepo.UpdateTransactionStatus(ctx, tOID, status); err != nil {
+	var shippingFee *float64
+	var totalPrice *float64
+	if req.ShippingFee != nil && isFarmer {
+		fee := *req.ShippingFee
+		if fee < 0 {
+			fee = 0
+		}
+		subtotal := tx.Subtotal
+		if subtotal == 0 {
+			subtotal = tx.TotalPrice
+		}
+		total := subtotal + fee
+		shippingFee = &fee
+		totalPrice = &total
+	}
+
+	if err := s.produceRepo.UpdateTransactionStatusWithShipping(ctx, tOID, status, shippingFee, totalPrice); err != nil {
 		return nil, err
 	}
 

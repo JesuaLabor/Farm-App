@@ -277,6 +277,8 @@ export const ProduceMarketplacePage: React.FC = () => {
         listingId: selectedListing.id,
         quantity: buyQuantity,
         contactMessage: contactMsg,
+        deliveryMethod: fulfillmentType,
+        deliveryAddress: fulfillmentType === 'delivery' ? deliveryAddress.trim() : undefined,
       });
       setPlacedOrder(tx);
     } catch (err: any) {
@@ -903,6 +905,17 @@ export const ProduceMarketplacePage: React.FC = () => {
                           🚜 Farm-Gate Pickup
                         </button>
                       </div>
+                      {fulfillmentType === 'delivery' ? (
+                        <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '10px', background: '#F8FAFC', border: '1px solid #E2E8F0', fontSize: '13px', color: '#475569', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>🚚</span>
+                          <span><strong>Delivery Fee:</strong> To be confirmed by the selling farmer upon order acceptance based on vehicle/hauling arrangements.</span>
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '10px', background: '#F0FDF4', border: '1px solid #BBF7D0', fontSize: '13px', color: '#166534', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>✓</span>
+                          <span><strong>Farm-Gate Pickup:</strong> ₱0 (FREE) — Pickup directly at the seller's farm.</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* 3. Address & Phone */}

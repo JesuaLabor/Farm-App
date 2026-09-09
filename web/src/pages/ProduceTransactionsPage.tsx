@@ -19,7 +19,11 @@ export interface OrderItem {
   quantityNum: number;
   quantity: string;
   unitPrice: number;
+  subtotal?: number;
+  shippingFee?: number;
   total: number;
+  deliveryMethod?: string;
+  deliveryAddress?: string;
   status: 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled';
   date: string;
   contactMessage?: string;
@@ -144,6 +148,8 @@ export const ProduceTransactionsPage: React.FC = () => {
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
   const [orderToCancel, setOrderToCancel] = useState<OrderItem | null>(null);
+  const [orderToSetShipping, setOrderToSetShipping] = useState<OrderItem | null>(null);
+  const [shippingFeeInput, setShippingFeeInput] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -185,20 +191,28 @@ export const ProduceTransactionsPage: React.FC = () => {
             : 'Just now';
           const parsedContact = parseContactMessage(t.contactMessage);
           const photo = t.cropPhoto || (t.listingId ? listingMap.get(t.listingId) : undefined);
+          const isDelivery = t.deliveryMethod === 'delivery' || (!t.deliveryMethod && !parsedContact.fulfillment?.toLowerCase().includes('pickup'));
+          const subtotal = t.subtotal ?? (t.unitPrice ? t.unitPrice * t.quantity : t.totalPrice);
+          const shippingFee = t.shippingFee ?? 0;
+
           return {
             id: t.id,
             isBackend: true,
             buyerId: t.buyerId,
             farmerId: t.farmerId,
             buyerName: t.buyerName || 'Buyer',
-            buyerLocation: parsedContact.fulfillment || 'Northern Mindanao',
+            buyerLocation: t.deliveryAddress || parsedContact.fulfillment || 'Northern Mindanao',
             farmerName: t.farmerName,
             product: t.cropName || 'Farm Produce',
             photo,
             quantityNum: t.quantity,
             quantity: `${t.quantity} kg`,
             unitPrice: t.unitPrice || (t.totalPrice / (t.quantity || 1)),
+            subtotal,
+            shippingFee,
             total: t.totalPrice,
+            deliveryMethod: t.deliveryMethod || (isDelivery ? 'delivery' : 'pickup'),
+            deliveryAddress: t.deliveryAddress,
             status: capStatus,
             date: timeStr,
             contactMessage: t.contactMessage,
@@ -216,24 +230,33 @@ export const ProduceTransactionsPage: React.FC = () => {
     }
   };
 
-  const handleUpdateStatus = async (orderId: string, newStatus: 'confirmed' | 'completed' | 'cancelled') => {
+  const handleUpdateStatus = async (orderId: string, newStatus: 'confirmed' | 'completed' | 'cancelled', shippingFee?: number) => {
     setIsUpdatingStatus(true);
     try {
       const target = orders.find((o) => o.id === orderId);
       if (target?.isBackend) {
-        await produceApi.updateTransactionStatus(orderId, newStatus);
+        await produceApi.updateTransactionStatus(orderId, newStatus, shippingFee);
       }
       const capStatus = (newStatus.charAt(0).toUpperCase() + newStatus.slice(1).toLowerCase()) as any;
       setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: capStatus } : o))
+        prev.map((o) => {
+          if (o.id === orderId) {
+            const fee = shippingFee !== undefined ? shippingFee : (o.shippingFee || 0);
+            const sub = o.subtotal ?? (o.total - (o.shippingFee || 0));
+            return { ...o, status: capStatus, shippingFee: fee, total: sub + fee };
+          }
+          return o;
+        })
       );
       if (selectedOrder && selectedOrder.id === orderId) {
-        setSelectedOrder((prev) => (prev ? { ...prev, status: capStatus } : null));
+        const fee = shippingFee !== undefined ? shippingFee : (selectedOrder.shippingFee || 0);
+        const sub = selectedOrder.subtotal ?? (selectedOrder.total - (selectedOrder.shippingFee || 0));
+        setSelectedOrder((prev) => (prev ? { ...prev, status: capStatus, shippingFee: fee, total: sub + fee } : null));
       }
       toastSuccess('Order Status Updated', `Order #${orderId.slice(-6).toUpperCase()} marked as ${capStatus}.`);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to update status', err);
-      toastError('Update Failed', 'Failed to update order status');
+      toastError('Update Failed', err.response?.data?.error || 'Failed to update order status');
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -982,8 +1005,18 @@ export const ProduceTransactionsPage: React.FC = () => {
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#64748B' }}>Total Order Value</div>
-                    <div style={{ fontSize: '28px', fontWeight: 800, color: '#0E4A27' }}>
+                    <div style={{ fontSize: '12px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span>Subtotal: <strong>₱{(ord.subtotal ?? (ord.total - (ord.shippingFee || 0))).toLocaleString()}</strong></span>
+                      <span>•</span>
+                      <span>
+                        {ord.deliveryMethod === 'pickup'
+                          ? '🏪 Farm-Gate Pickup (₱0)'
+                          : ord.shippingFee && ord.shippingFee > 0
+                          ? `🚚 Delivery: ₱${ord.shippingFee.toLocaleString()}`
+                          : (ord.status === 'Pending' ? '🚚 Delivery: Fee Pending Farmer Confirmation' : '🚚 Delivery: ₱0')}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27', marginTop: '2px' }}>
                       ₱{ord.total.toLocaleString()}
                     </div>
                   </div>
@@ -1018,7 +1051,14 @@ export const ProduceTransactionsPage: React.FC = () => {
                       <button
                         type="button"
                         disabled={isUpdatingStatus}
-                        onClick={() => handleUpdateStatus(ord.id, 'confirmed')}
+                        onClick={() => {
+                          if (ord.deliveryMethod === 'pickup') {
+                            handleUpdateStatus(ord.id, 'confirmed', 0);
+                          } else {
+                            setOrderToSetShipping(ord);
+                            setShippingFeeInput(ord.shippingFee || 0);
+                          }
+                        }}
                         style={{
                           padding: '10px 20px',
                           borderRadius: '10px',
@@ -1435,6 +1475,33 @@ export const ProduceTransactionsPage: React.FC = () => {
                       </div>
                     </div>
                   </div>
+
+                  {/* Itemized Cost Breakdown */}
+                  <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px dashed #E2E8F0', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                      <span>Crop Harvest Subtotal</span>
+                      <span style={{ fontWeight: 600, color: '#334155' }}>
+                        ₱{(selectedOrder.subtotal ?? (selectedOrder.total - (selectedOrder.shippingFee || 0))).toLocaleString()}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                      <span>
+                        Hauling / Delivery Fee
+                        {selectedOrder.deliveryMethod === 'pickup' && <span style={{ color: '#16A34A', fontWeight: 600 }}> (Farm-Gate Pickup)</span>}
+                      </span>
+                      <span style={{ fontWeight: 600, color: selectedOrder.deliveryMethod === 'pickup' ? '#16A34A' : (selectedOrder.shippingFee ? '#0F172A' : '#D97706') }}>
+                        {selectedOrder.deliveryMethod === 'pickup'
+                          ? '₱0 (FREE)'
+                          : selectedOrder.shippingFee !== undefined && selectedOrder.shippingFee > 0
+                          ? `₱${selectedOrder.shippingFee.toLocaleString()}`
+                          : (isPending ? 'Pending Farmer Confirmation' : '₱0 (FREE)')}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '6px', borderTop: '1px solid #E2E8F0', fontSize: '15px', fontWeight: 800 }}>
+                      <span style={{ color: '#0F172A' }}>Total Order Value</span>
+                      <span style={{ color: '#0E4A27' }}>₱{selectedOrder.total.toLocaleString()}</span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* ── Section B: Order Lifecycle Tracker with True Connecting Track Line ── */}
@@ -1763,7 +1830,12 @@ export const ProduceTransactionsPage: React.FC = () => {
                       type="button"
                       disabled={isUpdatingStatus}
                       onClick={async () => {
-                        await handleUpdateStatus(selectedOrder.id, 'confirmed');
+                        if (selectedOrder.deliveryMethod === 'pickup') {
+                          await handleUpdateStatus(selectedOrder.id, 'confirmed', 0);
+                        } else {
+                          setOrderToSetShipping(selectedOrder);
+                          setShippingFeeInput(selectedOrder.shippingFee || 0);
+                        }
                       }}
                       style={{
                         padding: '10px 20px',
@@ -2032,6 +2104,228 @@ export const ProduceTransactionsPage: React.FC = () => {
               >
                 <span>✕</span>
                 <span>{isUpdatingStatus ? 'Cancelling...' : 'Yes, Cancel Order'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Farmer Delivery / Hauling Fee Confirmation Modal ─── */}
+      {orderToSetShipping && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px',
+          }}
+          onClick={() => setOrderToSetShipping(null)}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '20px',
+              padding: '28px',
+              maxWidth: '520px',
+              width: '100%',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.08)',
+              border: '1px solid #E2E8F0',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div
+                style={{
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '12px',
+                  backgroundColor: '#EFFDF5',
+                  color: '#16A34A',
+                  fontSize: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid #BBF7D0',
+                }}
+              >
+                🚚
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#0F172A' }}>
+                  Set Crop Delivery / Hauling Fee
+                </h3>
+                <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#64748B' }}>
+                  Order #{orderToSetShipping.id.slice(-6).toUpperCase()} · {orderToSetShipping.product} ({orderToSetShipping.quantity})
+                </p>
+              </div>
+            </div>
+
+            <div
+              style={{
+                backgroundColor: '#F8FAFC',
+                borderRadius: '12px',
+                padding: '14px 16px',
+                marginBottom: '20px',
+                border: '1px solid #E2E8F0',
+                fontSize: '13px',
+              }}
+            >
+              <div style={{ color: '#334155', marginBottom: '6px' }}>
+                📍 <strong>Delivery Address:</strong> {orderToSetShipping.deliveryAddress || orderToSetShipping.buyerLocation || 'Buyer Address'}
+              </div>
+              <div style={{ color: '#64748B', fontSize: '12px', lineHeight: '1.4' }}>
+                As the farmer supplying this harvest, confirm the trucking/hauling fee based on the vehicle (trike, multicab, or truck) you arranged locally to deliver this produce to the buyer.
+              </div>
+            </div>
+
+            {/* Quick Vehicle Presets */}
+            <div style={{ marginBottom: '18px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Quick Hauling Presets
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                {[
+                  { label: 'Free Delivery', fee: 0, icon: '🎁' },
+                  { label: 'Trike / Bike', fee: 150, icon: '🛵' },
+                  { label: 'Multicab', fee: 500, icon: '🛻' },
+                  { label: 'Canter / Truck', fee: 1500, icon: '🚚' },
+                  { label: 'Elf 6-Wheeler', fee: 3500, icon: '🚛' },
+                  { label: '10-W Forwarder', fee: 7500, icon: '🏗️' },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => setShippingFeeInput(preset.fee)}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: '10px',
+                      border: `1.5px solid ${shippingFeeInput === preset.fee ? '#16A34A' : '#E2E8F0'}`,
+                      backgroundColor: shippingFeeInput === preset.fee ? '#F0FDF4' : '#FFFFFF',
+                      color: shippingFeeInput === preset.fee ? '#166534' : '#334155',
+                      fontWeight: 700,
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <div>{preset.icon} {preset.label}</div>
+                    <div style={{ fontSize: '11px', color: shippingFeeInput === preset.fee ? '#16A34A' : '#64748B', marginTop: '2px' }}>
+                      {preset.fee === 0 ? '₱0' : `₱${preset.fee.toLocaleString()}`}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Numeric Input */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                Exact Delivery / Hauling Fee (₱)
+              </label>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', fontWeight: 800, color: '#64748B', fontSize: '16px' }}>
+                  ₱
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="10"
+                  value={shippingFeeInput}
+                  onChange={(e) => setShippingFeeInput(Math.max(0, Number(e.target.value) || 0))}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px 12px 34px',
+                    borderRadius: '10px',
+                    border: '1.5px solid #CBD5E1',
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    color: '#0F172A',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            {/* Live Calculation */}
+            {(() => {
+              const subtotal = orderToSetShipping.subtotal ?? (orderToSetShipping.total - (orderToSetShipping.shippingFee || 0));
+              const newTotal = subtotal + shippingFeeInput;
+              return (
+                <div
+                  style={{
+                    backgroundColor: '#F1F5F9',
+                    borderRadius: '12px',
+                    padding: '14px 16px',
+                    marginBottom: '24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                    fontSize: '13px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                    <span>Crop Subtotal:</span>
+                    <span style={{ fontWeight: 600 }}>₱{subtotal.toLocaleString()}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B' }}>
+                    <span>Confirmed Hauling Fee:</span>
+                    <span style={{ fontWeight: 700, color: '#16A34A' }}>₱{shippingFeeInput.toLocaleString()}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #CBD5E1', paddingTop: '6px', fontSize: '15px', fontWeight: 800 }}>
+                    <span style={{ color: '#0F172A' }}>Updated Order Total:</span>
+                    <span style={{ color: '#0E4A27' }}>₱{newTotal.toLocaleString()}</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setOrderToSetShipping(null)}
+                style={{
+                  padding: '11px 20px',
+                  borderRadius: '10px',
+                  border: '1.5px solid #CBD5E1',
+                  backgroundColor: '#FFFFFF',
+                  color: '#475569',
+                  fontWeight: 700,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isUpdatingStatus}
+                onClick={async () => {
+                  const targetOrder = orderToSetShipping;
+                  setOrderToSetShipping(null);
+                  await handleUpdateStatus(targetOrder.id, 'confirmed', shippingFeeInput);
+                }}
+                style={{
+                  padding: '11px 24px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: '#16A34A',
+                  color: '#FFFFFF',
+                  fontWeight: 800,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.3)',
+                }}
+              >
+                Confirm & Accept Order
               </button>
             </div>
           </div>

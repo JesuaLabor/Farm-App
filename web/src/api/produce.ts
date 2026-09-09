@@ -62,8 +62,8 @@ export const produceApi = {
     return res.data;
   },
 
-  updateTransactionStatus: async (id: string, status: TransactionStatus): Promise<ProduceTransaction> => {
-    const res = await apiClient.put<ProduceTransaction>(`/api/produce/transactions/${id}/status`, { status });
+  updateTransactionStatus: async (id: string, status: TransactionStatus, shippingFee?: number): Promise<ProduceTransaction> => {
+    const res = await apiClient.put<ProduceTransaction>(`/api/produce/transactions/${id}/status`, { status, shippingFee });
     return res.data;
   },
 };

@@ -159,7 +159,7 @@ func (h *ProduceHandler) UpdateTransactionStatus(w http.ResponseWriter, r *http.
 		return
 	}
 
-	tx, err := h.produceService.UpdateTransactionStatus(r.Context(), userID, role, txID, req.Status)
+	tx, err := h.produceService.UpdateTransactionStatus(r.Context(), userID, role, txID, req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return

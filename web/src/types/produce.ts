@@ -43,7 +43,11 @@ export interface ProduceTransaction {
   farmerName: string;
   quantity: number;
   unitPrice: number;
+  subtotal?: number;
+  shippingFee?: number;
   totalPrice: number;
+  deliveryMethod?: string;
+  deliveryAddress?: string;
   contactMessage?: string;
   status: TransactionStatus;
   createdAt: string;
@@ -54,4 +58,6 @@ export interface CreateProduceTransactionPayload {
   listingId: string;
   quantity: number;
   contactMessage?: string;
+  deliveryMethod?: string;
+  deliveryAddress?: string;
 }

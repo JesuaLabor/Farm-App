@@ -82,7 +82,11 @@ type ProduceTransaction struct {
 	FarmerName     string            `bson:"farmer_name"         json:"farmerName"`
 	Quantity       float64           `bson:"quantity"            json:"quantity"`
 	UnitPrice      float64           `bson:"unit_price"          json:"unitPrice"`
+	Subtotal       float64           `bson:"subtotal"            json:"subtotal"`
+	ShippingFee    float64           `bson:"shipping_fee"        json:"shippingFee"`
 	TotalPrice     float64           `bson:"total_price"         json:"totalPrice"`
+	DeliveryMethod string            `bson:"delivery_method,omitempty" json:"deliveryMethod,omitempty"`
+	DeliveryAddress string           `bson:"delivery_address,omitempty" json:"deliveryAddress,omitempty"`
 	ContactMessage string            `bson:"contact_message,omitempty" json:"contactMessage,omitempty"`
 	Status         TransactionStatus `bson:"status"              json:"status"`
 	CreatedAt      time.Time         `bson:"created_at"          json:"createdAt"`
@@ -91,12 +95,15 @@ type ProduceTransaction struct {
 
 // CreateProduceTransactionRequest is the JSON body to initiate a purchase request.
 type CreateProduceTransactionRequest struct {
-	ListingID      string  `json:"listingId"`
-	Quantity       float64 `json:"quantity"`
-	ContactMessage string  `json:"contactMessage,omitempty"`
+	ListingID       string  `json:"listingId"`
+	Quantity        float64 `json:"quantity"`
+	ContactMessage  string  `json:"contactMessage,omitempty"`
+	DeliveryMethod  string  `json:"deliveryMethod,omitempty"`
+	DeliveryAddress string  `json:"deliveryAddress,omitempty"`
 }
 
 // UpdateTransactionStatusRequest is the JSON payload to update transaction status.
 type UpdateTransactionStatusRequest struct {
-	Status TransactionStatus `json:"status"`
+	Status      TransactionStatus `json:"status"`
+	ShippingFee *float64          `json:"shippingFee,omitempty"`
 }
