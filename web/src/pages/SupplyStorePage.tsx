@@ -515,12 +515,42 @@ export const SupplyStorePage: React.FC = () => {
                     Supplier: {item.supplierName}
                   </div>
 
-                  <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#1A1C1A', marginBottom: '8px' }}>
+                  <h3
+                    title={item.name}
+                    style={{
+                      fontSize: '19px',
+                      fontWeight: 800,
+                      color: '#1A1C1A',
+                      marginBottom: '6px',
+                      minHeight: '26px',
+                      maxHeight: '52px',
+                      lineHeight: '1.3',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
                     {item.name}
                   </h3>
 
-                  <p style={{ fontSize: '15px', color: '#525450', marginBottom: '14px', lineHeight: 1.4, flex: 1 }}>
-                    {item.description}
+                  <p
+                    title={item.description}
+                    style={{
+                      fontSize: '14px',
+                      color: '#64748B',
+                      marginBottom: '14px',
+                      lineHeight: '1.4',
+                      height: '40px',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {item.description || 'No detailed product description provided.'}
                   </p>
 
                   <div style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', marginBottom: '6px' }}>
