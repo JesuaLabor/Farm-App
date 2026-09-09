@@ -219,13 +219,19 @@ func (s *SupplyService) CreateOrder(ctx context.Context, buyerID string, req mod
 		}
 	}
 
+	subtotal := totalAmount
+	var shippingFee float64 = 0 // default 0 for pickup; for delivery, confirmed by supplier upon order acceptance
+	finalTotal := subtotal + shippingFee
+
 	order := &models.SupplyOrder{
 		BuyerID:         buyer.ID,
 		BuyerName:       fmt.Sprintf("%s %s", buyer.FirstName, buyer.LastName),
 		SupplierID:      supplierID,
 		SupplierName:    supplierName,
 		Items:           items,
-		TotalAmount:     totalAmount,
+		Subtotal:        subtotal,
+		ShippingFee:     shippingFee,
+		TotalAmount:     finalTotal,
 		DeliveryMethod:  req.DeliveryMethod,
 		DeliveryAddress: req.DeliveryAddress,
 		Status:          models.SupplyOrderPending,
@@ -250,8 +256,8 @@ func (s *SupplyService) CreateOrder(ctx context.Context, buyerID string, req mod
 	if s.notifRepo != nil {
 		_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
 			UserID:  supplierID,
-			Title:   "📦 New Supply Order",
-			Message: fmt.Sprintf("%s placed an order for %d item(s) totaling ₱%.2f", order.BuyerName, len(items), totalAmount),
+			Title:   "📦 New Supply Order Received",
+			Message: fmt.Sprintf("%s placed an order for %d item(s) totaling ₱%.2f", order.BuyerName, len(items), order.TotalAmount),
 			Type:    models.NotifTypeOrderStatus,
 			Link:    "/supply/orders",
 		})
@@ -265,8 +271,8 @@ func (s *SupplyService) ListOrders(ctx context.Context, userID string, role stri
 	return s.supplyRepo.ListOrders(ctx, userID, role)
 }
 
-// UpdateOrderStatus updates supply order fulfillment status.
-func (s *SupplyService) UpdateOrderStatus(ctx context.Context, userID string, orderID string, status models.SupplyOrderStatus) (*models.SupplyOrder, error) {
+// UpdateOrderStatus updates an order's fulfillment status and optional shipping fee.
+func (s *SupplyService) UpdateOrderStatus(ctx context.Context, userID string, orderID string, req models.UpdateSupplyOrderStatusRequest) (*models.SupplyOrder, error) {
 	oOID, err := bson.ObjectIDFromHex(orderID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid order ID: %w", err)
@@ -281,12 +287,28 @@ func (s *SupplyService) UpdateOrderStatus(ctx context.Context, userID string, or
 		return nil, errors.New("unauthorized to update this order")
 	}
 
-	if err := s.supplyRepo.UpdateOrderStatus(ctx, oOID, status); err != nil {
+	var shippingFee *float64
+	var totalAmount *float64
+	if req.ShippingFee != nil && order.SupplierID.Hex() == userID {
+		fee := *req.ShippingFee
+		if fee < 0 {
+			fee = 0
+		}
+		subtotal := order.Subtotal
+		if subtotal == 0 {
+			subtotal = order.TotalAmount
+		}
+		total := subtotal + fee
+		shippingFee = &fee
+		totalAmount = &total
+	}
+
+	if err := s.supplyRepo.UpdateOrderStatusWithShipping(ctx, oOID, req.Status, shippingFee, totalAmount); err != nil {
 		return nil, err
 	}
 
 	// When an active order is cancelled, restore stock back to products
-	if status == models.SupplyOrderCancelled && order.Status != models.SupplyOrderCancelled && order.Status != models.SupplyOrderCompleted {
+	if req.Status == models.SupplyOrderCancelled && order.Status != models.SupplyOrderCancelled && order.Status != models.SupplyOrderCompleted {
 		for _, item := range order.Items {
 			_ = s.supplyRepo.RestoreStock(ctx, item.ProductID, item.Quantity)
 		}
@@ -295,7 +317,7 @@ func (s *SupplyService) UpdateOrderStatus(ctx context.Context, userID string, or
 	updated, err := s.supplyRepo.GetOrderByID(ctx, oOID)
 	if err == nil && s.notifRepo != nil {
 		// Notify the appropriate party about status change
-		if status == models.SupplyOrderCancelled {
+		if req.Status == models.SupplyOrderCancelled {
 			if userID == updated.BuyerID.Hex() {
 				// Buyer cancelled -> Notify supplier
 				_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
@@ -320,7 +342,7 @@ func (s *SupplyService) UpdateOrderStatus(ctx context.Context, userID string, or
 			_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
 				UserID:  updated.BuyerID,
 				Title:   "🚚 Order Status Updated",
-				Message: fmt.Sprintf("Your supply order from %s is now %s", updated.SupplierName, status),
+				Message: fmt.Sprintf("Your supply order from %s is now %s", updated.SupplierName, req.Status),
 				Type:    models.NotifTypeOrderStatus,
 				Link:    "/supply/orders",
 			})

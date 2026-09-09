@@ -240,9 +240,20 @@ func (r *SupplyRepository) GetOrderByID(ctx context.Context, id bson.ObjectID) (
 
 // UpdateOrderStatus updates the status of an order.
 func (r *SupplyRepository) UpdateOrderStatus(ctx context.Context, orderID bson.ObjectID, status models.SupplyOrderStatus) error {
+	return r.UpdateOrderStatusWithShipping(ctx, orderID, status, nil, nil)
+}
+
+// UpdateOrderStatusWithShipping updates the status, shipping fee, and total amount of an order.
+func (r *SupplyRepository) UpdateOrderStatusWithShipping(ctx context.Context, orderID bson.ObjectID, status models.SupplyOrderStatus, shippingFee *float64, totalAmount *float64) error {
 	update := bson.M{
 		"status":     status,
 		"updated_at": time.Now(),
+	}
+	if shippingFee != nil {
+		update["shipping_fee"] = *shippingFee
+	}
+	if totalAmount != nil {
+		update["total_amount"] = *totalAmount
 	}
 	res, err := r.ordersColl.UpdateByID(ctx, orderID, bson.M{"$set": update})
 	if err != nil {

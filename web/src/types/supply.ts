@@ -74,6 +74,8 @@ export interface SupplyOrder {
   supplierId: string;
   supplierName: string;
   items: SupplyOrderItem[];
+  subtotal?: number;
+  shippingFee?: number;
   totalAmount: number;
   deliveryMethod: DeliveryMethod;
   deliveryAddress?: string;

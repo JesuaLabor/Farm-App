@@ -119,6 +119,8 @@ type SupplyOrder struct {
 	SupplierID      bson.ObjectID     `bson:"supplier_id"          json:"supplierId"`
 	SupplierName    string            `bson:"supplier_name"        json:"supplierName"`
 	Items           []SupplyOrderItem `bson:"items"                json:"items"`
+	Subtotal        float64           `bson:"subtotal"             json:"subtotal"`
+	ShippingFee     float64           `bson:"shipping_fee"         json:"shippingFee"`
 	TotalAmount     float64           `bson:"total_amount"         json:"totalAmount"`
 	DeliveryMethod  DeliveryMethod    `bson:"delivery_method"      json:"deliveryMethod"`
 	DeliveryAddress string            `bson:"delivery_address,omitempty" json:"deliveryAddress,omitempty"`
@@ -148,7 +150,8 @@ type CreateSupplyOrderRequest struct {
 
 // UpdateSupplyOrderStatusRequest updates an order's fulfillment status.
 type UpdateSupplyOrderStatusRequest struct {
-	Status SupplyOrderStatus `json:"status"`
+	Status      SupplyOrderStatus `json:"status"`
+	ShippingFee *float64          `json:"shippingFee,omitempty"`
 }
 
 // UpdatePaymentStatusRequest lets a supplier confirm COD payment receipt

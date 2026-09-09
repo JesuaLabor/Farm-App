@@ -55,8 +55,8 @@ export const supplyApi = {
     return res.data;
   },
 
-  updateOrderStatus: async (id: string, status: SupplyOrderStatus): Promise<SupplyOrder> => {
-    const res = await apiClient.put<SupplyOrder>(`/api/supply/orders/${id}/status`, { status });
+  updateOrderStatus: async (id: string, status: SupplyOrderStatus, shippingFee?: number): Promise<SupplyOrder> => {
+    const res = await apiClient.put<SupplyOrder>(`/api/supply/orders/${id}/status`, { status, shippingFee });
     return res.data;
   },
 

@@ -149,7 +149,7 @@ func (h *SupplyHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	order, err := h.supplyService.UpdateOrderStatus(r.Context(), userID, orderID, req.Status)
+	order, err := h.supplyService.UpdateOrderStatus(r.Context(), userID, orderID, req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return

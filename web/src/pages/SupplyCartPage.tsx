@@ -472,6 +472,8 @@ export const SupplyCartPage: React.FC = () => {
             listingId: item.id,
             quantity: item.quantity,
             contactMessage: contactMsg,
+            deliveryMethod: deliveryMethod,
+            deliveryAddress: deliveryMethod === 'delivery' ? deliveryAddress.trim() : undefined,
           });
         }
 
@@ -989,6 +991,17 @@ export const SupplyCartPage: React.FC = () => {
                       {activeTab === 'supplies' ? '🏪 Pickup' : '🚜 Farm Pickup'}
                     </button>
                   </div>
+                  {deliveryMethod === 'delivery' ? (
+                    <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '10px', background: '#F8FAFC', border: '1px solid #E2E8F0', fontSize: '12px', color: '#475569', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>🚚</span>
+                      <span><strong>Delivery Fee:</strong> To be confirmed by the {activeTab === 'supplies' ? 'supplier' : 'farmer'} upon order acceptance based on vehicle/hauling arrangements.</span>
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '10px', background: '#F0FDF4', border: '1px solid #BBF7D0', fontSize: '12px', color: '#166534', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>✓</span>
+                      <span><strong>{activeTab === 'supplies' ? 'Store Pickup' : 'Farm-Gate Pickup'}:</strong> ₱0 (FREE)</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Delivery Address */}
@@ -1089,17 +1102,29 @@ export const SupplyCartPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Order Total */}
-                <div style={{ padding: '14px', backgroundColor: '#f8fafc', borderRadius: '10px', marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Total for Selected</div>
-                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-                      {currentSelectedCount} item{currentSelectedCount !== 1 ? 's' : ''} selected
-                    </div>
+                {/* Order Cost Breakdown */}
+                <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '12px', marginBottom: '18px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', fontSize: '13px' }}>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>Items Subtotal ({currentSelectedCount} item{currentSelectedCount !== 1 ? 's' : ''}):</span>
+                    <span style={{ color: '#0f172a', fontWeight: 700 }}>₱{currentTotalAmount.toLocaleString()}</span>
                   </div>
-                  <span style={{ color: activeTab === 'supplies' ? '#ca8a04' : '#176B3A', fontSize: '22px', fontWeight: 800 }}>
-                    ₱{currentTotalAmount.toLocaleString()}
-                  </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', fontSize: '13px' }}>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>Shipping / Delivery Fee:</span>
+                    <span style={{ color: deliveryMethod === 'pickup' ? '#16a34a' : '#ca8a04', fontWeight: 700 }}>
+                      {deliveryMethod === 'pickup' ? '₱0 (Pickup)' : 'Pending Seller Confirmation'}
+                    </span>
+                  </div>
+                  <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', color: '#0f172a', fontWeight: 800 }}>Total Order Value</div>
+                      <div style={{ fontSize: '11px', color: '#64748b' }}>
+                        {deliveryMethod === 'delivery' ? '(Excl. delivery fee)' : '(Pickup at store/farm)'}
+                      </div>
+                    </div>
+                    <span style={{ color: activeTab === 'supplies' ? '#ca8a04' : '#176B3A', fontSize: '22px', fontWeight: 800 }}>
+                      ₱{currentTotalAmount.toLocaleString()}
+                    </span>
+                  </div>
                 </div>
 
                 <button

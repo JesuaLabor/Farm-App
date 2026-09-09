@@ -1220,6 +1220,17 @@ export const SupplyStorePage: React.FC = () => {
                       🏬 In-Store Pickup
                     </button>
                   </div>
+                  {buyNowDeliveryMethod === 'delivery' ? (
+                    <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '10px', background: '#F8FAFC', border: '1px solid #E2E8F0', fontSize: '13px', color: '#475569', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>🚚</span>
+                      <span><strong>Delivery Fee:</strong> To be confirmed by the supplier upon order acceptance based on cargo size and transport vehicle.</span>
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '10px', background: '#F0FDF4', border: '1px solid #BBF7D0', fontSize: '13px', color: '#166534', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>✓</span>
+                      <span><strong>Store Pickup:</strong> ₱0 (FREE) — Pickup directly at the supplier's store/warehouse.</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* 3. Address & Phone */}
