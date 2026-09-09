@@ -76,6 +76,7 @@ type SupplyProduct struct {
 	Price         float64        `bson:"price"               json:"price"`
 	StockQuantity int            `bson:"stock_quantity"      json:"stockQuantity"`
 	Unit          string         `bson:"unit"                json:"unit"` // e.g. "bag", "liter", "pack", "piece"
+	Location      string         `bson:"location,omitempty"   json:"location,omitempty"`
 	Images        []string       `bson:"images,omitempty"    json:"images,omitempty"`
 	CreatedAt     time.Time      `bson:"created_at"          json:"createdAt"`
 	UpdatedAt     time.Time      `bson:"updated_at"          json:"updatedAt"`
@@ -89,6 +90,7 @@ type CreateSupplyProductRequest struct {
 	Price         float64        `json:"price"`
 	StockQuantity int            `json:"stockQuantity"`
 	Unit          string         `json:"unit"`
+	Location      string         `json:"location,omitempty"`
 	Images        []string       `json:"images,omitempty"`
 }
 
@@ -100,6 +102,7 @@ type UpdateSupplyProductRequest struct {
 	Price         *float64        `json:"price,omitempty"`
 	StockQuantity *int            `json:"stockQuantity,omitempty"`
 	Unit          *string         `json:"unit,omitempty"`
+	Location      *string         `json:"location,omitempty"`
 	Images        []string        `json:"images,omitempty"`
 }
 
@@ -127,11 +130,11 @@ type SupplyOrder struct {
 	DeliveryAddress string            `bson:"delivery_address,omitempty" json:"deliveryAddress,omitempty"`
 	Status          SupplyOrderStatus `bson:"status"               json:"status"`
 	// Payment fields
-	PaymentMethod   PaymentMethod     `bson:"payment_method"       json:"paymentMethod"`
-	PaymentStatus   PaymentStatus     `bson:"payment_status"       json:"paymentStatus"`
-	PaymentNote     string            `bson:"payment_note,omitempty" json:"paymentNote,omitempty"` // e.g. reference number for online payments
-	CreatedAt       time.Time         `bson:"created_at"           json:"createdAt"`
-	UpdatedAt       time.Time         `bson:"updated_at"           json:"updatedAt"`
+	PaymentMethod PaymentMethod `bson:"payment_method"       json:"paymentMethod"`
+	PaymentStatus PaymentStatus `bson:"payment_status"       json:"paymentStatus"`
+	PaymentNote   string        `bson:"payment_note,omitempty" json:"paymentNote,omitempty"` // e.g. reference number for online payments
+	CreatedAt     time.Time     `bson:"created_at"           json:"createdAt"`
+	UpdatedAt     time.Time     `bson:"updated_at"           json:"updatedAt"`
 }
 
 // CreateOrderItemRequest represents an item entry during checkout.
@@ -146,7 +149,7 @@ type CreateSupplyOrderRequest struct {
 	DeliveryMethod  DeliveryMethod           `json:"deliveryMethod"`
 	DeliveryAddress string                   `json:"deliveryAddress,omitempty"`
 	// PaymentMethod defaults to "cod" if omitted.
-	PaymentMethod   PaymentMethod            `json:"paymentMethod"`
+	PaymentMethod PaymentMethod `json:"paymentMethod"`
 }
 
 // UpdateSupplyOrderStatusRequest updates an order's fulfillment status.

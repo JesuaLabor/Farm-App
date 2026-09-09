@@ -142,7 +142,7 @@ export const ProduceMarketplacePage: React.FC = () => {
           return;
         }
       }
-    } catch {}
+    } catch { }
     setProduceCartMap({});
   };
 
@@ -167,7 +167,7 @@ export const ProduceMarketplacePage: React.FC = () => {
     const raw = localStorage.getItem('agriconnect_produce_cart');
     let items: { id: string; listing: any; quantity: number }[] = [];
     if (raw) {
-      try { items = JSON.parse(raw); } catch {}
+      try { items = JSON.parse(raw); } catch { }
     }
 
     const idx = items.findIndex((i) => i.id === item.id);
@@ -373,8 +373,8 @@ export const ProduceMarketplacePage: React.FC = () => {
               {user?.role === 'lgu_staff'
                 ? 'Browse and monitor fresh harvests listed by verified local farmers in your jurisdiction.'
                 : user?.role === 'farmer'
-                ? 'Explore market listings, compare regional harvest prices, or post your new crops.'
-                : 'Buy fresh crops directly from verified farmers in Northern Mindanao.'}
+                  ? 'Explore market listings, compare regional harvest prices, or post your new crops.'
+                  : 'Buy fresh crops directly from verified farmers in Northern Mindanao.'}
             </p>
           </div>
 
@@ -504,36 +504,23 @@ export const ProduceMarketplacePage: React.FC = () => {
                   {/* Row 1: Overline Seller Identity & Location */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '20px', marginBottom: '6px' }}>
                     <span
-                      title={`Farmer: ${item.farmerName || item.sellerName || 'Verified Farmer'}${item.location ? ` • 📍 ${item.location}` : ''}`}
+                      title={`Farmer: ${item.farmerName || item.sellerName || 'Verified Farmer'} • 📍 ${item.location || 'Northern Mindanao'}`}
                       style={{ fontSize: '13px', color: '#525450', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                     >
-                      Farmer: {item.farmerName || item.sellerName || 'Verified Farmer'}{item.location ? ` • 📍 ${item.location}` : ''}
+                      Farmer: {item.farmerName || item.sellerName || 'Verified Farmer'}{item.location ? ` • 📍 ${item.location}` : ' • 📍 Northern Mindanao'}
                     </span>
-                    {isOwnListing && (
-                      <span style={{
-                        padding: '2px 8px',
-                        backgroundColor: '#E2E8F0',
-                        color: '#475569',
-                        borderRadius: '6px',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        whiteSpace: 'nowrap',
-                        marginLeft: '6px',
-                      }}>
-                        Your Harvest
-                      </span>
-                    )}
                   </div>
 
                   {/* Row 2: Product Name */}
                   <h3
                     title={item.cropName}
                     style={{
-                      fontSize: '19px',
+                      fontSize: '18px',
                       fontWeight: 800,
                       color: '#1A1C1A',
-                      height: '48px',
-                      lineHeight: '24px',
+                      minHeight: '26px',
+                      maxHeight: '48px',
+                      lineHeight: '1.3',
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
                       WebkitBoxOrient: 'vertical',
@@ -549,24 +536,25 @@ export const ProduceMarketplacePage: React.FC = () => {
                   <p
                     title={item.description || `Freshly harvested ${item.cropName} directly from verified farm in ${item.location || 'Northern Mindanao'}.`}
                     style={{
-                      fontSize: '13.5px',
+                      fontSize: '13px',
                       color: '#64748B',
-                      lineHeight: '20px',
-                      height: '40px',
+                      lineHeight: '19px',
+                      minHeight: '19px',
+                      maxHeight: '38px',
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
                       WebkitBoxOrient: 'vertical',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       wordBreak: 'break-word',
-                      margin: '0 0 12px 0',
+                      margin: '0 0 10px 0',
                     }}
                   >
                     {item.description || `Freshly harvested ${item.cropName} directly from verified farm in ${item.location || 'Northern Mindanao'}.`}
                   </p>
 
                   {/* Row 4: Price Slot */}
-                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', marginBottom: '6px', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', marginBottom: '6px', display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: 'auto' }}>
                     <span>₱{item.pricePerUnit}</span>
                     <span style={{ fontSize: '14px', color: '#525450', fontWeight: 600 }}>/ {item.unit || 'kg'}</span>
                   </div>
@@ -840,7 +828,7 @@ export const ProduceMarketplacePage: React.FC = () => {
                       {selectedListing.cropName}
                     </h2>
                     <div style={{ fontSize: '16px', color: '#525450', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                      <span>Sold by <strong>{selectedListing.sellerName || selectedListing.farmerName || 'Verified Farmer'}</strong> • 📍 {selectedListing.location || 'Northern Mindanao'}</span>
+                      <span>Selling by <strong>{selectedListing.sellerName || selectedListing.farmerName || 'Verified Farmer'}</strong> • 📍 {selectedListing.location || 'Northern Mindanao'}</span>
                       {selectedListing.farmerId && user?.id !== selectedListing.farmerId && (
                         <button
                           type="button"

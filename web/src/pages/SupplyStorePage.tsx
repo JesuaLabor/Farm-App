@@ -88,6 +88,7 @@ export const SupplyStorePage: React.FC = () => {
   const [prodUnit, setProdUnit] = useState('50kg bag');
   const [prodStock, setProdStock] = useState<number>(500);
   const [prodDesc, setProdDesc] = useState('');
+  const [prodLocation, setProdLocation] = useState('');
   const [prodImageFile, setProdImageFile] = useState<File | null>(null);
   const [prodImagePreview, setProdImagePreview] = useState<string>('');
   const prodFileInputRef = useRef<HTMLInputElement>(null);
@@ -116,11 +117,12 @@ export const SupplyStorePage: React.FC = () => {
         unit: prodUnit,
         stockQuantity: prodStock,
         description: prodDesc,
+        location: prodLocation,
         images: uploadedImageUrl ? [uploadedImageUrl] : [],
       });
       toastSuccess('Product Listed', `"${prodName}" has been added to the store.`);
       setShowAddModal(false);
-      setProdName(''); setProdDesc('');
+      setProdName(''); setProdDesc(''); setProdLocation('');
       setProdImageFile(null);
       setProdImagePreview('');
       if (prodFileInputRef.current) prodFileInputRef.current.value = '';
@@ -385,8 +387,8 @@ export const SupplyStorePage: React.FC = () => {
               {user?.role === 'supplier'
                 ? 'Manage your agricultural inputs, track buyer orders, and expand your catalog.'
                 : user?.role === 'lgu_staff'
-                ? 'Inspect available certified fertilizers, hybrid seeds, and machinery for agricultural programs.'
-                : 'Order certified fertilizers, hybrid seeds, crop protection, and machinery directly from verified suppliers.'}
+                  ? 'Inspect available certified fertilizers, hybrid seeds, and machinery for agricultural programs.'
+                  : 'Order certified fertilizers, hybrid seeds, crop protection, and machinery directly from verified suppliers.'}
             </p>
           </div>
 
@@ -536,36 +538,26 @@ export const SupplyStorePage: React.FC = () => {
                 </div>
 
                 <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  {/* Row 1: Overline Seller Identity */}
+                  {/* Row 1: Overline Seller Identity & Location */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '20px', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '13px', color: '#525450', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      Supplier: {item.supplierName || 'Verified Supplier'}
+                    <span
+                      title={`Supplier: ${item.supplierName || 'Verified Supplier'} • 📍 ${item.location || 'Northern Mindanao'}`}
+                      style={{ fontSize: '13px', color: '#525450', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    >
+                      Supplier: {item.supplierName || 'Verified Supplier'} • 📍 {item.location || 'Northern Mindanao'}
                     </span>
-                    {isOwnProduct && (
-                      <span style={{
-                        padding: '2px 8px',
-                        backgroundColor: '#E2E8F0',
-                        color: '#475569',
-                        borderRadius: '6px',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        whiteSpace: 'nowrap',
-                        marginLeft: '6px',
-                      }}>
-                        Your Supply
-                      </span>
-                    )}
                   </div>
 
                   {/* Row 2: Product Name */}
                   <h3
                     title={item.name}
                     style={{
-                      fontSize: '19px',
+                      fontSize: '18px',
                       fontWeight: 800,
                       color: '#1A1C1A',
-                      height: '48px',
-                      lineHeight: '24px',
+                      minHeight: '26px',
+                      maxHeight: '48px',
+                      lineHeight: '1.3',
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
                       WebkitBoxOrient: 'vertical',
@@ -581,24 +573,25 @@ export const SupplyStorePage: React.FC = () => {
                   <p
                     title={item.description}
                     style={{
-                      fontSize: '13.5px',
+                      fontSize: '13px',
                       color: '#64748B',
-                      lineHeight: '20px',
-                      height: '40px',
+                      lineHeight: '19px',
+                      minHeight: '19px',
+                      maxHeight: '38px',
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
                       WebkitBoxOrient: 'vertical',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       wordBreak: 'break-word',
-                      margin: '0 0 12px 0',
+                      margin: '0 0 10px 0',
                     }}
                   >
                     {item.description || 'Certified agricultural input from verified supplier.'}
                   </p>
 
                   {/* Row 4: Price Slot */}
-                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', marginBottom: '6px', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', marginBottom: '6px', display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: 'auto' }}>
                     <span>₱{item.price.toLocaleString()}</span>
                     <span style={{ fontSize: '14px', color: '#525450', fontWeight: 600 }}>/ {item.unit}</span>
                   </div>
@@ -812,6 +805,18 @@ export const SupplyStorePage: React.FC = () => {
               </div>
 
               <div className="form-group">
+                <label className="form-label">Warehouse / Store Pickup Location (optional)</label>
+                <input
+                  type="text"
+                  value={prodLocation}
+                  onChange={(e) => setProdLocation(e.target.value)}
+                  placeholder="e.g. Valencia City, Bukidnon"
+                  className="form-input"
+                  style={{ fontSize: '18px' }}
+                />
+              </div>
+
+              <div className="form-group">
                 <label className="form-label">Product Image (optional)</label>
                 <input
                   ref={prodFileInputRef}
@@ -911,8 +916,9 @@ export const SupplyStorePage: React.FC = () => {
                 <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27' }}>
                   {viewProduct.name}
                 </h2>
-                <div style={{ fontSize: '15px', color: '#525450', marginTop: '2px' }}>
-                  Supplied by <strong>{viewProduct.supplierName}</strong>
+                <div style={{ fontSize: '15px', color: '#525450', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span>Supplied by <strong>{viewProduct.supplierName}</strong></span>
+                  <span style={{ color: '#166534', fontWeight: 600 }}>• 📍 {viewProduct.location || 'Northern Mindanao'}</span>
                 </div>
               </div>
               <button

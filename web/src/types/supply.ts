@@ -45,6 +45,7 @@ export interface SupplyProduct {
   price: number;
   stockQuantity: number;
   unit: string;
+  location?: string;
   images?: string[];
   createdAt: string;
   updatedAt: string;
@@ -57,6 +58,7 @@ export interface CreateSupplyProductPayload {
   price: number;
   stockQuantity: number;
   unit: string;
+  location?: string;
   images?: string[];
 }
 

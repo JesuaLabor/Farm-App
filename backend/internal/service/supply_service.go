@@ -47,6 +47,19 @@ func (s *SupplyService) CreateProduct(ctx context.Context, supplierID string, re
 		return nil, errors.New("stock quantity cannot be negative")
 	}
 
+	loc := req.Location
+	if loc == "" {
+		if supplier.Municipality != "" && supplier.Province != "" {
+			loc = fmt.Sprintf("%s, %s", supplier.Municipality, supplier.Province)
+		} else if supplier.Address != "" {
+			loc = supplier.Address
+		} else if supplier.Province != "" {
+			loc = supplier.Province
+		} else {
+			loc = "Northern Mindanao"
+		}
+	}
+
 	product := &models.SupplyProduct{
 		SupplierID:    supplier.ID,
 		SupplierName:  fmt.Sprintf("%s %s", supplier.FirstName, supplier.LastName),
@@ -57,6 +70,7 @@ func (s *SupplyService) CreateProduct(ctx context.Context, supplierID string, re
 		Price:         req.Price,
 		StockQuantity: req.StockQuantity,
 		Unit:          req.Unit,
+		Location:      loc,
 		Images:        req.Images,
 	}
 
@@ -115,6 +129,9 @@ func (s *SupplyService) UpdateProduct(ctx context.Context, supplierID string, pr
 	}
 	if req.Unit != nil {
 		update["unit"] = *req.Unit
+	}
+	if req.Location != nil {
+		update["location"] = *req.Location
 	}
 	if req.Images != nil {
 		update["images"] = req.Images

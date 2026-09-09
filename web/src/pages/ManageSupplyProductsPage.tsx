@@ -32,6 +32,7 @@ export const ManageSupplyProductsPage: React.FC = () => {
   const [price, setPrice] = useState<number>(1000);
   const [stockQuantity, setStockQuantity] = useState<number>(50);
   const [unit, setUnit] = useState('bag');
+  const [location, setLocation] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
   const [existingImageUrl, setExistingImageUrl] = useState<string>('');
@@ -68,6 +69,7 @@ export const ManageSupplyProductsPage: React.FC = () => {
       setPrice(product.price);
       setStockQuantity(product.stockQuantity);
       setUnit(product.unit);
+      setLocation(product.location || '');
       const img = product.images?.[0] || '';
       setExistingImageUrl(img);
       setImagePreview(img ? getImageUrl(img) : '');
@@ -79,6 +81,11 @@ export const ManageSupplyProductsPage: React.FC = () => {
       setPrice(1000);
       setStockQuantity(50);
       setUnit('bag');
+      setLocation(
+        user?.municipality && user?.province
+          ? `${user.municipality}, ${user.province}`
+          : user?.address || 'Northern Mindanao'
+      );
       setExistingImageUrl('');
       setImagePreview('');
     }
@@ -123,6 +130,7 @@ export const ManageSupplyProductsPage: React.FC = () => {
       price,
       stockQuantity,
       unit,
+      location,
       images: finalImageUrl ? [finalImageUrl] : [],
     };
 
@@ -238,6 +246,19 @@ export const ManageSupplyProductsPage: React.FC = () => {
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>Unit</label>
                     <input type="text" required value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="bag, liter, piece" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
                   </div>
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>
+                    Warehouse / Store Pickup Location
+                  </label>
+                  <input
+                    type="text"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="e.g. Valencia City, Bukidnon"
+                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                  />
                 </div>
 
                 <div style={{ marginBottom: '16px' }}>
@@ -383,15 +404,15 @@ export const ManageSupplyProductsPage: React.FC = () => {
           item={
             productToDelete
               ? {
-                  id: productToDelete.id,
-                  name: productToDelete.name,
-                  category: productToDelete.category,
-                  price: productToDelete.price,
-                  unit: productToDelete.unit,
-                  stock: productToDelete.stockQuantity,
-                  image: productToDelete.images?.[0],
-                  typeLabel: 'Supply Product',
-                }
+                id: productToDelete.id,
+                name: productToDelete.name,
+                category: productToDelete.category,
+                price: productToDelete.price,
+                unit: productToDelete.unit,
+                stock: productToDelete.stockQuantity,
+                image: productToDelete.images?.[0],
+                typeLabel: 'Supply Product',
+              }
               : null
           }
           title="Delete Supply Product?"
