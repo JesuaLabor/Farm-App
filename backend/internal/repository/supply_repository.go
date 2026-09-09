@@ -265,6 +265,25 @@ func (r *SupplyRepository) UpdateOrderStatusWithShipping(ctx context.Context, or
 	return nil
 }
 
+// UpdateOrderQuoteDecision updates order status, delivery method, fee and total when buyer makes decision.
+func (r *SupplyRepository) UpdateOrderQuoteDecision(ctx context.Context, orderID bson.ObjectID, status models.SupplyOrderStatus, deliveryMethod models.DeliveryMethod, shippingFee float64, totalAmount float64) error {
+	update := bson.M{
+		"status":          status,
+		"delivery_method": deliveryMethod,
+		"shipping_fee":    shippingFee,
+		"total_amount":    totalAmount,
+		"updated_at":      time.Now(),
+	}
+	res, err := r.ordersColl.UpdateByID(ctx, orderID, bson.M{"$set": update})
+	if err != nil {
+		return fmt.Errorf("update order quote decision: %w", err)
+	}
+	if res.MatchedCount == 0 {
+		return ErrOrderNotFound
+	}
+	return nil
+}
+
 // UpdatePaymentStatus updates the payment_status (and optional note) of a supply order.
 // Called by the supplier to confirm COD receipt, or by the payment gateway webhook for online payments.
 func (r *SupplyRepository) UpdatePaymentStatus(ctx context.Context, orderID bson.ObjectID, status models.PaymentStatus, note string) error {

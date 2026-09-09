@@ -24,7 +24,7 @@ export interface OrderItem {
   total: number;
   deliveryMethod?: string;
   deliveryAddress?: string;
-  status: 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled';
+  status: 'Pending' | 'Quoted' | 'Confirmed' | 'Completed' | 'Cancelled';
   date: string;
   contactMessage?: string;
 }
@@ -143,7 +143,7 @@ export const ProduceTransactionsPage: React.FC = () => {
     );
   };
 
-  const [selectedTab, setSelectedTab] = useState<'All Orders' | 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled'>('All Orders');
+  const [selectedTab, setSelectedTab] = useState<'All Orders' | 'Pending' | 'Quoted' | 'Confirmed' | 'Completed' | 'Cancelled'>('All Orders');
   const [searchQuery, setSearchQuery] = useState('');
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
@@ -154,9 +154,10 @@ export const ProduceTransactionsPage: React.FC = () => {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const tabs: ('All Orders' | 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled')[] = [
+  const tabs: ('All Orders' | 'Pending' | 'Quoted' | 'Confirmed' | 'Completed' | 'Cancelled')[] = [
     'All Orders',
     'Pending',
+    'Quoted',
     'Confirmed',
     'Completed',
     'Cancelled',
@@ -234,29 +235,87 @@ export const ProduceTransactionsPage: React.FC = () => {
     setIsUpdatingStatus(true);
     try {
       const target = orders.find((o) => o.id === orderId);
+      let returnedStatus = newStatus as string;
+      let updatedTx: any = null;
       if (target?.isBackend) {
-        await produceApi.updateTransactionStatus(orderId, newStatus, shippingFee);
+        updatedTx = await produceApi.updateTransactionStatus(orderId, newStatus, shippingFee);
+        if (updatedTx?.status) {
+          returnedStatus = updatedTx.status;
+        }
       }
-      const capStatus = (newStatus.charAt(0).toUpperCase() + newStatus.slice(1).toLowerCase()) as any;
+      const capStatus = (returnedStatus.charAt(0).toUpperCase() + returnedStatus.slice(1).toLowerCase()) as any;
+      const fee = updatedTx?.shippingFee !== undefined ? updatedTx.shippingFee : (shippingFee !== undefined ? shippingFee : 0);
+      const total = updatedTx?.totalPrice !== undefined ? updatedTx.totalPrice : undefined;
+
       setOrders((prev) =>
         prev.map((o) => {
           if (o.id === orderId) {
-            const fee = shippingFee !== undefined ? shippingFee : (o.shippingFee || 0);
             const sub = o.subtotal ?? (o.total - (o.shippingFee || 0));
-            return { ...o, status: capStatus, shippingFee: fee, total: sub + fee };
+            return { ...o, status: capStatus, shippingFee: fee, total: total ?? (sub + fee) };
           }
           return o;
         })
       );
       if (selectedOrder && selectedOrder.id === orderId) {
-        const fee = shippingFee !== undefined ? shippingFee : (selectedOrder.shippingFee || 0);
         const sub = selectedOrder.subtotal ?? (selectedOrder.total - (selectedOrder.shippingFee || 0));
-        setSelectedOrder((prev) => (prev ? { ...prev, status: capStatus, shippingFee: fee, total: sub + fee } : null));
+        setSelectedOrder((prev) => (prev ? { ...prev, status: capStatus, shippingFee: fee, total: total ?? (sub + fee) } : null));
       }
-      toastSuccess('Order Status Updated', `Order #${orderId.slice(-6).toUpperCase()} marked as ${capStatus}.`);
+      if (returnedStatus === 'quoted') {
+        toastSuccess('Delivery Fee Quoted', `Hauling fee of ₱${fee.toLocaleString()} submitted. Waiting for buyer approval.`);
+      } else {
+        toastSuccess('Order Status Updated', `Order #${orderId.slice(-6).toUpperCase()} marked as ${capStatus}.`);
+      }
     } catch (err: any) {
       console.error('Failed to update status', err);
       toastError('Update Failed', err.response?.data?.error || 'Failed to update order status');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleQuoteDecision = async (orderId: string, action: 'approve' | 'switch_pickup' | 'reject') => {
+    setIsUpdatingStatus(true);
+    try {
+      const updated = await produceApi.respondToQuote(orderId, action);
+      const capStatus = (updated.status.charAt(0).toUpperCase() + updated.status.slice(1).toLowerCase()) as any;
+      setOrders((prev) =>
+        prev.map((o) => {
+          if (o.id === orderId) {
+            return {
+              ...o,
+              status: capStatus,
+              deliveryMethod: updated.deliveryMethod || o.deliveryMethod,
+              shippingFee: updated.shippingFee,
+              total: updated.totalPrice,
+            };
+          }
+          return o;
+        })
+      );
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: capStatus,
+                deliveryMethod: updated.deliveryMethod || prev.deliveryMethod,
+                shippingFee: updated.shippingFee,
+                total: updated.totalPrice,
+              }
+            : null
+        );
+      }
+      if (action === 'approve') {
+        toastSuccess('Quote Approved', 'You approved the delivery fee! Order is confirmed and farmer will begin fulfillment.');
+      } else if (action === 'switch_pickup') {
+        toastSuccess('Switched to Pickup', 'Order switched to Farm Pickup (₱0 fee). Ready for pickup scheduling.');
+      } else {
+        toastInfo('Order Cancelled', 'Quoted delivery fee was declined and order has been cancelled.');
+      }
+      loadTransactions();
+    } catch (err: any) {
+      console.error('Failed to respond to quote', err);
+      toastError('Action Failed', err.response?.data?.error || 'Failed to submit quote decision');
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -271,12 +330,6 @@ export const ProduceTransactionsPage: React.FC = () => {
   };
 
   // KPI calculations
-  const totalOrdersCount = orders.length;
-  const pendingCount = orders.filter((o) => o.status === 'Pending').length;
-  const confirmedCount = orders.filter((o) => o.status === 'Confirmed').length;
-  const completedCount = orders.filter((o) => o.status === 'Completed').length;
-  const cancelledCount = orders.filter((o) => o.status === 'Cancelled').length;
-
   const totalRevenue = orders
     .filter((o) => o.status === 'Confirmed' || o.status === 'Completed')
     .reduce((sum, o) => sum + o.total, 0);
@@ -294,6 +347,7 @@ export const ProduceTransactionsPage: React.FC = () => {
 
   // KPI recalculations based on active pool
   const activePendingCount = activeOrders.filter((o) => o.status === 'Pending').length;
+  const activeQuotedCount = activeOrders.filter((o) => o.status === 'Quoted').length;
   const activeConfirmedCount = activeOrders.filter((o) => o.status === 'Confirmed').length;
   const activeCompletedCount = activeOrders.filter((o) => o.status === 'Completed').length;
   const activeCancelledCount = activeOrders.filter((o) => o.status === 'Cancelled').length;
@@ -321,6 +375,14 @@ export const ProduceTransactionsPage: React.FC = () => {
           color: '#854D0E',
           dot: '#CA8A04',
           label: '⏳ Pending Confirmation',
+        };
+      case 'Quoted':
+        return {
+          bg: '#FEF3C7',
+          border: '#FCD34D',
+          color: '#92400E',
+          dot: '#F59E0B',
+          label: '⚡ Review Delivery Fee',
         };
       case 'Confirmed':
         return {
@@ -353,6 +415,8 @@ export const ProduceTransactionsPage: React.FC = () => {
     switch (status) {
       case 'Pending':
         return '#EAB308';
+      case 'Quoted':
+        return '#F59E0B';
       case 'Confirmed':
         return '#3B82F6';
       case 'Completed':
@@ -610,6 +674,7 @@ export const ProduceTransactionsPage: React.FC = () => {
             const isSelected = selectedTab === tab;
             let count = activeOrders.length;
             if (tab === 'Pending') count = activePendingCount;
+            if (tab === 'Quoted') count = activeQuotedCount;
             if (tab === 'Confirmed') count = activeConfirmedCount;
             if (tab === 'Completed') count = activeCompletedCount;
             if (tab === 'Cancelled') count = activeCancelledCount;
@@ -806,6 +871,7 @@ export const ProduceTransactionsPage: React.FC = () => {
                       </span>
                       <span style={{ fontSize: '12px', color: '#0E4A27', fontWeight: 700 }}>
                         {ord.status === 'Pending' && '⏳ Waiting for Farmer Confirmation'}
+                        {ord.status === 'Quoted' && '⚡ Fee Quoted · Awaiting Buyer Review'}
                         {ord.status === 'Confirmed' && '🚚 Harvest Confirmed · Ready for Pickup / Delivery'}
                         {ord.status === 'Completed' && '✓ Successfully Delivered & Completed'}
                       </span>
@@ -822,12 +888,16 @@ export const ProduceTransactionsPage: React.FC = () => {
                           ? true
                           : ord.status === 'Confirmed'
                           ? s.stepNum <= 3
+                          : ord.status === 'Quoted'
+                          ? s.stepNum <= 2
                           : s.stepNum === 1;
 
                         const isCurrent = ord.status === 'Completed'
                           ? s.stepNum === 4
                           : ord.status === 'Confirmed'
                           ? s.stepNum === 3
+                          : ord.status === 'Quoted'
+                          ? s.stepNum === 2
                           : s.stepNum === 1;
 
                         return (
@@ -991,6 +1061,124 @@ export const ProduceTransactionsPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Quoted Banner (Awaiting Buyer Decision) */}
+                {ord.status === 'Quoted' && (
+                  <div
+                    style={{
+                      marginTop: '16px',
+                      padding: '14px 18px',
+                      borderRadius: '12px',
+                      backgroundColor: '#FEF9C3',
+                      border: '1.5px solid #FDE047',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '22px' }}>⚡</span>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: 800, color: '#854D0E' }}>
+                          Delivery Hauling Fee Quoted: ₱{(ord.shippingFee || 0).toLocaleString()}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#A16207', marginTop: '2px' }}>
+                          {(isBuyer || isViewingPurchases)
+                            ? `Total order cost is ₱${ord.total.toLocaleString()} (Produce: ₱${(ord.subtotal ?? (ord.total - (ord.shippingFee || 0))).toLocaleString()} + Delivery: ₱${(ord.shippingFee || 0).toLocaleString()}). Please approve or switch to farm pickup.`
+                            : `Awaiting buyer decision for this ₱${(ord.shippingFee || 0).toLocaleString()} delivery quote before harvest fulfillment.`}
+                        </div>
+                      </div>
+                    </div>
+                    {(isBuyer || isViewingPurchases) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          disabled={isUpdatingStatus}
+                          onClick={() => handleQuoteDecision(ord.id, 'approve')}
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            backgroundColor: '#16A34A',
+                            color: '#FFFFFF',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            boxShadow: '0 2px 4px rgba(22,163,74,0.2)',
+                          }}
+                        >
+                          <span>✓</span>
+                          <span>Approve Total</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isUpdatingStatus}
+                          onClick={() => handleQuoteDecision(ord.id, 'switch_pickup')}
+                          style={{
+                            padding: '8px 14px',
+                            borderRadius: '8px',
+                            border: '1.5px solid #2563EB',
+                            backgroundColor: '#EFF6FF',
+                            color: '#1D4ED8',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <span>🏪</span>
+                          <span>Switch to Pickup (₱0)</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isUpdatingStatus}
+                          onClick={() => handleQuoteDecision(ord.id, 'reject')}
+                          style={{
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            border: '1.5px solid #FECACA',
+                            backgroundColor: '#FEF2F2',
+                            color: '#DC2626',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <span>✕</span>
+                          <span>Decline</span>
+                        </button>
+                      </div>
+                    )}
+                    {isFarmer && !isViewingPurchases && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOrderToSetShipping(ord);
+                          setShippingFeeInput(ord.shippingFee || 0);
+                        }}
+                        style={{
+                          padding: '8px 14px',
+                          borderRadius: '8px',
+                          border: '1px solid #D97706',
+                          backgroundColor: '#FFFFFF',
+                          color: '#B45309',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Adjust Fee
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {/* Order Card Footer */}
                 <div
                   style={{
@@ -1095,6 +1283,25 @@ export const ProduceTransactionsPage: React.FC = () => {
                       >
                         <span>⏳</span>
                         <span>Waiting for Farmer Confirmation</span>
+                      </span>
+                    )}
+
+                    {ord.status === 'Quoted' && isFarmer && !isViewingPurchases && (
+                      <span
+                        style={{
+                          fontSize: '13px',
+                          fontWeight: 700,
+                          color: '#D97706',
+                          backgroundColor: '#FEF3C7',
+                          padding: '8px 14px',
+                          borderRadius: '10px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <span>⏳</span>
+                        <span>Awaiting Buyer Quote Approval</span>
                       </span>
                     )}
 
@@ -1235,6 +1442,7 @@ export const ProduceTransactionsPage: React.FC = () => {
         const modalBadge = getStatusBadgeStyle(selectedOrder.status);
         const modalCropIcon = getCropIcon(selectedOrder.product);
         const isPending = selectedOrder.status === 'Pending';
+        const isQuoted = selectedOrder.status === 'Quoted';
         const isConfirmed = selectedOrder.status === 'Confirmed';
         const isCompleted = selectedOrder.status === 'Completed';
         const isCancelled = selectedOrder.status === 'Cancelled';
@@ -1556,8 +1764,9 @@ export const ProduceTransactionsPage: React.FC = () => {
                       <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748B' }}>
                         Order Lifecycle Tracker
                       </span>
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: isCompleted ? '#16A34A' : isConfirmed ? '#2563EB' : '#D97706' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: isCompleted ? '#16A34A' : isConfirmed ? '#2563EB' : isQuoted ? '#D97706' : '#D97706' }}>
                         {isPending && '⏳ Waiting for Farmer Confirmation'}
+                        {isQuoted && '⚡ Quoted · Awaiting Buyer Decision'}
                         {isConfirmed && '🚚 Ready for Delivery / Pickup'}
                         {isCompleted && '✓ Completed & Delivered'}
                       </span>
@@ -1582,7 +1791,7 @@ export const ProduceTransactionsPage: React.FC = () => {
                           style={{
                             height: '100%',
                             backgroundColor: '#16A34A',
-                            width: isCompleted ? '100%' : isConfirmed ? '66%' : '10%',
+                            width: isCompleted ? '100%' : isConfirmed ? '66%' : isQuoted ? '33%' : '10%',
                             transition: 'width 0.3s ease',
                           }}
                         />
@@ -1599,12 +1808,16 @@ export const ProduceTransactionsPage: React.FC = () => {
                             ? true
                             : isConfirmed
                             ? s.stepNum <= 3
+                            : isQuoted
+                            ? s.stepNum <= 2
                             : s.stepNum === 1;
 
                           const isCurrent = isCompleted
                             ? s.stepNum === 4
                             : isConfirmed
                             ? s.stepNum === 3
+                            : isQuoted
+                            ? s.stepNum === 2
                             : s.stepNum === 1;
 
                           return (
@@ -1874,6 +2087,115 @@ export const ProduceTransactionsPage: React.FC = () => {
                       <span>⏳</span>
                       <span>Awaiting Farmer Acceptance</span>
                     </span>
+                  )}
+
+                  {isQuoted && (isBuyer || isViewingPurchases) && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        disabled={isUpdatingStatus}
+                        onClick={() => handleQuoteDecision(selectedOrder.id, 'approve')}
+                        style={{
+                          padding: '10px 18px',
+                          borderRadius: '10px',
+                          border: 'none',
+                          backgroundColor: '#16A34A',
+                          color: '#FFFFFF',
+                          fontWeight: 700,
+                          fontSize: '14px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          boxShadow: '0 2px 6px rgba(22,163,74,0.25)',
+                        }}
+                      >
+                        <span>✓</span>
+                        <span>Approve Total (₱{selectedOrder.total.toLocaleString()})</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isUpdatingStatus}
+                        onClick={() => handleQuoteDecision(selectedOrder.id, 'switch_pickup')}
+                        style={{
+                          padding: '10px 16px',
+                          borderRadius: '10px',
+                          border: '1.5px solid #2563EB',
+                          backgroundColor: '#EFF6FF',
+                          color: '#1D4ED8',
+                          fontWeight: 700,
+                          fontSize: '14px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <span>🏪</span>
+                        <span>Switch to Pickup (₱0 Fee)</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isUpdatingStatus}
+                        onClick={() => handleQuoteDecision(selectedOrder.id, 'reject')}
+                        style={{
+                          padding: '10px 14px',
+                          borderRadius: '10px',
+                          border: '1.5px solid #FECACA',
+                          backgroundColor: '#FEF2F2',
+                          color: '#DC2626',
+                          fontWeight: 700,
+                          fontSize: '14px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <span>✕</span>
+                        <span>Decline Quote</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {isQuoted && isFarmer && !isViewingPurchases && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span
+                        style={{
+                          fontSize: '13px',
+                          fontWeight: 700,
+                          color: '#D97706',
+                          backgroundColor: '#FEF3C7',
+                          padding: '8px 14px',
+                          borderRadius: '10px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <span>⏳</span>
+                        <span>Quoted ₱{(selectedOrder.shippingFee || 0).toLocaleString()} · Awaiting Buyer Approval</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOrderToSetShipping(selectedOrder);
+                          setShippingFeeInput(selectedOrder.shippingFee || 0);
+                        }}
+                        style={{
+                          padding: '8px 14px',
+                          borderRadius: '10px',
+                          border: '1px solid #D97706',
+                          backgroundColor: '#FFFFFF',
+                          color: '#B45309',
+                          fontWeight: 700,
+                          fontSize: '13px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Adjust Fee
+                      </button>
+                    </div>
                   )}
 
                   {isConfirmed && (

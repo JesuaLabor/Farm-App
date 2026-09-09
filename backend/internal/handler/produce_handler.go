@@ -167,3 +167,23 @@ func (h *ProduceHandler) UpdateTransactionStatus(w http.ResponseWriter, r *http.
 
 	writeJSON(w, http.StatusOK, tx)
 }
+
+// RespondToQuote handles POST /api/produce/transactions/{id}/quote-decision (Buyer).
+func (h *ProduceHandler) RespondToQuote(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	txID := chi.URLParam(r, "id")
+
+	var req models.BuyerQuoteDecisionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	tx, err := h.produceService.RespondToQuote(r.Context(), userID, txID, req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, tx)
+}

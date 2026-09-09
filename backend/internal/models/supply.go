@@ -20,6 +20,7 @@ type SupplyOrderStatus string
 
 const (
 	SupplyOrderPending    SupplyOrderStatus = "pending"
+	SupplyOrderQuoted     SupplyOrderStatus = "quoted"
 	SupplyOrderProcessing SupplyOrderStatus = "processing"
 	SupplyOrderShipped    SupplyOrderStatus = "shipped_ready"
 	SupplyOrderCompleted  SupplyOrderStatus = "completed"

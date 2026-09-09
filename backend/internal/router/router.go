@@ -98,6 +98,7 @@ func New(
 
 			r.Get("/transactions", produceHandler.ListTransactions)
 			r.Put("/transactions/{id}/status", produceHandler.UpdateTransactionStatus)
+			r.Post("/transactions/{id}/quote-decision", produceHandler.RespondToQuote)
 		})
 	})
 
@@ -119,6 +120,7 @@ func New(
 			r.Put("/orders/{id}/status", supplyHandler.UpdateOrderStatus)
 			// Payment status: supplier confirms COD receipt; future: gateway webhook for online payments.
 			r.Put("/orders/{id}/payment-status", supplyHandler.UpdatePaymentStatus)
+			r.Post("/orders/{id}/quote-decision", supplyHandler.RespondToQuote)
 		})
 	})
 

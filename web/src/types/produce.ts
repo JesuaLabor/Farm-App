@@ -1,5 +1,6 @@
 export type ListingStatus = 'available' | 'sold' | 'reserved';
-export type TransactionStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
+export type TransactionStatus = 'pending' | 'quoted' | 'confirmed' | 'completed' | 'cancelled';
+export type BuyerQuoteAction = 'approve' | 'switch_pickup' | 'reject';
 
 export interface ProduceListing {
   id: string;

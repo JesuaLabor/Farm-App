@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/agriconnect/backend/internal/models"
 	"github.com/agriconnect/backend/internal/repository"
@@ -303,12 +304,19 @@ func (s *SupplyService) UpdateOrderStatus(ctx context.Context, userID string, or
 		totalAmount = &total
 	}
 
-	if err := s.supplyRepo.UpdateOrderStatusWithShipping(ctx, oOID, req.Status, shippingFee, totalAmount); err != nil {
+	status := req.Status
+	// If it's a delivery order and supplier confirms/quotes shipping fee,
+	// move to Quoted status so buyer can approve total before processing starts.
+	if order.SupplierID.Hex() == userID && (status == models.SupplyOrderProcessing || status == models.SupplyOrderQuoted) && order.DeliveryMethod == models.DeliveryShip {
+		status = models.SupplyOrderQuoted
+	}
+
+	if err := s.supplyRepo.UpdateOrderStatusWithShipping(ctx, oOID, status, shippingFee, totalAmount); err != nil {
 		return nil, err
 	}
 
 	// When an active order is cancelled, restore stock back to products
-	if req.Status == models.SupplyOrderCancelled && order.Status != models.SupplyOrderCancelled && order.Status != models.SupplyOrderCompleted {
+	if status == models.SupplyOrderCancelled && order.Status != models.SupplyOrderCancelled && order.Status != models.SupplyOrderCompleted {
 		for _, item := range order.Items {
 			_ = s.supplyRepo.RestoreStock(ctx, item.ProductID, item.Quantity)
 		}
@@ -316,8 +324,19 @@ func (s *SupplyService) UpdateOrderStatus(ctx context.Context, userID string, or
 
 	updated, err := s.supplyRepo.GetOrderByID(ctx, oOID)
 	if err == nil && s.notifRepo != nil {
-		// Notify the appropriate party about status change
-		if req.Status == models.SupplyOrderCancelled {
+		if status == models.SupplyOrderQuoted {
+			feeVal := 0.0
+			if shippingFee != nil {
+				feeVal = *shippingFee
+			}
+			_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
+				UserID:  updated.BuyerID,
+				Title:   "🚚 Delivery Fee Quoted - Action Required",
+				Message: fmt.Sprintf("Supplier %s quoted ₱%.2f shipping fee for order #%s. Please review and approve total.", updated.SupplierName, feeVal, updated.ID.Hex()[:8]),
+				Type:    models.NotifTypeOrderStatus,
+				Link:    "/supply/orders",
+			})
+		} else if status == models.SupplyOrderCancelled {
 			if userID == updated.BuyerID.Hex() {
 				// Buyer cancelled -> Notify supplier
 				_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
@@ -342,7 +361,7 @@ func (s *SupplyService) UpdateOrderStatus(ctx context.Context, userID string, or
 			_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
 				UserID:  updated.BuyerID,
 				Title:   "🚚 Order Status Updated",
-				Message: fmt.Sprintf("Your supply order from %s is now %s", updated.SupplierName, req.Status),
+				Message: fmt.Sprintf("Your supply order from %s is now %s", updated.SupplierName, status),
 				Type:    models.NotifTypeOrderStatus,
 				Link:    "/supply/orders",
 			})
@@ -350,6 +369,102 @@ func (s *SupplyService) UpdateOrderStatus(ctx context.Context, userID string, or
 	}
 
 	return updated, err
+}
+
+// RespondToQuote allows a buyer to approve, switch to pickup, or reject a quoted shipping fee.
+func (s *SupplyService) RespondToQuote(ctx context.Context, userID string, orderID string, req models.BuyerQuoteDecisionRequest) (*models.SupplyOrder, error) {
+	oOID, err := bson.ObjectIDFromHex(orderID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid order ID: %w", err)
+	}
+
+	order, err := s.supplyRepo.GetOrderByID(ctx, oOID)
+	if err != nil {
+		return nil, err
+	}
+
+	if order.BuyerID.Hex() != userID {
+		return nil, errors.New("only the buyer can respond to a quoted delivery fee")
+	}
+
+	if order.Status != models.SupplyOrderQuoted && order.Status != models.SupplyOrderPending {
+		return nil, fmt.Errorf("order cannot be updated from status %s", order.Status)
+	}
+
+	action := strings.ToLower(strings.TrimSpace(req.Action))
+	var newStatus models.SupplyOrderStatus
+	deliveryMethod := order.DeliveryMethod
+	shippingFee := order.ShippingFee
+	totalAmount := order.TotalAmount
+
+	subtotal := order.Subtotal
+	if subtotal <= 0 {
+		var calcSubtotal float64
+		for _, item := range order.Items {
+			calcSubtotal += float64(item.Quantity) * item.PricePerItem
+		}
+		subtotal = calcSubtotal
+	}
+
+	switch action {
+	case "approve":
+		newStatus = models.SupplyOrderProcessing
+		totalAmount = subtotal + shippingFee
+		if err := s.supplyRepo.UpdateOrderQuoteDecision(ctx, oOID, newStatus, deliveryMethod, shippingFee, totalAmount); err != nil {
+			return nil, err
+		}
+		if s.notifRepo != nil {
+			_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
+				UserID:  order.SupplierID,
+				Title:   "✅ Order Total Approved",
+				Message: fmt.Sprintf("Buyer %s approved total of ₱%.2f (including ₱%.2f shipping fee) for order #%s. You may now pack and process.", order.BuyerName, totalAmount, shippingFee, order.ID.Hex()[:8]),
+				Type:    models.NotifTypeOrderStatus,
+				Link:    "/supply/orders",
+			})
+		}
+
+	case "switch_pickup":
+		newStatus = models.SupplyOrderProcessing
+		deliveryMethod = models.DeliveryPickup
+		shippingFee = 0
+		totalAmount = subtotal
+		if err := s.supplyRepo.UpdateOrderQuoteDecision(ctx, oOID, newStatus, deliveryMethod, shippingFee, totalAmount); err != nil {
+			return nil, err
+		}
+		if s.notifRepo != nil {
+			_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
+				UserID:  order.SupplierID,
+				Title:   "🚗 Switched to Store Pickup",
+				Message: fmt.Sprintf("Buyer %s switched order #%s to Store Pickup (₱0 fee). Total is ₱%.2f. Ready for preparation!", order.BuyerName, order.ID.Hex()[:8], totalAmount),
+				Type:    models.NotifTypeOrderStatus,
+				Link:    "/supply/orders",
+			})
+		}
+
+	case "reject":
+		newStatus = models.SupplyOrderCancelled
+		if err := s.supplyRepo.UpdateOrderStatus(ctx, oOID, newStatus); err != nil {
+			return nil, err
+		}
+		// Restore reserved stock
+		for _, item := range order.Items {
+			_ = s.supplyRepo.RestoreStock(ctx, item.ProductID, item.Quantity)
+		}
+		if s.notifRepo != nil {
+			_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
+				UserID:  order.SupplierID,
+				Title:   "📦 Order Quote Declined",
+				Message: fmt.Sprintf("Buyer %s declined the quoted shipping fee and cancelled order #%s.", order.BuyerName, order.ID.Hex()[:8]),
+				Type:    models.NotifTypeOrderStatus,
+				Link:    "/supply/orders",
+			})
+		}
+
+	default:
+		return nil, fmt.Errorf("invalid action: %s (expected 'approve', 'switch_pickup', or 'reject')", req.Action)
+	}
+
+	return s.supplyRepo.GetOrderByID(ctx, oOID)
 }
 
 // UpdatePaymentStatus updates the payment status of a supply order.

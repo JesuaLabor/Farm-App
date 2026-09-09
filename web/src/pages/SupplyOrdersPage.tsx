@@ -5,6 +5,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useChat } from '../contexts/ChatContext';
 import { supplyApi } from '../api/supply';
 import { getImageUrl } from '../api';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import type { PaymentMethod, PaymentStatus, SupplyOrder, SupplyOrderStatus } from '../types/supply';
 
 const getSupplyFallback = (name: string = ''): string => {
@@ -27,6 +28,7 @@ const getSupplyFallback = (name: string = ''): string => {
 // ── Fulfillment status badge config ─────────────────────────────────────────
 const statusBadges: Record<SupplyOrderStatus, { label: string; bg: string; color: string; icon: string }> = {
   pending:       { label: 'Order Placed · Pending Confirmation', bg: '#fef9c3', color: '#854d0e', icon: '📝' },
+  quoted:        { label: 'Delivery Fee Quoted · Action Required', bg: '#fef3c7', color: '#92400e', icon: '⚡' },
   processing:    { label: 'Processing in Warehouse',           bg: '#dbeafe', color: '#1e40af', icon: '📦' },
   shipped_ready: { label: 'Shipped / Ready for Pickup',        bg: '#e0e7ff', color: '#3730a3', icon: '🚚' },
   completed:     { label: 'Order Completed & Delivered',       bg: '#dcfce7', color: '#166534', icon: '✓' },
@@ -56,7 +58,7 @@ export const SupplyOrdersPage: React.FC = () => {
   const { user } = useAuth();
   const { openChatWith } = useChat();
   const navigate = useNavigate();
-  const { success: toastSuccess, error: toastError } = useToast();
+  const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
 
   const handleChatOrderParty = (order: SupplyOrder) => {
     const isSupplier = user?.role === 'supplier';
@@ -86,6 +88,8 @@ export const SupplyOrdersPage: React.FC = () => {
   const [filterTab, setFilterTab] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
   const [orderToSetShipping, setOrderToSetShipping] = useState<SupplyOrder | null>(null);
   const [shippingFeeInput, setShippingFeeInput] = useState<number>(0);
+  const [orderToCancel, setOrderToCancel] = useState<SupplyOrder | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -116,6 +120,37 @@ export const SupplyOrdersPage: React.FC = () => {
     }
   };
 
+  const handleQuoteDecision = async (orderId: string, action: 'approve' | 'switch_pickup' | 'reject') => {
+    setUpdatingStatusId(orderId);
+    try {
+      await supplyApi.respondToQuote(orderId, action);
+      if (action === 'approve') {
+        toastSuccess('Quote Approved', 'You approved the delivery fee! The order has been sent to warehouse processing.');
+      } else if (action === 'switch_pickup') {
+        toastSuccess('Switched to Pickup', 'Order switched to Store Pickup (₱0 fee). Processing in warehouse.');
+      } else {
+        toastInfo('Order Cancelled', 'Delivery quote declined and order cancelled. Inventory restored.');
+      }
+      await fetchOrders();
+    } catch (err: any) {
+      console.error('Failed to respond to quote:', err);
+      toastError('Action Failed', err.response?.data?.error || 'Failed to submit quote decision');
+    } finally {
+      setUpdatingStatusId(null);
+    }
+  };
+
+  const handleConfirmCancelOrder = async () => {
+    if (!orderToCancel) return;
+    setIsCancelling(true);
+    try {
+      await handleUpdateStatus(orderToCancel.id, 'cancelled');
+      setOrderToCancel(null);
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   const handleMarkCODPaid = async (orderId: string) => {
     setMarkingPaid(orderId);
     try {
@@ -135,7 +170,7 @@ export const SupplyOrdersPage: React.FC = () => {
   // Filter orders based on active tab
   const filteredOrders = orders.filter((order) => {
     if (filterTab === 'active') {
-      return order.status === 'pending' || order.status === 'processing' || order.status === 'shipped_ready';
+      return order.status === 'pending' || order.status === 'quoted' || order.status === 'processing' || order.status === 'shipped_ready';
     }
     if (filterTab === 'completed') {
       return order.status === 'completed';
@@ -146,7 +181,7 @@ export const SupplyOrdersPage: React.FC = () => {
     return true;
   });
 
-  const activeCount = orders.filter((o) => o.status === 'pending' || o.status === 'processing' || o.status === 'shipped_ready').length;
+  const activeCount = orders.filter((o) => o.status === 'pending' || o.status === 'quoted' || o.status === 'processing' || o.status === 'shipped_ready').length;
   const completedCount = orders.filter((o) => o.status === 'completed').length;
 
   const isSupplier = user?.role === 'supplier';
@@ -343,7 +378,8 @@ export const SupplyOrdersPage: React.FC = () => {
             const isSupplier = user?.id === order.supplierId;
             const isBuyer = user?.id === order.buyerId;
 
-            const currentStepIdx = STEP_ORDER.indexOf(order.status);
+            const isQuoted = order.status === 'quoted';
+            const currentStepIdx = isQuoted ? 0 : STEP_ORDER.indexOf(order.status);
             const isCancelled = order.status === 'cancelled';
 
             const canMarkCODPaid =
@@ -416,10 +452,15 @@ export const SupplyOrdersPage: React.FC = () => {
                 {/* Live Tracking Progress Bar (Shopee style timeline) */}
                 {!isCancelled && (
                   <div style={{ backgroundColor: '#f8fafc', padding: '16px 20px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ marginBottom: '14px' }}>
+                    <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                         Live Fulfillment Timeline
                       </span>
+                      {isQuoted && (
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#d97706' }}>
+                          ⚡ Delivery Fee Quoted · Awaiting Buyer Approval
+                        </span>
+                      )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
                       {[
@@ -603,6 +644,125 @@ export const SupplyOrdersPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Quoted Fee Review Banner */}
+                {isQuoted && (
+                  <div
+                    style={{
+                      padding: '16px 20px',
+                      borderRadius: '14px',
+                      backgroundColor: '#FEF9C3',
+                      border: '1.5px solid #FDE047',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '14px',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ fontSize: '24px' }}>⚡</span>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: 800, color: '#854D0E' }}>
+                          Supplier Quoted Delivery Hauling Fee: ₱{(order.shippingFee || 0).toLocaleString()}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#A16207', marginTop: '3px' }}>
+                          {isBuyer
+                            ? `Total order amount is ₱${order.totalAmount.toLocaleString()} (Items: ₱${(order.subtotal || (order.totalAmount - (order.shippingFee || 0))).toLocaleString()} + Delivery: ₱${(order.shippingFee || 0).toLocaleString()}). Please review and approve to begin fulfillment, or switch to store pickup.`
+                            : `You quoted a delivery hauling fee of ₱${(order.shippingFee || 0).toLocaleString()}. Waiting for buyer to approve total amount before warehouse packing.`}
+                        </div>
+                      </div>
+                    </div>
+
+                    {isBuyer && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          disabled={updatingStatusId === order.id}
+                          onClick={() => handleQuoteDecision(order.id, 'approve')}
+                          style={{
+                            padding: '9px 16px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            backgroundColor: '#16A34A',
+                            color: '#FFFFFF',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            boxShadow: '0 2px 4px rgba(22,163,74,0.2)',
+                          }}
+                        >
+                          <span>✓</span>
+                          <span>Approve Total</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={updatingStatusId === order.id}
+                          onClick={() => handleQuoteDecision(order.id, 'switch_pickup')}
+                          style={{
+                            padding: '9px 14px',
+                            borderRadius: '8px',
+                            border: '1.5px solid #2563EB',
+                            backgroundColor: '#EFF6FF',
+                            color: '#1D4ED8',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <span>🏪</span>
+                          <span>Switch to Pickup (₱0)</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={updatingStatusId === order.id}
+                          onClick={() => handleQuoteDecision(order.id, 'reject')}
+                          style={{
+                            padding: '9px 12px',
+                            borderRadius: '8px',
+                            border: '1.5px solid #FECACA',
+                            backgroundColor: '#FEF2F2',
+                            color: '#DC2626',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <span>✕</span>
+                          <span>Decline</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {isSupplier && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOrderToSetShipping(order);
+                          setShippingFeeInput(order.shippingFee || 0);
+                        }}
+                        style={{
+                          padding: '8px 14px',
+                          borderRadius: '8px',
+                          border: '1px solid #D97706',
+                          backgroundColor: '#FFFFFF',
+                          color: '#B45309',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Adjust Fee
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {/* Delivery & Payment Info Grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', fontSize: '13px' }}>
                   <div style={{ padding: '12px 16px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
@@ -669,6 +829,46 @@ export const SupplyOrdersPage: React.FC = () => {
                       <span>💬</span>
                       <span>{isSupplier ? 'Chat Customer' : 'Chat Supplier'}</span>
                     </button>
+                  )}
+
+                  {/* Supplier waiting for buyer quote decision */}
+                  {isSupplier && isQuoted && (
+                    <span
+                      style={{
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        color: '#D97706',
+                        backgroundColor: '#FEF3C7',
+                        padding: '8px 14px',
+                        borderRadius: '9px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <span>⏳</span>
+                      <span>Waiting for Buyer Quote Approval</span>
+                    </span>
+                  )}
+
+                  {/* Buyer waiting for supplier confirmation */}
+                  {isBuyer && order.status === 'pending' && (
+                    <span
+                      style={{
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        color: '#D97706',
+                        backgroundColor: '#FEF3C7',
+                        padding: '8px 14px',
+                        borderRadius: '9px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <span>⏳</span>
+                      <span>Waiting for Supplier Confirmation</span>
+                    </span>
                   )}
 
                   {/* Farmer / Buyer can mark as received when shipped */}
@@ -780,14 +980,10 @@ export const SupplyOrdersPage: React.FC = () => {
                     </button>
                   )}
 
-                  {/* Cancel Order (Buyer or Supplier can cancel pending/processing orders) */}
-                  {(order.status === 'pending' || (isSupplier && order.status === 'processing')) && (
+                  {/* Cancel Order (Buyer or Supplier can cancel pending/quoted/processing orders) */}
+                  {(order.status === 'pending' || isQuoted || (isSupplier && order.status === 'processing')) && (
                     <button
-                      onClick={async () => {
-                        if (window.confirm('Are you sure you want to cancel this supply order? Reserved supplies will be restored to inventory.')) {
-                          await handleUpdateStatus(order.id, 'cancelled');
-                        }
-                      }}
+                      onClick={() => setOrderToCancel(order)}
                       disabled={updatingStatusId === order.id}
                       style={{
                         padding: '9px 16px',
@@ -881,7 +1077,7 @@ export const SupplyOrdersPage: React.FC = () => {
                 📍 <strong>Delivery Address:</strong> {orderToSetShipping.deliveryAddress || 'Address on file'}
               </div>
               <div style={{ color: '#64748b', fontSize: '12px', lineHeight: '1.4' }}>
-                As the supplier, confirm the freight/hauling cost based on the transport vehicle (motorcycle courier, multicab, or truck) you coordinated for this delivery.
+                As the supplier, confirm the freight/hauling cost based on the transport vehicle you coordinated for this delivery. The buyer will review and approve the final total before warehouse fulfillment starts.
               </div>
             </div>
 
@@ -1027,12 +1223,38 @@ export const SupplyOrdersPage: React.FC = () => {
                   boxShadow: '0 2px 8px rgba(202, 138, 4, 0.3)',
                 }}
               >
-                Confirm & Start Processing
+                Send Delivery Quote to Buyer
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Modern UI/UX Destructive Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={!!orderToCancel}
+        onClose={() => {
+          if (!isCancelling) setOrderToCancel(null);
+        }}
+        onConfirm={handleConfirmCancelOrder}
+        item={
+          orderToCancel
+            ? {
+                id: orderToCancel.id,
+                name: `Supply Order #${orderToCancel.id.slice(-6).toUpperCase()}`,
+                category: `${orderToCancel.items?.length || 0} items`,
+                price: orderToCancel.totalAmount,
+                image: orderToCancel.items?.[0]?.productImage,
+                typeLabel: 'Supply Order',
+              }
+            : null
+        }
+        title="Cancel Supply Order?"
+        description="Are you sure you want to cancel this supply order? All reserved inventory will be automatically restored to the store catalog."
+        confirmText="Yes, Cancel Order"
+        cancelText="Keep Order Active"
+        isDeleting={isCancelling}
+      />
     </div>
   );
 };

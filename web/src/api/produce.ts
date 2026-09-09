@@ -66,4 +66,9 @@ export const produceApi = {
     const res = await apiClient.put<ProduceTransaction>(`/api/produce/transactions/${id}/status`, { status, shippingFee });
     return res.data;
   },
+
+  respondToQuote: async (id: string, action: 'approve' | 'switch_pickup' | 'reject'): Promise<ProduceTransaction> => {
+    const res = await apiClient.post<ProduceTransaction>(`/api/produce/transactions/${id}/quote-decision`, { action });
+    return res.data;
+  },
 };

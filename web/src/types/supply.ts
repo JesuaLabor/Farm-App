@@ -9,6 +9,7 @@ export type DeliveryMethod = 'delivery' | 'pickup';
 
 export type SupplyOrderStatus =
   | 'pending'
+  | 'quoted'
   | 'processing'
   | 'shipped_ready'
   | 'completed'

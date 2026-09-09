@@ -184,3 +184,23 @@ func (h *SupplyHandler) UpdatePaymentStatus(w http.ResponseWriter, r *http.Reque
 
 	writeJSON(w, http.StatusOK, order)
 }
+
+// RespondToQuote handles POST /api/supply/orders/{id}/quote-decision (Buyer).
+func (h *SupplyHandler) RespondToQuote(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	orderID := chi.URLParam(r, "id")
+
+	var req models.BuyerQuoteDecisionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	order, err := h.supplyService.RespondToQuote(r.Context(), userID, orderID, req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, order)
+}

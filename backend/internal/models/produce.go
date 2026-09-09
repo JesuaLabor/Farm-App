@@ -18,6 +18,7 @@ type TransactionStatus string
 
 const (
 	TxPending   TransactionStatus = "pending"
+	TxQuoted    TransactionStatus = "quoted"
 	TxConfirmed TransactionStatus = "confirmed"
 	TxCompleted TransactionStatus = "completed"
 	TxCancelled TransactionStatus = "cancelled"
@@ -106,4 +107,9 @@ type CreateProduceTransactionRequest struct {
 type UpdateTransactionStatusRequest struct {
 	Status      TransactionStatus `json:"status"`
 	ShippingFee *float64          `json:"shippingFee,omitempty"`
+}
+
+// BuyerQuoteDecisionRequest is the payload for buyer responding to a seller-quoted fee.
+type BuyerQuoteDecisionRequest struct {
+	Action string `json:"action"` // "approve", "switch_pickup", "reject"
 }

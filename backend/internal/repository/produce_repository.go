@@ -243,6 +243,25 @@ func (r *ProduceRepository) UpdateTransactionStatusWithShipping(ctx context.Cont
 	return nil
 }
 
+// UpdateTransactionQuoteDecision updates status, delivery method, fee and total when buyer makes decision.
+func (r *ProduceRepository) UpdateTransactionQuoteDecision(ctx context.Context, txID bson.ObjectID, status models.TransactionStatus, deliveryMethod string, shippingFee float64, totalPrice float64) error {
+	update := bson.M{
+		"status":          status,
+		"delivery_method": deliveryMethod,
+		"shipping_fee":    shippingFee,
+		"total_price":     totalPrice,
+		"updated_at":      time.Now(),
+	}
+	res, err := r.transactionsColl.UpdateByID(ctx, txID, bson.M{"$set": update})
+	if err != nil {
+		return fmt.Errorf("update transaction quote decision: %w", err)
+	}
+	if res.MatchedCount == 0 {
+		return ErrTransactionNotFound
+	}
+	return nil
+}
+
 // GetTransactionByID retrieves a single transaction.
 func (r *ProduceRepository) GetTransactionByID(ctx context.Context, txID bson.ObjectID) (*models.ProduceTransaction, error) {
 	var tx models.ProduceTransaction

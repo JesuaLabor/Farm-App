@@ -69,4 +69,9 @@ export const supplyApi = {
     const res = await apiClient.put<SupplyOrder>(`/api/supply/orders/${id}/payment-status`, payload);
     return res.data;
   },
+
+  respondToQuote: async (id: string, action: 'approve' | 'switch_pickup' | 'reject'): Promise<SupplyOrder> => {
+    const res = await apiClient.post<SupplyOrder>(`/api/supply/orders/${id}/quote-decision`, { action });
+    return res.data;
+  },
 };

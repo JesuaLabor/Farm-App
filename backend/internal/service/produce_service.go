@@ -328,6 +328,12 @@ func (s *ProduceService) UpdateTransactionStatus(ctx context.Context, userID str
 		totalPrice = &total
 	}
 
+	// If it's a delivery order and farmer confirms/quotes shipping fee,
+	// move to Quoted status so buyer can approve total before dispatch.
+	if isFarmer && (status == models.TxConfirmed || status == models.TxQuoted) && tx.DeliveryMethod == "delivery" {
+		status = models.TxQuoted
+	}
+
 	if err := s.produceRepo.UpdateTransactionStatusWithShipping(ctx, tOID, status, shippingFee, totalPrice); err != nil {
 		return nil, err
 	}
@@ -357,7 +363,15 @@ func (s *ProduceService) UpdateTransactionStatus(ctx context.Context, userID str
 		var notifTitle string
 		var notifMsg string
 
-		if isFarmer || isAdmin {
+		if status == models.TxQuoted {
+			notifRecipient = tx.BuyerID
+			notifTitle = "🌾 Delivery Fee Quoted - Action Required"
+			feeVal := 0.0
+			if shippingFee != nil {
+				feeVal = *shippingFee
+			}
+			notifMsg = fmt.Sprintf("Farmer %s quoted ₱%.2f hauling fee for %s. Please review and approve total.", tx.FarmerName, feeVal, tx.CropName)
+		} else if isFarmer || isAdmin {
 			notifRecipient = tx.BuyerID
 			notifTitle = "🌾 Crop Order Status Updated"
 			notifMsg = fmt.Sprintf("Your order for %s has been %s by %s", tx.CropName, status, tx.FarmerName)
@@ -374,6 +388,103 @@ func (s *ProduceService) UpdateTransactionStatus(ctx context.Context, userID str
 			Type:    models.NotifTypeOrderStatus,
 			Link:    "/produce/orders",
 		})
+	}
+
+	return s.produceRepo.GetTransactionByID(ctx, tOID)
+}
+
+// RespondToQuote allows a buyer to approve, switch to pickup, or reject a quoted delivery fee.
+func (s *ProduceService) RespondToQuote(ctx context.Context, userID string, txID string, req models.BuyerQuoteDecisionRequest) (*models.ProduceTransaction, error) {
+	tOID, err := bson.ObjectIDFromHex(txID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid transaction ID: %w", err)
+	}
+
+	tx, err := s.produceRepo.GetTransactionByID(ctx, tOID)
+	if err != nil {
+		return nil, err
+	}
+
+	if tx.BuyerID.Hex() != userID {
+		return nil, errors.New("only the buyer can respond to a quoted delivery fee")
+	}
+
+	if tx.Status != models.TxQuoted && tx.Status != models.TxPending {
+		return nil, fmt.Errorf("order cannot be updated from status %s", tx.Status)
+	}
+
+	action := strings.ToLower(strings.TrimSpace(req.Action))
+	var newStatus models.TransactionStatus
+	deliveryMethod := tx.DeliveryMethod
+	shippingFee := tx.ShippingFee
+	totalPrice := tx.TotalPrice
+
+	subtotal := tx.Subtotal
+	if subtotal <= 0 {
+		subtotal = tx.Quantity * tx.UnitPrice
+	}
+
+	switch action {
+	case "approve":
+		newStatus = models.TxConfirmed
+		totalPrice = subtotal + shippingFee
+		if err := s.produceRepo.UpdateTransactionQuoteDecision(ctx, tOID, newStatus, deliveryMethod, shippingFee, totalPrice); err != nil {
+			return nil, err
+		}
+		if s.notifRepo != nil {
+			_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
+				UserID:  tx.FarmerID,
+				Title:   "✅ Order Total Approved",
+				Message: fmt.Sprintf("Buyer %s approved total of ₱%.2f (including ₱%.2f delivery fee) for %s. Order confirmed!", tx.BuyerName, totalPrice, shippingFee, tx.CropName),
+				Type:    models.NotifTypeOrderStatus,
+				Link:    "/produce/orders",
+			})
+		}
+
+	case "switch_pickup":
+		newStatus = models.TxConfirmed
+		deliveryMethod = "pickup"
+		shippingFee = 0
+		totalPrice = subtotal
+		if err := s.produceRepo.UpdateTransactionQuoteDecision(ctx, tOID, newStatus, deliveryMethod, shippingFee, totalPrice); err != nil {
+			return nil, err
+		}
+		if s.notifRepo != nil {
+			_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
+				UserID:  tx.FarmerID,
+				Title:   "🚗 Switched to Farm Pickup",
+				Message: fmt.Sprintf("Buyer %s switched order for %s to Farm Pickup (₱0 fee). Total is ₱%.2f. Order confirmed for pickup!", tx.BuyerName, tx.CropName, totalPrice),
+				Type:    models.NotifTypeOrderStatus,
+				Link:    "/produce/orders",
+			})
+		}
+
+	case "reject":
+		newStatus = models.TxCancelled
+		if err := s.produceRepo.UpdateTransactionStatus(ctx, tOID, newStatus); err != nil {
+			return nil, err
+		}
+		// Restore listing stock
+		if listing, err := s.produceRepo.GetListingByID(ctx, tx.ListingID); err == nil {
+			restoredQty := listing.Quantity + tx.Quantity
+			update := bson.M{"quantity": restoredQty}
+			if listing.Status == models.ListingSold && restoredQty > 0 {
+				update["status"] = models.ListingAvailable
+			}
+			_ = s.produceRepo.UpdateListing(ctx, tx.ListingID, update)
+		}
+		if s.notifRepo != nil {
+			_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
+				UserID:  tx.FarmerID,
+				Title:   "🌾 Order Quote Declined",
+				Message: fmt.Sprintf("Buyer %s declined the quoted shipping fee and cancelled order for %s.", tx.BuyerName, tx.CropName),
+				Type:    models.NotifTypeOrderStatus,
+				Link:    "/produce/orders",
+			})
+		}
+
+	default:
+		return nil, fmt.Errorf("invalid action: %s (expected 'approve', 'switch_pickup', or 'reject')", req.Action)
 	}
 
 	return s.produceRepo.GetTransactionByID(ctx, tOID)
