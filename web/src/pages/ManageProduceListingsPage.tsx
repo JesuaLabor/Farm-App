@@ -28,6 +28,7 @@ export const ManageProduceListingsPage: React.FC = () => {
   const [price, setPrice] = useState('50');
   const [farmLocation, setFarmLocation] = useState('');
   const [availableDate, setAvailableDate] = useState(new Date().toISOString().split('T')[0]);
+  const [description, setDescription] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
   const [existingPhotos, setExistingPhotos] = useState<string[]>([]);
@@ -75,6 +76,7 @@ export const ManageProduceListingsPage: React.FC = () => {
     setPrice('50');
     setFarmLocation(defaultUserLocation || 'Northern Mindanao');
     setAvailableDate(new Date().toISOString().split('T')[0]);
+    setDescription('');
     setImageFile(null);
     setImagePreview('');
     setExistingPhotos([]);
@@ -90,6 +92,7 @@ export const ManageProduceListingsPage: React.FC = () => {
     setPrice(String(item.pricePerUnit));
     setFarmLocation(item.location || '');
     setAvailableDate(item.harvestDate ? String(item.harvestDate).split('T')[0] : '');
+    setDescription(item.description || '');
     setImageFile(null);
     setImagePreview('');
     setExistingPhotos(item.photos || []);
@@ -137,6 +140,8 @@ export const ManageProduceListingsPage: React.FC = () => {
       : [];
 
     try {
+      const finalDescription = description.trim() || `Fresh harvest from ${farmLocation.trim()}`;
+
       if (editingListing) {
         // Update existing listing
         await produceApi.updateListing(editingListing.id, {
@@ -148,7 +153,7 @@ export const ManageProduceListingsPage: React.FC = () => {
           harvestDate: availableDate,
           location: farmLocation.trim(),
           photos: finalPhotos,
-          description: `Fresh harvest from ${farmLocation.trim()}`,
+          description: finalDescription,
         });
         toastSuccess('Listing Updated!', `"${cropName}" changes have been saved.`);
       } else {
@@ -162,7 +167,7 @@ export const ManageProduceListingsPage: React.FC = () => {
           harvestDate: availableDate,
           location: farmLocation.trim(),
           photos: finalPhotos,
-          description: `Fresh harvest from ${farmLocation.trim()}`,
+          description: finalDescription,
         });
         toastSuccess('Listing Published!', `"${cropName}" is now live on the marketplace.`);
       }
@@ -405,10 +410,25 @@ export const ManageProduceListingsPage: React.FC = () => {
                 />
               </div>
 
+              {/* Description */}
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>
+                  7. Produce Description (optional)
+                </label>
+                <textarea
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Describe your crop (e.g. freshly picked, organically grown, grade A size, sweet variety, ideal for retail or bulk buyers)..."
+                  className="form-input"
+                  style={{ fontSize: '14px', padding: '10px 14px', width: '100%', borderRadius: '10px', fontFamily: 'inherit', resize: 'vertical' }}
+                />
+              </div>
+
               {/* Image Upload */}
               <div className="form-group" style={{ marginBottom: '24px' }}>
                 <label className="form-label" style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>
-                  7. Attach Produce Photo (optional)
+                  8. Attach Produce Photo (optional)
                 </label>
                 <input
                   ref={fileInputRef}

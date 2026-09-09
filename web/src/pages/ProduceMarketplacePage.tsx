@@ -501,10 +501,13 @@ export const ProduceMarketplacePage: React.FC = () => {
                 </div>
 
                 <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  {/* Row 1: Overline Seller Identity */}
+                  {/* Row 1: Overline Seller Identity & Location */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '20px', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '13px', color: '#525450', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      Farmer: {item.farmerName || item.sellerName || 'Verified Farmer'}
+                    <span
+                      title={`Farmer: ${item.farmerName || item.sellerName || 'Verified Farmer'}${item.location ? ` • 📍 ${item.location}` : ''}`}
+                      style={{ fontSize: '13px', color: '#525450', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    >
+                      Farmer: {item.farmerName || item.sellerName || 'Verified Farmer'}{item.location ? ` • 📍 ${item.location}` : ''}
                     </span>
                     {isOwnListing && (
                       <span style={{
@@ -542,17 +545,25 @@ export const ProduceMarketplacePage: React.FC = () => {
                     {item.cropName}
                   </h3>
 
-                  {/* Row 3: Secondary Details Slot (Location & Harvest batch value) */}
-                  <div style={{ height: '40px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '3px', marginBottom: '12px' }}>
-                    <div style={{ fontSize: '13px', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      <span>📍</span>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.location || 'Northern Mindanao'}</span>
-                    </div>
-                    <div style={{ fontSize: '12.5px', color: '#166534', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span>🌾</span>
-                      <span>Harvest Batch: ₱{((item.quantity || 0) * (item.pricePerUnit || 0)).toLocaleString()}</span>
-                    </div>
-                  </div>
+                  {/* Row 3: Secondary Details Slot (Crop Description 2-line clamp) */}
+                  <p
+                    title={item.description || `Freshly harvested ${item.cropName} directly from verified farm in ${item.location || 'Northern Mindanao'}.`}
+                    style={{
+                      fontSize: '13.5px',
+                      color: '#64748B',
+                      lineHeight: '20px',
+                      height: '40px',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      wordBreak: 'break-word',
+                      margin: '0 0 12px 0',
+                    }}
+                  >
+                    {item.description || `Freshly harvested ${item.cropName} directly from verified farm in ${item.location || 'Northern Mindanao'}.`}
+                  </p>
 
                   {/* Row 4: Price Slot */}
                   <div style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', marginBottom: '6px', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
@@ -900,6 +911,11 @@ export const ProduceMarketplacePage: React.FC = () => {
                     <div style={{ fontSize: '15px', color: '#525450', marginTop: '2px', fontWeight: 600 }}>
                       📦 Available Harvest: <strong>{selectedListing.quantity} {selectedListing.unit || 'kg'}</strong>
                     </div>
+                    {selectedListing.description && (
+                      <div style={{ fontSize: '13.5px', color: '#64748B', marginTop: '4px', lineHeight: 1.4 }}>
+                        {selectedListing.description}
+                      </div>
+                    )}
                   </div>
                   <span className="badge badge-verified" style={{ fontSize: '14px' }}>
                     ✓ Verified
