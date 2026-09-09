@@ -2,11 +2,11 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const tabs = [
-  { key: '/dashboard', label: 'Home',      icon: '🏠' },
-  { key: '/marketplace', label: 'Market',    icon: '🌾' },
-  { key: '/community',   label: 'Community', icon: '💬' },
-  { key: '/supply',      label: 'Supplies',  icon: '🚜' },
-  { key: '/profile',     label: 'Profile',   icon: '👤' },
+  { key: '/dashboard', label: 'Home', icon: '🏠' },
+  { key: '/marketplace', label: 'Market', icon: '🏪' },
+  { key: '/community', label: 'Community', icon: '💬' },
+  { key: '/supply', label: 'Supplies', icon: '🚜' },
+  { key: '/profile', label: 'Profile', icon: '👤' },
 ] as const;
 
 export const BottomTabBar: React.FC = () => {

@@ -34,11 +34,11 @@ export const DashboardScreen: React.FC = () => {
   const initials = `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase();
 
   const roleLabelMap: Record<Role, string> = {
-    farmer:      'Farmer Producer',
-    buyer:       'Wholesale Buyer',
-    supplier:    'Agri Supplier',
-    expert:      'Agronomist Expert',
-    lgu_staff:   'LGU Agriculture Officer',
+    farmer: 'Farmer Producer',
+    buyer: 'Wholesale Buyer',
+    supplier: 'Agri Supplier',
+    expert: 'Agronomist Expert',
+    lgu_staff: 'LGU Agriculture Officer',
     super_admin: 'Super Admin',
   };
 
@@ -78,7 +78,7 @@ export const DashboardScreen: React.FC = () => {
         <div className="section-title" style={{ marginBottom: 12 }}>Quick Actions</div>
         <div className="quick-grid">
           <button className="quick-card" onClick={() => navigate('/marketplace')}>
-            <div className="quick-icon-wrap" style={{ background: '#d4ead9' }}>🌾</div>
+            <div className="quick-icon-wrap" style={{ background: '#d4ead9' }}>🏪</div>
             <div className="quick-title">Marketplace</div>
             <div className="quick-sub">Crops & Produce</div>
           </button>

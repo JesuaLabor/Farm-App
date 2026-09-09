@@ -19,14 +19,14 @@ const getBreadcrumbs = (pathname: string, role?: string): BreadcrumbInfo => {
     return { parent: 'Dashboard', parentPath: '/dashboard', current: 'Messages & Inquiries', icon: '💬' };
   }
   if (pathname === '/produce/manage') {
-    return { parent: 'Marketplace', parentPath: '/produce', current: 'My Listings', icon: '📦' };
+    return { parent: 'Marketplace', parentPath: '/produce', current: 'My Listings', icon: '🏪' };
   }
   if (pathname === '/produce/orders') {
     return {
       parent: 'Marketplace',
       parentPath: '/produce',
       current: role === 'farmer' ? 'Crop Sales Orders' : 'My Produce Purchases',
-      icon: '🧾',
+      icon: '🏪',
     };
   }
   if (pathname === '/produce/orders') {
@@ -34,14 +34,14 @@ const getBreadcrumbs = (pathname: string, role?: string): BreadcrumbInfo => {
       parent: 'Marketplace',
       parentPath: '/produce',
       current: role === 'farmer' ? 'Orders & Sales' : 'My Orders',
-      icon: '📦',
+      icon: '🏪',
     };
   }
   if (pathname === '/produce/manage') {
-    return { parent: 'Marketplace', parentPath: '/produce', current: 'My Crop Listings', icon: '🌾' };
+    return { parent: 'Marketplace', parentPath: '/produce', current: 'My Crop Listings', icon: '🏪' };
   }
   if (pathname.startsWith('/produce')) {
-    return { parent: 'Marketplace', parentPath: '/produce', current: 'Fresh Harvests', icon: '🌾' };
+    return { parent: 'Marketplace', parentPath: '/produce', current: 'Fresh Harvests', icon: '🏪' };
   }
   if (pathname === '/market-prices') {
     return { parent: 'Market Prices', parentPath: '/market-prices', current: 'Northern Mindanao', icon: '📈' };
@@ -69,7 +69,7 @@ const getBreadcrumbs = (pathname: string, role?: string): BreadcrumbInfo => {
       parent: 'Marketplace',
       parentPath: '/produce',
       current: role === 'supplier' ? 'Customer Orders' : role === 'farmer' ? 'Orders & Sales' : 'My Orders',
-      icon: '📦',
+      icon: '🏪',
     };
   }
   if (pathname.startsWith('/supply')) {
@@ -171,7 +171,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           count += items.length;
         }
       }
-    } catch {}
+    } catch { }
     setCartCount(count);
   };
 
@@ -214,10 +214,10 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 
   const filteredSuggestions = searchQuery.trim()
     ? sampleAutocompleteSuggestions.filter(
-        (item) =>
-          item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.term.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      (item) =>
+        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.term.toLowerCase().includes(searchQuery.toLowerCase())
+    )
     : [];
 
   const handleSelectSuggestion = (path: string) => {
