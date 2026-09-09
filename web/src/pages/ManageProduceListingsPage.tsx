@@ -4,6 +4,7 @@ import { api, getImageUrl } from '../api';
 import { produceApi } from '../api/produce';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import type { ProduceListing } from '../types/produce';
 
 export const ManageProduceListingsPage: React.FC = () => {
@@ -205,16 +206,21 @@ export const ManageProduceListingsPage: React.FC = () => {
     }
   };
 
-  const handleDeleteListing = async (item: ProduceListing) => {
-    if (!window.confirm(`Are you sure you want to delete "${item.cropName}"? This action cannot be undone.`)) {
-      return;
-    }
+  const [listingToDelete, setListingToDelete] = useState<ProduceListing | null>(null);
+  const [isDeletingListing, setIsDeletingListing] = useState(false);
+
+  const handleConfirmDeleteListing = async () => {
+    if (!listingToDelete) return;
+    setIsDeletingListing(true);
     try {
-      await produceApi.deleteListing(item.id);
-      toastInfo('Listing Deleted', `Listing for "${item.cropName}" has been removed.`);
+      await produceApi.deleteListing(listingToDelete.id);
+      toastInfo('Listing Deleted', `Listing for "${listingToDelete.cropName}" has been removed.`);
+      setListingToDelete(null);
       loadListings();
     } catch (err: any) {
       toastError('Delete Failed', err.response?.data?.error || err.message);
+    } finally {
+      setIsDeletingListing(false);
     }
   };
 
@@ -560,7 +566,7 @@ export const ManageProduceListingsPage: React.FC = () => {
                   </button>
 
                   <button
-                    onClick={() => handleDeleteListing(item)}
+                    onClick={() => setListingToDelete(item)}
                     style={{
                       padding: '8px 14px',
                       borderRadius: '8px',
@@ -570,8 +576,18 @@ export const ManageProduceListingsPage: React.FC = () => {
                       fontWeight: 700,
                       fontSize: '14px',
                       cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.15s ease',
                     }}
                     title="Delete listing permanently"
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#ffe4e6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#fff1f2';
+                    }}
                   >
                     🗑
                   </button>
@@ -598,6 +614,34 @@ export const ManageProduceListingsPage: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* Modern UI/UX Destructive Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={!!listingToDelete}
+        onClose={() => {
+          if (!isDeletingListing) setListingToDelete(null);
+        }}
+        onConfirm={handleConfirmDeleteListing}
+        item={
+          listingToDelete
+            ? {
+                id: listingToDelete.id,
+                name: listingToDelete.cropName,
+                category: listingToDelete.category,
+                price: listingToDelete.pricePerUnit,
+                unit: listingToDelete.unit,
+                stock: listingToDelete.quantity,
+                image: listingToDelete.photos?.[0],
+                typeLabel: 'Crop Listing',
+              }
+            : null
+        }
+        title="Delete Crop Listing?"
+        description={`Are you sure you want to remove your harvest listing for "${listingToDelete?.cropName}"? Once removed, it will no longer appear in the produce marketplace.`}
+        confirmText="Yes, Delete Listing"
+        cancelText="Cancel, Keep Listing"
+        isDeleting={isDeletingListing}
+      />
     </div>
   );
 };

@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supplyApi } from '../api/supply';
 import { api, getImageUrl } from '../api';
 import { useToast } from '../contexts/ToastContext';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import type { SupplyCategory, SupplyProduct } from '../types/supply';
 
 const categories: { key: SupplyCategory; label: string }[] = [
@@ -145,15 +146,21 @@ export const ManageSupplyProductsPage: React.FC = () => {
     }
   };
 
-  const handleDeleteProduct = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) return;
+  const [productToDelete, setProductToDelete] = useState<SupplyProduct | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
+  const handleConfirmDelete = async () => {
+    if (!productToDelete) return;
+    setIsDeleting(true);
     try {
-      await supplyApi.deleteProduct(id);
-      toastSuccess('Product Deleted', 'The product has been removed.');
+      await supplyApi.deleteProduct(productToDelete.id);
+      toastSuccess('Product Deleted', `"${productToDelete.name}" has been permanently removed.`);
+      setProductToDelete(null);
       fetchMyProducts();
     } catch (err: any) {
       toastError('Delete Failed', err.response?.data?.error || 'Failed to delete product');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -332,12 +339,67 @@ export const ManageSupplyProductsPage: React.FC = () => {
 
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button onClick={() => handleOpenForm(item)} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#fff', fontWeight: 600, cursor: 'pointer' }}>Edit</button>
-                  <button onClick={() => handleDeleteProduct(item.id)} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', backgroundColor: '#fef2f2', color: '#991b1b', fontWeight: 600, cursor: 'pointer' }}>Delete</button>
+                  <button
+                    onClick={() => setProductToDelete(item)}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      border: '1px solid #fecaca',
+                      backgroundColor: '#fef2f2',
+                      color: '#b91c1c',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#fee2e2';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#fef2f2';
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                    Delete
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
+
+        {/* UI/UX Expert Destructive Confirmation Modal */}
+        <ConfirmDeleteModal
+          isOpen={!!productToDelete}
+          onClose={() => {
+            if (!isDeleting) setProductToDelete(null);
+          }}
+          onConfirm={handleConfirmDelete}
+          item={
+            productToDelete
+              ? {
+                  id: productToDelete.id,
+                  name: productToDelete.name,
+                  category: productToDelete.category,
+                  price: productToDelete.price,
+                  unit: productToDelete.unit,
+                  stock: productToDelete.stockQuantity,
+                  image: productToDelete.images?.[0],
+                  typeLabel: 'Supply Product',
+                }
+              : null
+          }
+          title="Delete Supply Product?"
+          description="Are you sure you want to delete this supply product from your store inventory? Once removed, buyers and farmers will no longer be able to purchase it."
+          confirmText="Yes, Delete Product"
+          cancelText="Cancel, Keep Product"
+          isDeleting={isDeleting}
+        />
       </main>
     </div>
   );

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useChat } from '../../contexts/ChatContext';
 import { chatApi } from '../../api/chat';
@@ -19,6 +20,8 @@ export const FloatingChatDock: React.FC = () => {
     refreshUnreadCount,
     refreshConversations,
   } = useChat();
+
+  const location = useLocation();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -114,6 +117,20 @@ export const FloatingChatDock: React.FC = () => {
     return nameMatch || titleMatch;
   });
 
+  // Do not render on messages page (which has the dedicated full-page hub), login, or register
+  if (
+    location.pathname === '/messages' ||
+    location.pathname === '/login' ||
+    location.pathname === '/register'
+  ) {
+    return null;
+  }
+
+  // If chat is not open, do not show any floating launcher bubble
+  if (!isOpen) {
+    return null;
+  }
+
   // 1. Minimized floating pill
   if (isOpen && isMinimized) {
     return (
@@ -180,62 +197,7 @@ export const FloatingChatDock: React.FC = () => {
     );
   }
 
-  // 2. Closed launcher bubble (bottom-right)
-  if (!isOpen) {
-    return (
-      <div
-        onClick={() => {
-          refreshConversations();
-          setShowList(conversations.length > 0 && !activeConversation);
-          maximizeChat();
-        }}
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          zIndex: 9998,
-          background: '#0E4A27',
-          color: '#FFFFFF',
-          borderRadius: '50%',
-          width: '58px',
-          height: '58px',
-          boxShadow: '0 8px 24px rgba(14, 74, 39, 0.4)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-          border: '2px solid rgba(255,255,255,0.25)',
-        }}
-        title="Open AgriConnect Chat"
-        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.08)')}
-        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-      >
-        <span style={{ fontSize: '26px' }}>💬</span>
-        {unreadCount > 0 && (
-          <span
-            style={{
-              position: 'absolute',
-              top: '-4px',
-              right: '-4px',
-              background: '#DC2626',
-              color: '#FFFFFF',
-              borderRadius: '12px',
-              padding: '2px 7px',
-              fontSize: '12px',
-              fontWeight: 800,
-              boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-              border: '2px solid #FFFFFF',
-            }}
-          >
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
-      </div>
-    );
-  }
-
-  // 3. Open Floating Chat Window
+  // Open Floating Chat Window
   return (
     <div
       style={{
