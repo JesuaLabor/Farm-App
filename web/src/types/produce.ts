@@ -31,6 +31,7 @@ export interface CreateProduceListingPayload {
   location: string;
   photos?: string[];
   description?: string;
+  status?: ListingStatus;
 }
 
 export interface ProduceTransaction {

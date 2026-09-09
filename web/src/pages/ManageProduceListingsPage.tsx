@@ -5,7 +5,7 @@ import { produceApi } from '../api/produce';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
-import type { ProduceListing } from '../types/produce';
+import type { ProduceListing, ListingStatus } from '../types/produce';
 
 export const ManageProduceListingsPage: React.FC = () => {
   const { user } = useAuth();
@@ -154,6 +154,7 @@ export const ManageProduceListingsPage: React.FC = () => {
           location: farmLocation.trim(),
           photos: finalPhotos,
           description: finalDescription,
+          status: editingListing.status === 'sold' && Number(quantity) > 0 ? 'available' : editingListing.status,
         });
         toastSuccess('Listing Updated!', `"${cropName}" changes have been saved.`);
       } else {
@@ -183,7 +184,7 @@ export const ManageProduceListingsPage: React.FC = () => {
   };
 
   const togglePauseStatus = async (item: ProduceListing) => {
-    const newStatus = item.status === 'available' ? 'reserved' : 'available';
+    const newStatus: ListingStatus = item.status === 'available' ? 'reserved' : 'available';
     try {
       // Optimistic update
       setMyListings((prev) =>
@@ -198,6 +199,7 @@ export const ManageProduceListingsPage: React.FC = () => {
         harvestDate: item.harvestDate,
         location: item.location,
         photos: item.photos,
+        status: newStatus,
       });
       if (newStatus === 'available') {
         toastSuccess('Listing Live', `"${item.cropName}" is now accepting orders!`);
@@ -516,7 +518,8 @@ export const ManageProduceListingsPage: React.FC = () => {
       ) : myListings.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {myListings.map((item) => {
-            const isLive = item.status === 'available';
+            const isSoldOut = item.status === 'sold' || item.quantity <= 0;
+            const isLive = item.status === 'available' && item.quantity > 0;
             const photoUrl = getImageUrl(item.photos?.[0], 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80');
 
             return (
@@ -563,10 +566,10 @@ export const ManageProduceListingsPage: React.FC = () => {
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                   <span
-                    className={isLive ? 'badge badge-verified' : 'badge badge-warning'}
+                    className={isLive ? 'badge badge-verified' : isSoldOut ? 'badge badge-danger' : 'badge badge-warning'}
                     style={{ fontSize: '14px', padding: '6px 14px', borderRadius: '20px' }}
                   >
-                    {isLive ? '✓ Live & Selling' : '⏸ Temporarily Paused'}
+                    {isLive ? '✓ Live & Selling' : isSoldOut ? '📦 Sold Out' : '⏸ Temporarily Paused'}
                   </span>
 
                   <button

@@ -115,6 +115,10 @@ func (s *ProduceService) UpdateListing(ctx context.Context, farmerID string, lis
 	}
 	if req.Quantity != nil {
 		update["quantity"] = *req.Quantity
+		// If listing was sold out but farmer restocked quantity > 0 without explicitly specifying another status, reactivate to available
+		if *req.Quantity > 0 && existing.Status == models.ListingSold && req.Status == nil {
+			update["status"] = models.ListingAvailable
+		}
 	}
 	if req.Unit != nil {
 		update["unit"] = *req.Unit
