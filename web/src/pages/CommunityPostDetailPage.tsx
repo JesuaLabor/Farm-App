@@ -74,13 +74,12 @@ export const CommunityPostDetailPage: React.FC = () => {
 
   const getRoleBadge = (role?: string) => {
     switch (role) {
-      case 'expert':
-        return { label: '🎓 Licensed Agronomist', bg: '#f3e8ff', color: '#6b21a8' };
       case 'farmer':
         return { label: '🌾 Farmer', bg: '#dcfce7', color: '#15803d' };
       case 'supplier':
         return { label: '🏪 Agri Supplier', bg: '#e0f2fe', color: '#0369a1' };
       case 'lgu':
+      case 'lgu_staff':
       case 'lgu_officer':
         return { label: '🏛️ LGU Staff', bg: '#fef3c7', color: '#b45309' };
       case 'buyer':
@@ -157,7 +156,7 @@ export const CommunityPostDetailPage: React.FC = () => {
           padding: '32px',
           borderRadius: '20px',
           marginBottom: '28px',
-          borderLeft: post.authorRole === 'expert' ? '6px solid #6b21a8' : '6px solid #16a34a',
+          borderLeft: post.authorRole === 'lgu_staff' ? '6px solid #0D9488' : '6px solid #16a34a',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
@@ -167,7 +166,7 @@ export const CommunityPostDetailPage: React.FC = () => {
                 width: '46px',
                 height: '46px',
                 borderRadius: '50%',
-                backgroundColor: post.authorRole === 'expert' ? '#6b21a8' : '#16a34a',
+                backgroundColor: post.authorRole === 'lgu_staff' ? '#0D9488' : '#16a34a',
                 color: '#fff',
                 display: 'flex',
                 alignItems: 'center',
@@ -302,7 +301,7 @@ export const CommunityPostDetailPage: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {comments.map((comment) => {
             const cBadge = getRoleBadge(comment.authorRole);
-            const isExpert = comment.authorRole === 'expert';
+            const isLGU = comment.authorRole === 'lgu_staff';
             return (
               <div
                 key={comment.id}
@@ -310,8 +309,8 @@ export const CommunityPostDetailPage: React.FC = () => {
                 style={{
                   padding: '24px',
                   borderRadius: '18px',
-                  backgroundColor: isExpert ? '#faf5ff' : '#FFFFFF',
-                  borderLeft: isExpert ? '6px solid #6b21a8' : '4px solid #CBD5E1',
+                  backgroundColor: isLGU ? '#f0fdfa' : '#FFFFFF',
+                  borderLeft: isLGU ? '6px solid #0D9488' : '4px solid #CBD5E1',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
@@ -321,7 +320,7 @@ export const CommunityPostDetailPage: React.FC = () => {
                         width: '38px',
                         height: '38px',
                         borderRadius: '50%',
-                        backgroundColor: isExpert ? '#6b21a8' : '#16a34a',
+                        backgroundColor: isLGU ? '#0D9488' : '#16a34a',
                         color: '#fff',
                         display: 'flex',
                         alignItems: 'center',

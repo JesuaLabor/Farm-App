@@ -10,7 +10,6 @@ const rolesList: { role: Role; title: string; desc: string; icon: string }[] = [
   { role: 'farmer',   title: 'Farmer',    desc: 'Sell produce and access live market rates',       icon: '🧑‍🌾' },
   { role: 'buyer',    title: 'Buyer',     desc: 'Source fresh crops and livestock directly',        icon: '📦' },
   { role: 'supplier', title: 'Supplier',  desc: 'Sell seeds, fertilizers, and machinery',          icon: '🚜' },
-  { role: 'expert',   title: 'Expert',    desc: 'Provide agronomic advice and consultation',        icon: '🎓' },
   { role: 'lgu_staff',title: 'LGU Staff', desc: 'Coordinate regional agricultural programs',        icon: '🏛️' },
 ];
 

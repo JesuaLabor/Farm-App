@@ -1,4 +1,4 @@
-export type Role = 'farmer' | 'buyer' | 'supplier' | 'expert' | 'lgu_staff' | 'super_admin';
+export type Role = 'farmer' | 'buyer' | 'supplier' | 'lgu_staff' | 'super_admin';
 
 export interface User {
   id: string;

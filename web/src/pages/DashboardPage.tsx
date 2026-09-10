@@ -16,7 +16,6 @@ export const DashboardPage: React.FC = () => {
     farmer: 'Farmer',
     buyer: 'Wholesale Buyer',
     supplier: 'Supplier Partner',
-    expert: 'Agronomist',
     lgu_staff: 'LGU Officer',
     super_admin: 'Super Admin',
   };
@@ -30,7 +29,6 @@ export const DashboardPage: React.FC = () => {
     farmer: 'How can AgriConnect help your farm today?',
     buyer: 'Source fresh wholesale produce directly from local verified farmers.',
     supplier: 'Manage your agricultural supply inventory and customer orders.',
-    expert: 'Provide agronomic advice, answer queries, and share crop guides.',
     lgu_staff: 'Local Agriculture Office • Regional Monitoring & Governance',
     super_admin: 'Platform governance, staff approvals, and regional agricultural monitoring.',
   };
@@ -300,30 +298,6 @@ export const DashboardPage: React.FC = () => {
             path: '/market-prices',
           },
         ];
-      case 'expert':
-        return [
-          {
-            title: 'Answer Farmer Inquiries',
-            subtitle: 'Provide technical answers and diagnosis in Community',
-            icon: '💬',
-            bg: '#176B3A',
-            path: '/community',
-          },
-          {
-            title: 'Publish Guides & Tips',
-            subtitle: 'Share agronomic best practices and disease alerts',
-            icon: '📖',
-            bg: '#0E4A27',
-            path: '/community#guides',
-          },
-          {
-            title: 'Review Market & Programs',
-            subtitle: 'Check government programs and commodity prices',
-            icon: '🏛️',
-            bg: '#2B72B3',
-            path: '/programs',
-          },
-        ];
       default: // farmer
         return [
           {
@@ -417,15 +391,6 @@ export const DashboardPage: React.FC = () => {
             { label: 'Marketplace Produce', value: 'Available', sub: 'Fresh harvest from verified farms', color: '#2B72B3' },
             { label: 'Purchase Orders', value: 'Live Tracking', sub: 'Direct from farmers', color: '#176B3A' },
             { label: 'Commodity Prices', value: 'Monitored', sub: 'Official regional benchmarks', color: '#0E4A27' },
-          ],
-        };
-      case 'expert':
-        return {
-          title: 'Your Advisory Activity',
-          cards: [
-            { label: 'Community Forum', value: 'Live Q&A', sub: 'Diagnose and help local crop growers', color: '#176B3A' },
-            { label: 'Field Guides', value: 'Handbooks Active', sub: 'Pest control & soil nutrition', color: '#2B72B3' },
-            { label: 'Status', value: 'Licensed Expert', sub: 'Verified agronomist credentials', color: '#B26A00' },
           ],
         };
       default: // farmer

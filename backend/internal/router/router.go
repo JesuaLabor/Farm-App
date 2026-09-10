@@ -129,10 +129,10 @@ func New(
 		r.Get("/", priceHandler.ListHistory)
 		r.Get("/latest", priceHandler.GetLatestPrice)
 
-		// LGU staff / Expert / Admin role can record daily crop prices
+		// LGU staff / Admin role can record daily crop prices
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.JWTAuth(jwtSecret))
-			r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleExpert)).Post("/", priceHandler.CreateRecord)
+			r.With(middleware.RequireRole(models.RoleLGUStaff)).Post("/", priceHandler.CreateRecord)
 		})
 	})
 
@@ -160,10 +160,10 @@ func New(
 			r.With(middleware.RequireRole(models.RoleFarmer)).Get("/applications/my", programHandler.ListApplicationsByFarmer)
 
 			// LGU / Admin endpoints
-			r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleExpert)).Post("/", programHandler.CreateProgram)
-			r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleExpert)).Put("/{id}/status", programHandler.UpdateProgramStatus)
-			r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleExpert)).Get("/{id}/applications", programHandler.ListApplicationsByProgram)
-			r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleExpert)).Put("/applications/{appId}/status", programHandler.ReviewApplication)
+			r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleSuperAdmin)).Post("/", programHandler.CreateProgram)
+			r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleSuperAdmin)).Put("/{id}/status", programHandler.UpdateProgramStatus)
+			r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleSuperAdmin)).Get("/{id}/applications", programHandler.ListApplicationsByProgram)
+			r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleSuperAdmin)).Put("/applications/{appId}/status", programHandler.ReviewApplication)
 		})
 	})
 
@@ -185,7 +185,7 @@ func New(
 	// LGU Regional Monitoring Dashboard routes
 	r.Route("/api/lgu", func(r chi.Router) {
 		r.Use(middleware.JWTAuth(jwtSecret))
-		r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleExpert)).Get("/dashboard", analyticsHandler.GetLGUDashboard)
+		r.With(middleware.RequireRole(models.RoleLGUStaff, models.RoleSuperAdmin)).Get("/dashboard", analyticsHandler.GetLGUDashboard)
 	})
 
 	// Chat routes

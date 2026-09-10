@@ -12,7 +12,6 @@ const roleLabelMap: Record<string, string> = {
   farmer: 'Farmer Producer',
   buyer: 'Wholesale Buyer',
   supplier: 'Agri Supplier',
-  expert: 'Agronomist Expert',
   lgu_staff: 'LGU Officer',
   super_admin: 'Super Administrator',
 };
@@ -239,11 +238,9 @@ export const ProfilePage: React.FC = () => {
                         ? '🏛️ Verified LGU Officer'
                         : user.role === 'supplier'
                           ? '🚜 Verified Agri-Supplier'
-                          : user.role === 'expert'
-                            ? '🎓 Verified Agronomist Expert'
-                            : user.role === 'buyer'
-                              ? '📦 Verified Wholesale Buyer'
-                              : '🧑‍🌾 Verified Farmer'}
+                          : user.role === 'buyer'
+                            ? '📦 Verified Wholesale Buyer'
+                            : '🧑‍🌾 Verified Farmer'}
               </span>
             </div>
 

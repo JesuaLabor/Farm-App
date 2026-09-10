@@ -13,7 +13,6 @@ const (
 	RoleFarmer     Role = "farmer"
 	RoleBuyer      Role = "buyer"
 	RoleSupplier   Role = "supplier"
-	RoleExpert     Role = "expert"
 	RoleLGUStaff   Role = "lgu_staff"
 	RoleSuperAdmin Role = "super_admin"
 )
@@ -30,7 +29,6 @@ var ValidRoles = map[Role]bool{
 	RoleFarmer:     true,
 	RoleBuyer:      true,
 	RoleSupplier:   true,
-	RoleExpert:     true,
 	RoleLGUStaff:   true,
 	RoleSuperAdmin: true,
 }

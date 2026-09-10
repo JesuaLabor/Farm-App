@@ -139,7 +139,6 @@ export const ProfileScreen: React.FC = () => {
     farmer:      'Farmer',
     buyer:       'Buyer',
     supplier:    'Supplier',
-    expert:      'Expert',
     lgu_staff:   'LGU Staff',
     super_admin: 'Super Admin',
   };

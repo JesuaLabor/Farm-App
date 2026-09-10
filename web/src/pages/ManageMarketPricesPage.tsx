@@ -124,7 +124,7 @@ export const ManageMarketPricesPage: React.FC = () => {
           Record Official Market Prices
         </h1>
         <p style={{ fontSize: '13px', color: '#64748B', margin: '4px 0 0 0' }}>
-          LGU & Expert price monitoring for daily agricultural commodity pricing index.
+          LGU official price monitoring for daily agricultural commodity pricing index.
         </p>
       </div>
 

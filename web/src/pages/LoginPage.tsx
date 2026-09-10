@@ -199,7 +199,7 @@ export const LoginPage: React.FC = () => {
             'Direct Farm-to-Market Trade',
             'Official LGU Price Benchmarks',
             'Role-Based Secure Access',
-            'Expert Agronomic Guidance',
+            'Agricultural Community Hub',
           ].map((item) => (
             <span key={item} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span

@@ -1,6 +1,6 @@
 # AgriConnect 🌾
 
-A full-stack agricultural platform connecting farmers, buyers, suppliers, experts, and LGU staff across the Philippines.
+A full-stack agricultural platform connecting farmers, buyers, suppliers, and LGU staff across the Philippines.
 
 ## Tech Stack
 
@@ -135,8 +135,8 @@ npm run dev
 | `farmer` | Agricultural producer | Crop listings, market prices, farm finances, community |
 | `buyer` | Produce buyer | Browse listings, purchase, supply store, orders |
 | `supplier` | Input supplier | Manage supply catalog, fulfill orders |
-| `expert` | Agricultural expert | Community Q&A, government programs |
 | `lgu_staff` | Local government unit | Program management, LGU dashboard, price monitoring |
+| `super_admin` | Platform administrator | Regional staff approvals, user management, system governance |
 
 ---
 

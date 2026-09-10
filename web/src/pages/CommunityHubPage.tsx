@@ -307,13 +307,12 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
 
   const getRoleBadge = (role?: string) => {
     switch (role) {
-      case 'expert':
-        return { label: '🎓 Agronomist', bg: '#f3e8ff', color: '#6b21a8' };
       case 'farmer':
         return { label: '🌾 Farmer', bg: '#dcfce7', color: '#15803d' };
       case 'supplier':
         return { label: '📦 Supplier', bg: '#e0f2fe', color: '#0369a1' };
       case 'lgu':
+      case 'lgu_staff':
       case 'lgu_officer':
         return { label: '🏛️ LGU Staff', bg: '#fef3c7', color: '#b45309' };
       case 'buyer':
@@ -435,7 +434,7 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════════
-          TAB 1: COMMUNITY FORUM (Q&A Feed & Verified Expert Answers)
+          TAB 1: COMMUNITY FORUM (Q&A Feed & Verified Community Answers)
       ══════════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'community' && (
         <div>
@@ -513,7 +512,7 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               {posts.map((post) => {
                 const rBadge = getRoleBadge(post.authorRole);
-                const isExpert = post.authorRole === 'expert';
+                const isLGU = post.authorRole === 'lgu_staff';
                 return (
                   <div
                     key={post.id}
@@ -523,7 +522,7 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
                       padding: '26px',
                       cursor: 'pointer',
                       transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                      borderLeft: isExpert ? '6px solid #6b21a8' : '4px solid #16a34a',
+                      borderLeft: isLGU ? '6px solid #0D9488' : '4px solid #16a34a',
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = 'translateY(-2px)';

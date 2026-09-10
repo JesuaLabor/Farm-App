@@ -47,7 +47,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenAddModal
     },
     {
       title: 'Ask Community',
-      desc: 'Ask farmers or experts for advice',
+      desc: 'Ask farmers or community for advice',
       icon: '💬',
       action: () => {
         setShowAddMenu(false);

@@ -37,7 +37,6 @@ export const DashboardScreen: React.FC = () => {
     farmer: 'Farmer Producer',
     buyer: 'Wholesale Buyer',
     supplier: 'Agri Supplier',
-    expert: 'Agronomist Expert',
     lgu_staff: 'LGU Agriculture Officer',
     super_admin: 'Super Admin',
   };
@@ -85,7 +84,7 @@ export const DashboardScreen: React.FC = () => {
           <button className="quick-card" onClick={() => navigate('/community')}>
             <div className="quick-icon-wrap" style={{ background: '#f3e8ff' }}>💬</div>
             <div className="quick-title">Forum</div>
-            <div className="quick-sub">Ask Experts</div>
+            <div className="quick-sub">Community Q&A</div>
           </button>
           <button className="quick-card" onClick={() => navigate('/supply')}>
             <div className="quick-icon-wrap" style={{ background: '#f2ede3' }}>🚜</div>

@@ -300,34 +300,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ],
       },
     ];
-  } else if (role === 'expert') {
-    navGroups = [
-      {
-        title: 'MAIN',
-        items: [{ label: 'Dashboard', to: '/dashboard', icon: icons.dashboard }],
-      },
-      {
-        title: 'ADVISORY',
-        items: [
-          { label: 'Community Hub', to: '/community', icon: icons.community },
-        ],
-      },
-      {
-        title: 'RESOURCES',
-        items: [
-          { label: 'Marketplace', to: '/produce', icon: icons.marketplace },
-          { label: 'Market Prices', to: '/market-prices', icon: icons.marketPrices },
-          { label: "Gov't Programs", to: '/programs', icon: icons.programs },
-        ],
-      },
-      {
-        title: 'ACCOUNT',
-        items: [
-          { label: 'Settings', to: '/settings', icon: icons.settings },
-          { label: 'Help & Support', to: '/help', isAction: true, action: onOpenHelp, icon: icons.help },
-        ],
-      },
-    ];
   } else {
     // Default: 'farmer'
     navGroups = [

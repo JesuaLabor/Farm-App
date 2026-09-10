@@ -1,5 +1,5 @@
 /** Roles available in the AgriConnect system. */
-export type Role = 'farmer' | 'buyer' | 'supplier' | 'expert' | 'lgu_staff';
+export type Role = 'farmer' | 'buyer' | 'supplier' | 'lgu_staff' | 'super_admin';
 
 /** User profile as returned by the API. */
 export interface User {
