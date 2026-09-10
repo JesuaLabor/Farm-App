@@ -198,6 +198,9 @@ func (s *SupplyService) CreateOrder(ctx context.Context, buyerID string, req mod
 
 		product, err := s.supplyRepo.GetProductByID(ctx, pOID)
 		if err != nil {
+			if errors.Is(err, repository.ErrProductNotFound) {
+				return nil, fmt.Errorf("product (ID: %s) is no longer available or was removed by the supplier", itemReq.ProductID)
+			}
 			return nil, fmt.Errorf("fetch product: %w", err)
 		}
 

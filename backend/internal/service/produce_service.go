@@ -188,15 +188,15 @@ func (s *ProduceService) InitiateTransaction(ctx context.Context, buyerID string
 	}
 
 	if listing.Status != models.ListingAvailable {
-		return nil, errors.New("listing is no longer available")
+		return nil, fmt.Errorf("listing for '%s' is no longer available (status: %s)", listing.CropName, listing.Status)
 	}
 
 	if listing.FarmerID.Hex() == buyerID {
-		return nil, errors.New("you cannot purchase your own produce listing")
+		return nil, fmt.Errorf("you cannot purchase your own produce listing ('%s')", listing.CropName)
 	}
 
 	if req.Quantity <= 0 || req.Quantity > listing.Quantity {
-		return nil, fmt.Errorf("invalid quantity: requested %.2f, available %.2f", req.Quantity, listing.Quantity)
+		return nil, fmt.Errorf("insufficient harvest for '%s' (requested %.0f %s, available %.0f %s)", listing.CropName, req.Quantity, listing.Unit, listing.Quantity, listing.Unit)
 	}
 
 	subtotal := req.Quantity * listing.PricePerUnit

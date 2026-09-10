@@ -50,41 +50,41 @@ const getPaymentOptions = (isPickup: boolean): {
   desc: string;
   comingSoon?: boolean;
 }[] => [
-  {
-    id: 'cod',
-    label: isPickup ? 'Cash on Pickup' : 'Cash on Delivery',
-    icon: '💵',
-    desc: isPickup ? 'Pay in cash upon in-store collection.' : 'Pay in cash when your order arrives.',
-  },
-  {
-    id: 'gcash',
-    label: 'GCash',
-    icon: '📱',
-    desc: 'Send via GCash e-wallet.',
-    comingSoon: true,
-  },
-  {
-    id: 'maya',
-    label: 'Maya',
-    icon: '💜',
-    desc: 'Pay with Maya (formerly PayMaya).',
-    comingSoon: true,
-  },
-  {
-    id: 'bank_transfer',
-    label: 'Bank Transfer',
-    icon: '🏦',
-    desc: 'InstaPay / PESONet transfer.',
-    comingSoon: true,
-  },
-  {
-    id: 'card',
-    label: 'Credit / Debit Card',
-    icon: '💳',
-    desc: 'Visa, Mastercard via secure gateway.',
-    comingSoon: true,
-  },
-];
+    {
+      id: 'cod',
+      label: isPickup ? 'Cash on Pickup' : 'Cash on Delivery',
+      icon: '💵',
+      desc: isPickup ? 'Pay in cash upon in-store collection.' : 'Pay in cash when your order arrives.',
+    },
+    {
+      id: 'gcash',
+      label: 'GCash',
+      icon: '📱',
+      desc: 'Send via GCash e-wallet.',
+      comingSoon: true,
+    },
+    {
+      id: 'maya',
+      label: 'Maya',
+      icon: '💜',
+      desc: 'Pay with Maya (formerly PayMaya).',
+      comingSoon: true,
+    },
+    {
+      id: 'bank_transfer',
+      label: 'Bank Transfer',
+      icon: '🏦',
+      desc: 'InstaPay / PESONet transfer.',
+      comingSoon: true,
+    },
+    {
+      id: 'card',
+      label: 'Credit / Debit Card',
+      icon: '💳',
+      desc: 'Visa, Mastercard via secure gateway.',
+      comingSoon: true,
+    },
+  ];
 
 export const SupplyCartPage: React.FC = () => {
   const { user } = useAuth();
@@ -119,13 +119,17 @@ export const SupplyCartPage: React.FC = () => {
     if (rawSupply) {
       try {
         const parsed: CartItem[] = JSON.parse(rawSupply);
-        setCart(parsed);
+        const validItems = Array.isArray(parsed) ? parsed.filter((i) => i?.product?.id && (i.quantity || 0) > 0) : [];
+        if (validItems.length !== (Array.isArray(parsed) ? parsed.length : 0)) {
+          localStorage.setItem('agriconnect_cart', JSON.stringify(validItems));
+        }
+        setCart(validItems);
         setSelectedSupplyIds((prev) => {
           if (isInitial) {
-            return new Set(parsed.map((i) => i.product.id));
+            return new Set(validItems.map((i) => i.product.id));
           }
           // Preserve user's existing selections for items that still exist in cart
-          const validIds = new Set(parsed.map((i) => i.product.id));
+          const validIds = new Set(validItems.map((i) => i.product.id));
           const retained = new Set<string>();
           prev.forEach((id) => {
             if (validIds.has(id)) retained.add(id);
@@ -145,13 +149,17 @@ export const SupplyCartPage: React.FC = () => {
     if (rawProduce) {
       try {
         const parsedProduce: ProduceCartItem[] = JSON.parse(rawProduce);
-        setProduceCart(parsedProduce);
+        const validProduce = Array.isArray(parsedProduce) ? parsedProduce.filter((i) => i?.id && (i.quantity || 0) > 0) : [];
+        if (validProduce.length !== (Array.isArray(parsedProduce) ? parsedProduce.length : 0)) {
+          localStorage.setItem('agriconnect_produce_cart', JSON.stringify(validProduce));
+        }
+        setProduceCart(validProduce);
         setSelectedProduceIds((prev) => {
           if (isInitial) {
-            return new Set(parsedProduce.map((i) => i.id));
+            return new Set(validProduce.map((i) => i.id));
           }
           // Preserve user's existing selections for items that still exist in produce cart
-          const validIds = new Set(parsedProduce.map((i) => i.id));
+          const validIds = new Set(validProduce.map((i) => i.id));
           const retained = new Set<string>();
           prev.forEach((id) => {
             if (validIds.has(id)) retained.add(id);
@@ -175,19 +183,24 @@ export const SupplyCartPage: React.FC = () => {
         const parsed: CartItem[] = JSON.parse(rawSupply);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const freshProducts = await supplyApi.listProducts();
-          if (Array.isArray(freshProducts) && freshProducts.length > 0) {
+          if (Array.isArray(freshProducts)) {
             const productMap = new Map(freshProducts.map((p) => [p.id, p]));
             let changed = false;
             let adjustedItemName = '';
+            const removedNames: string[] = [];
             const reconciled: CartItem[] = [];
 
             for (const item of parsed) {
+              if (!item?.product?.id) {
+                changed = true;
+                continue;
+              }
               const fresh = productMap.get(item.product.id);
               if (fresh) {
                 const maxStock = Math.max(0, fresh.stockQuantity);
                 const cappedQty = Math.min(item.quantity, maxStock);
 
-                if (cappedQty !== item.quantity || fresh.stockQuantity !== item.product.stockQuantity) {
+                if (cappedQty !== item.quantity || fresh.stockQuantity !== item.product.stockQuantity || fresh.price !== item.product.price) {
                   changed = true;
                   adjustedItemName = fresh.name;
                 }
@@ -202,8 +215,17 @@ export const SupplyCartPage: React.FC = () => {
                   );
                 }
               } else {
-                reconciled.push(item);
+                // Product no longer exists in supplier inventory / database
+                changed = true;
+                removedNames.push(item.product?.name || 'A product');
               }
+            }
+
+            if (removedNames.length > 0) {
+              toastWarning(
+                'Unavailable Items Removed',
+                `${removedNames.join(', ')} is no longer available from suppliers and was removed from your cart.`
+              );
             }
 
             if (changed) {
@@ -216,10 +238,12 @@ export const SupplyCartPage: React.FC = () => {
                 });
                 return retained;
               });
-              toastInfo(
-                'Cart Adjusted to Available Stock',
-                `Item quantity for "${adjustedItemName || 'cart items'}" was adjusted to match current supplier stock.`
-              );
+              if (adjustedItemName && removedNames.length === 0) {
+                toastInfo(
+                  'Cart Adjusted to Available Stock',
+                  `Item quantity for "${adjustedItemName}" was adjusted to match current supplier stock.`
+                );
+              }
             }
           }
         }
@@ -229,9 +253,91 @@ export const SupplyCartPage: React.FC = () => {
     }
   };
 
+  // Reconcile and clamp produce cart quantities against live database harvest listings
+  const reconcileProduceCartWithLiveStock = async () => {
+    try {
+      const rawProduce = localStorage.getItem('agriconnect_produce_cart');
+      if (rawProduce) {
+        const parsed: ProduceCartItem[] = JSON.parse(rawProduce);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const freshListings = await produceApi.listListings();
+          if (Array.isArray(freshListings)) {
+            const listingMap = new Map(freshListings.map((l) => [l.id, l]));
+            let changed = false;
+            let adjustedCropName = '';
+            const removedNames: string[] = [];
+            const reconciled: ProduceCartItem[] = [];
+
+            for (const item of parsed) {
+              if (!item?.id) {
+                changed = true;
+                continue;
+              }
+              const fresh = listingMap.get(item.id);
+              // Must exist, be available status, and have positive harvest quantity
+              if (fresh && fresh.status === 'available' && fresh.quantity > 0) {
+                const maxHarvest = Math.max(0, fresh.quantity);
+                const cappedQty = Math.min(item.quantity, maxHarvest);
+
+                if (
+                  cappedQty !== item.quantity ||
+                  fresh.quantity !== item.listing?.quantity ||
+                  fresh.pricePerUnit !== item.listing?.pricePerUnit
+                ) {
+                  changed = true;
+                  adjustedCropName = fresh.cropName;
+                }
+
+                if (cappedQty > 0) {
+                  reconciled.push({ ...item, listing: fresh, quantity: cappedQty });
+                } else {
+                  changed = true;
+                  removedNames.push(fresh.cropName);
+                }
+              } else {
+                // Listing was deleted, marked sold/reserved, or has 0 quantity
+                changed = true;
+                const cropLabel = fresh ? `${fresh.cropName} (${fresh.status || 'out of stock'})` : (item.listing?.cropName || 'A crop listing');
+                removedNames.push(cropLabel);
+              }
+            }
+
+            if (removedNames.length > 0) {
+              toastWarning(
+                'Unavailable Crops Removed',
+                `${removedNames.join(', ')} is no longer available and was removed from your cart.`
+              );
+            }
+
+            if (changed) {
+              saveProduceCart(reconciled);
+              setSelectedProduceIds((prev) => {
+                const validIds = new Set(reconciled.map((i) => i.id));
+                const retained = new Set<string>();
+                prev.forEach((id) => {
+                  if (validIds.has(id)) retained.add(id);
+                });
+                return retained;
+              });
+              if (adjustedCropName && removedNames.length === 0) {
+                toastInfo(
+                  'Harvest Quantity Adjusted',
+                  `Available quantity for "${adjustedCropName}" was updated.`
+                );
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to reconcile produce cart:', e);
+    }
+  };
+
   useEffect(() => {
     loadCart(true);
     reconcileCartWithLiveStock();
+    reconcileProduceCartWithLiveStock();
     const handleSync = () => {
       if (isInternalUpdate.current) return;
       loadCart(false);
@@ -250,6 +356,15 @@ export const SupplyCartPage: React.FC = () => {
       setActiveTab('produce');
     }
   }, [cart.length, produceCart.length]);
+
+  // Reconcile produce whenever switching to produce tab
+  useEffect(() => {
+    if (activeTab === 'produce') {
+      reconcileProduceCartWithLiveStock();
+    } else {
+      reconcileCartWithLiveStock();
+    }
+  }, [activeTab]);
 
   const saveSupplyCart = (newCart: CartItem[]) => {
     setCart(newCart);
@@ -443,7 +558,16 @@ export const SupplyCartPage: React.FC = () => {
         toastSuccess('Order Placed!', successText);
         setTimeout(() => navigate('/supply/orders'), 2200);
       } catch (err: any) {
-        toastError('Checkout Failed', err.response?.data?.error || 'Failed to place supply order.');
+        const errorMsg = err.response?.data?.error || err.message || 'Failed to place supply order.';
+        toastError('Checkout Failed', errorMsg);
+        // Automatically reconcile cart if a product was not found or stock changed
+        if (
+          errorMsg.toLowerCase().includes('not found') ||
+          errorMsg.toLowerCase().includes('no longer available') ||
+          errorMsg.toLowerCase().includes('stock')
+        ) {
+          reconcileCartWithLiveStock();
+        }
       } finally {
         setOrdering(false);
       }
@@ -465,27 +589,52 @@ export const SupplyCartPage: React.FC = () => {
       }
 
       setOrdering(true);
+      const successfulItemIds: string[] = [];
+      const failedErrors: string[] = [];
+
       try {
         for (const item of selectedProduceItems) {
-          const contactMsg = `Fulfillment: ${deliveryMethod === 'delivery' ? `Delivery to ${deliveryAddress.trim()}` : 'Farm-Gate Pickup'} • Phone: ${contactPhone.trim()} • Payment: ${paymentMethod === 'cod' ? 'Cash on Delivery/Pickup' : 'GCash'}`;
-          await produceApi.initiateTransaction({
-            listingId: item.id,
-            quantity: item.quantity,
-            contactMessage: contactMsg,
-            deliveryMethod: deliveryMethod,
-            deliveryAddress: deliveryMethod === 'delivery' ? deliveryAddress.trim() : undefined,
+          try {
+            const contactMsg = `Fulfillment: ${deliveryMethod === 'delivery' ? `Delivery to ${deliveryAddress.trim()}` : 'Farm-Gate Pickup'} • Phone: ${contactPhone.trim()} • Payment: ${paymentMethod === 'cod' ? 'Cash on Delivery/Pickup' : 'GCash'}`;
+            await produceApi.initiateTransaction({
+              listingId: item.id,
+              quantity: item.quantity,
+              contactMessage: contactMsg,
+              deliveryMethod: deliveryMethod,
+              deliveryAddress: deliveryMethod === 'delivery' ? deliveryAddress.trim() : undefined,
+            });
+            successfulItemIds.push(item.id);
+          } catch (itemErr: any) {
+            const errMsg = itemErr.response?.data?.error || itemErr.message || `Failed to order ${item.listing?.cropName || 'crop'}`;
+            failedErrors.push(errMsg);
+          }
+        }
+
+        // Remove any successfully ordered items immediately so retries do not re-order them
+        if (successfulItemIds.length > 0) {
+          const remaining = produceCart.filter((i) => !successfulItemIds.includes(i.id));
+          saveProduceCart(remaining);
+          setSelectedProduceIds((prev) => {
+            const next = new Set(prev);
+            successfulItemIds.forEach((id) => next.delete(id));
+            return next;
           });
         }
 
-        // Remove checked-out produce items
-        const remaining = produceCart.filter((i) => !selectedProduceIds.has(i.id));
-        saveProduceCart(remaining);
-        setSelectedProduceIds(new Set(remaining.map((i) => i.id)));
+        // Auto-reconcile produce cart if there were errors or sold-out items
+        if (failedErrors.length > 0) {
+          await reconcileProduceCartWithLiveStock();
+          toastError('Checkout Issue', failedErrors.join(' • '));
+        }
 
-        toastSuccess('Harvest Order Placed!', 'Harvest crop order placed successfully! Redirecting to My Crop Orders…');
-        setTimeout(() => navigate('/produce/orders'), 2200);
-      } catch (err: any) {
-        toastError('Checkout Failed', err.response?.data?.error || 'Failed to place crop order.');
+        if (successfulItemIds.length > 0) {
+          if (failedErrors.length === 0) {
+            toastSuccess('Harvest Order Placed!', 'Harvest crop order placed successfully! Redirecting to My Crop Orders…');
+            setTimeout(() => navigate('/produce/orders'), 2200);
+          } else {
+            toastSuccess('Partial Order Placed', `${successfulItemIds.length} harvest(s) ordered successfully. Unavailable items were removed from your cart.`);
+          }
+        }
       } finally {
         setOrdering(false);
       }
