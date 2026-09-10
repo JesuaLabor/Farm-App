@@ -8,9 +8,11 @@ import type {
 } from '../types/program';
 
 export const programApi = {
-  listPrograms: async (status?: string): Promise<GovernmentProgram[]> => {
+  listPrograms: async (status?: string, municipality?: string, exact?: boolean): Promise<GovernmentProgram[]> => {
     const params = new URLSearchParams();
     if (status) params.append('status', status);
+    if (municipality) params.append('municipality', municipality);
+    if (exact) params.append('exact', 'true');
     const res = await apiClient.get<GovernmentProgram[]>(`/api/programs?${params.toString()}`);
     return res.data;
   },

@@ -2,12 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { apiClient } from '../api';
 import { programApi } from '../api/program';
 import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface UnifiedProgram {
   id: string;
   title: string;
   organization: string;
   description: string;
+  municipality?: string;
+  province?: string;
+  region?: string;
   deadline: string;
   deadlineDate?: Date;
   isExpired?: boolean;
@@ -23,6 +27,7 @@ const samplePrograms: UnifiedProgram[] = [
     title: 'Rice Farmer Cash Assistance (RFFA)',
     organization: 'Department of Agriculture (DA)',
     description: 'Direct cash subsidy of ₱5,000 for smallholder rice farmers owning 2 hectares or less.',
+    municipality: 'All Municipalities',
     deadline: 'October 15, 2026',
     deadlineDate: new Date('2026-10-15T00:00:00Z'),
     isExpired: false,
@@ -36,6 +41,7 @@ const samplePrograms: UnifiedProgram[] = [
     title: 'Corn Seed & Fertilizer Discount Voucher',
     organization: 'DA Region X - Northern Mindanao',
     description: 'Discount vouchers worth up to ₱3,000 for hybrid yellow corn seeds and inorganic fertilizer.',
+    municipality: 'Malaybalay City',
     deadline: 'September 30, 2026',
     deadlineDate: new Date('2026-09-30T00:00:00Z'),
     isExpired: false,
@@ -49,6 +55,7 @@ const samplePrograms: UnifiedProgram[] = [
     title: 'Solar-Powered Irrigation System (SPIS) Grant',
     organization: 'Bukidnon Provincial Agriculture Office',
     description: 'Free community solar irrigation installation for accredited farmer associations in Bukidnon.',
+    municipality: 'Valencia City',
     deadline: 'November 1, 2026',
     deadlineDate: new Date('2026-11-01T00:00:00Z'),
     isExpired: false,
@@ -60,8 +67,12 @@ const samplePrograms: UnifiedProgram[] = [
 ];
 
 export const GovernmentProgramsPage: React.FC = () => {
+  const { user } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
   const [selectedCat, setSelectedCat] = useState('All Programs');
+  const [municipalityScope, setMunicipalityScope] = useState<'my_municipality' | 'all'>(
+    user?.municipality ? 'my_municipality' : 'all'
+  );
   const [programs, setPrograms] = useState<UnifiedProgram[]>(samplePrograms);
   const [loading, setLoading] = useState(false);
 
@@ -100,6 +111,9 @@ export const GovernmentProgramsPage: React.FC = () => {
               title: p.title,
               organization: p.agency || 'Department of Agriculture',
               description: p.description,
+              municipality: p.municipality || 'All Municipalities',
+              province: p.province,
+              region: p.region,
               deadline: rawDeadline ? rawDeadline.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Open',
               deadlineDate: rawDeadline || undefined,
               isExpired: isPast,
@@ -110,10 +124,9 @@ export const GovernmentProgramsPage: React.FC = () => {
             };
           });
 
-          // Merge backend programs with sample programs to ensure variety
-          const existingIds = new Set(mapped.map((p) => p.title.toLowerCase()));
-          const extraSamples = samplePrograms.filter((s) => !existingIds.has(s.title.toLowerCase()));
-          setPrograms([...mapped, ...extraSamples]);
+          setPrograms(mapped);
+        } else {
+          setPrograms(samplePrograms);
         }
       } catch (err) {
         console.warn('Using local government programs:', err);
@@ -128,6 +141,15 @@ export const GovernmentProgramsPage: React.FC = () => {
   const categories = ['All Programs', 'Available', 'For You', 'Ending Soon', 'Past / Closed'];
 
   const filteredPrograms = programs.filter((prog) => {
+    // 1. Municipality filter
+    if (municipalityScope === 'my_municipality' && user?.municipality) {
+      const userMun = user.municipality.trim().toLowerCase();
+      const progMun = (prog.municipality || '').trim().toLowerCase();
+      const isMatch = !progMun || progMun === 'all municipalities' || progMun === 'all' || progMun === userMun;
+      if (!isMatch) return false;
+    }
+
+    // 2. Category filter
     if (selectedCat === 'All Programs') return true;
     if (selectedCat === 'Available') return !prog.isExpired;
     if (selectedCat === 'For You') return prog.eligible && !prog.isExpired;
@@ -140,6 +162,13 @@ export const GovernmentProgramsPage: React.FC = () => {
     return prog.category === selectedCat;
   });
 
+  const isOutOfJurisdiction = (prog: UnifiedProgram) => {
+    if (!user?.municipality || !prog.municipality) return false;
+    const userMun = user.municipality.trim().toLowerCase();
+    const progMun = prog.municipality.trim().toLowerCase();
+    return progMun !== '' && progMun !== 'all' && progMun !== 'all municipalities' && userMun !== progMun;
+  };
+
   const handleOpenDetails = (prog: UnifiedProgram) => {
     setSelectedProgram(prog);
     setIsApplying(false);
@@ -147,6 +176,13 @@ export const GovernmentProgramsPage: React.FC = () => {
   };
 
   const handleStartApply = (prog: UnifiedProgram) => {
+    if (isOutOfJurisdiction(prog)) {
+      toastError(
+        'Out of Jurisdiction',
+        `You cannot apply for this program. It is exclusively for farmers registered in ${prog.municipality} (your registered location is ${user?.municipality || 'different'}).`
+      );
+      return;
+    }
     setSelectedProgram(prog);
     setIsApplying(true);
     setErrorMsg(null);
@@ -301,6 +337,72 @@ export const GovernmentProgramsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* ─── Municipality Scope Filter Bar ─── */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px',
+          background: '#FFFFFF',
+          padding: '14px 20px',
+          borderRadius: '16px',
+          border: '1.5px solid #E2E8F0',
+          marginBottom: '20px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '14px', fontWeight: 800, color: '#1E293B' }}>
+            📍 Municipality Filter:
+          </span>
+          {user?.municipality ? (
+            <span style={{ fontSize: '13px', color: '#64748B' }}>
+              Showing programs for registered location <strong style={{ color: '#0F172A' }}>{user.municipality}</strong>
+            </span>
+          ) : (
+            <span style={{ fontSize: '13px', color: '#64748B' }}>
+              Filter programs by your local municipal agriculture office
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {user?.municipality && (
+            <button
+              onClick={() => setMunicipalityScope('my_municipality')}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '10px',
+                border: `1.5px solid ${municipalityScope === 'my_municipality' ? '#166534' : '#CBD5E1'}`,
+                background: municipalityScope === 'my_municipality' ? '#F0FDF4' : '#FFFFFF',
+                color: municipalityScope === 'my_municipality' ? '#166534' : '#475569',
+                fontWeight: 700,
+                fontSize: '13px',
+                cursor: 'pointer',
+              }}
+            >
+              📍 My Town ({user.municipality})
+            </button>
+          )}
+          <button
+            onClick={() => setMunicipalityScope('all')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '10px',
+              border: `1.5px solid ${municipalityScope === 'all' ? '#166534' : '#CBD5E1'}`,
+              background: municipalityScope === 'all' ? '#F0FDF4' : '#FFFFFF',
+              color: municipalityScope === 'all' ? '#166534' : '#475569',
+              fontWeight: 700,
+              fontSize: '13px',
+              cursor: 'pointer',
+            }}
+          >
+            🌐 All Municipalities
+          </button>
+        </div>
+      </div>
+
       {/* ─── Category Filter Tabs ─── */}
       <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', marginBottom: '32px' }}>
         {categories.map((cat) => {
@@ -352,9 +454,24 @@ export const GovernmentProgramsPage: React.FC = () => {
             >
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                  <span className="badge badge-info" style={{ fontSize: '13px', fontWeight: 700 }}>
-                    🏛️ {prog.organization}
-                  </span>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span className="badge badge-info" style={{ fontSize: '13px', fontWeight: 700 }}>
+                      🏛️ {prog.organization}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        padding: '3px 8px',
+                        borderRadius: '8px',
+                        background: prog.municipality && prog.municipality !== 'All Municipalities' ? '#ECFDF5' : '#F1F5F9',
+                        color: prog.municipality && prog.municipality !== 'All Municipalities' ? '#065F46' : '#475569',
+                        border: prog.municipality && prog.municipality !== 'All Municipalities' ? '1px solid #A7F3D0' : '1px solid #CBD5E1',
+                      }}
+                    >
+                      📍 {prog.municipality || 'All Municipalities'}
+                    </span>
+                  </div>
                   {prog.eligible && (
                     <span className="badge badge-verified" style={{ fontSize: '13px', fontWeight: 700 }}>
                       ✓ Pre-Qualified
@@ -423,6 +540,24 @@ export const GovernmentProgramsPage: React.FC = () => {
                   >
                     Closed
                   </button>
+                ) : isOutOfJurisdiction(prog) ? (
+                  <button
+                    disabled
+                    title={`This program is exclusively for farmers registered in ${prog.municipality}.`}
+                    style={{
+                      flex: 2,
+                      padding: '12px',
+                      borderRadius: '12px',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      background: '#FEF3C7',
+                      color: '#92400E',
+                      border: '1px solid #FCD34D',
+                      cursor: 'not-allowed',
+                    }}
+                  >
+                    🔒 {prog.municipality} Only
+                  </button>
                 ) : (
                   <button
                     onClick={() => handleStartApply(prog)}
@@ -460,6 +595,12 @@ export const GovernmentProgramsPage: React.FC = () => {
               {selectedProgram.description}
             </p>
 
+            {isOutOfJurisdiction(selectedProgram) && (
+              <div style={{ padding: '14px 18px', borderRadius: '14px', background: '#FEF3C7', border: '1.5px solid #FCD34D', color: '#92400E', fontSize: '13px', fontWeight: 600, marginBottom: '22px', lineHeight: 1.5 }}>
+                ⚠️ <strong>Jurisdiction Restriction:</strong> This subsidy is exclusively reserved for farmers with registered farm parcels in <strong>{selectedProgram.municipality}</strong>. Your account is registered in <strong>{user?.municipality || 'another municipality'}</strong>.
+              </div>
+            )}
+
             <div style={{ padding: '20px', borderRadius: '16px', background: '#EAF6EE', border: '1.5px solid #176B3A', marginBottom: '24px' }}>
               <div style={{ fontSize: '16px', fontWeight: 800, color: '#176B3A', marginBottom: '8px' }}>
                 ✓ Eligibility Criteria:
@@ -490,13 +631,23 @@ export const GovernmentProgramsPage: React.FC = () => {
               <button onClick={() => setSelectedProgram(null)} className="btn btn-secondary btn-large" style={{ flex: 1, borderRadius: '12px' }}>
                 Close
               </button>
-              <button
-                onClick={() => handleStartApply(selectedProgram)}
-                className="btn btn-primary btn-large"
-                style={{ flex: 2, borderRadius: '12px', fontWeight: 800 }}
-              >
-                Proceed to Apply →
-              </button>
+              {isOutOfJurisdiction(selectedProgram) ? (
+                <button
+                  disabled
+                  className="btn btn-secondary btn-large"
+                  style={{ flex: 2, borderRadius: '12px', opacity: 0.6, cursor: 'not-allowed', fontWeight: 700 }}
+                >
+                  🔒 Ineligible ({selectedProgram.municipality} Only)
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleStartApply(selectedProgram)}
+                  className="btn btn-primary btn-large"
+                  style={{ flex: 2, borderRadius: '12px', fontWeight: 800 }}
+                >
+                  Proceed to Apply →
+                </button>
+              )}
             </div>
           </div>
         </div>

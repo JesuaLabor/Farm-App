@@ -40,8 +40,10 @@ func (h *ProgramHandler) CreateProgram(w http.ResponseWriter, r *http.Request) {
 // ListPrograms handles GET /api/programs.
 func (h *ProgramHandler) ListPrograms(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
+	municipality := r.URL.Query().Get("municipality")
+	exact := r.URL.Query().Get("exact") == "true"
 
-	programs, err := h.progService.ListPrograms(r.Context(), status)
+	programs, err := h.progService.ListPrograms(r.Context(), status, municipality, exact)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to fetch programs")
 		return

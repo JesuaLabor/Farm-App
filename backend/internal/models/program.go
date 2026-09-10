@@ -30,6 +30,9 @@ type Program struct {
 	Agency              string        `bson:"agency"                 json:"agency"` // e.g. "DA-RFO III", "Municipal Agriculture Office"
 	EligibilityCriteria []string      `bson:"eligibility_criteria"   json:"eligibilityCriteria"`
 	RequiredDocuments   []string      `bson:"required_documents"     json:"requiredDocuments"`
+	Region              string        `bson:"region,omitempty"       json:"region,omitempty"`
+	Province            string        `bson:"province,omitempty"     json:"province,omitempty"`
+	Municipality        string        `bson:"municipality,omitempty" json:"municipality,omitempty"`
 	Deadline            time.Time     `bson:"deadline"               json:"deadline"`
 	Status              ProgramStatus `bson:"status"                 json:"status"` // "open" or "closed"
 	CreatedBy           bson.ObjectID `bson:"created_by"             json:"createdBy,omitempty"`
@@ -67,6 +70,9 @@ type CreateProgramRequest struct {
 	Title               string   `json:"title"`
 	Description         string   `json:"description"`
 	Agency              string   `json:"agency"`
+	Region              string   `json:"region,omitempty"`
+	Province            string   `json:"province,omitempty"`
+	Municipality        string   `json:"municipality,omitempty"`
 	EligibilityCriteria []string `json:"eligibilityCriteria"`
 	RequiredDocuments   []string `json:"requiredDocuments"`
 	Deadline            string   `json:"deadline"` // YYYY-MM-DD

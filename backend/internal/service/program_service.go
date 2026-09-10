@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/agriconnect/backend/internal/models"
@@ -37,15 +38,39 @@ func (s *ProgramService) CreateProgram(ctx context.Context, creatorID string, re
 		return nil, errors.New("program description is required")
 	}
 
+	// Fetch creator to determine role and jurisdiction
+	creator, err := s.userRepo.FindByID(ctx, cOID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch creator: %w", err)
+	}
+
 	deadline, _ := time.Parse("2006-01-02", req.Deadline)
 	if deadline.IsZero() {
 		deadline = time.Now().AddDate(0, 1, 0) // Default 30 days
+	}
+
+	region := req.Region
+	province := req.Province
+	municipality := req.Municipality
+
+	// LGU staff is strictly scoped to their assigned Municipality & Province & Region
+	if creator.Role == models.RoleLGUStaff {
+		municipality = creator.Municipality
+		province = creator.Province
+		region = creator.Region
+	} else if municipality == "" && creator.Municipality != "" {
+		municipality = creator.Municipality
+		province = creator.Province
+		region = creator.Region
 	}
 
 	prog := &models.Program{
 		Title:               req.Title,
 		Description:         req.Description,
 		Agency:              req.Agency,
+		Region:              region,
+		Province:            province,
+		Municipality:        municipality,
 		EligibilityCriteria: req.EligibilityCriteria,
 		RequiredDocuments:   req.RequiredDocuments,
 		Deadline:            deadline,
@@ -59,9 +84,9 @@ func (s *ProgramService) CreateProgram(ctx context.Context, creatorID string, re
 	return prog, nil
 }
 
-// ListPrograms fetches program listings.
-func (s *ProgramService) ListPrograms(ctx context.Context, status string) ([]models.Program, error) {
-	return s.progRepo.ListPrograms(ctx, status)
+// ListPrograms fetches program listings with optional status, municipality filter, and exact match flag.
+func (s *ProgramService) ListPrograms(ctx context.Context, status, municipality string, exactMunicipality bool) ([]models.Program, error) {
+	return s.progRepo.ListPrograms(ctx, status, municipality, exactMunicipality)
 }
 
 // GetProgramByID gets details of a program.
@@ -106,6 +131,16 @@ func (s *ProgramService) SubmitApplication(ctx context.Context, farmerID string,
 	}
 	if prog.Status != models.ProgramStatusOpen {
 		return nil, errors.New("this government program is closed for applications")
+	}
+
+	// Verify municipal jurisdiction:
+	// If program is scoped to a specific municipality, farmer must belong to that municipality
+	progMun := strings.TrimSpace(prog.Municipality)
+	if progMun != "" && !strings.EqualFold(progMun, "all") && !strings.EqualFold(progMun, "all municipalities") {
+		farmerMun := strings.TrimSpace(user.Municipality)
+		if !strings.EqualFold(progMun, farmerMun) {
+			return nil, fmt.Errorf("this program is exclusively for farmers in %s (your registered municipality is %s)", progMun, farmerMun)
+		}
 	}
 
 	app := &models.ProgramApplication{

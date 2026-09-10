@@ -39,6 +39,7 @@ func (r *ProgramRepository) ensureIndexes() {
 	_, _ = r.progColl.Indexes().CreateMany(ctx, []mongo.IndexModel{
 		{Keys: bson.D{{Key: "status", Value: 1}}},
 		{Keys: bson.D{{Key: "deadline", Value: 1}}},
+		{Keys: bson.D{{Key: "municipality", Value: 1}}},
 	})
 
 	_, _ = r.appColl.Indexes().CreateMany(ctx, []mongo.IndexModel{
@@ -64,11 +65,25 @@ func (r *ProgramRepository) CreateProgram(ctx context.Context, prog *models.Prog
 	return nil
 }
 
-// ListPrograms retrieves all programs with optional status filter.
-func (r *ProgramRepository) ListPrograms(ctx context.Context, status string) ([]models.Program, error) {
+// ListPrograms retrieves all programs with optional status and municipality filter.
+// If exactMunicipality is true, only programs strictly tagged with that municipality are returned.
+// Otherwise, it includes programs for that municipality as well as nationwide/open programs.
+func (r *ProgramRepository) ListPrograms(ctx context.Context, status string, municipality string, exactMunicipality bool) ([]models.Program, error) {
 	query := bson.M{}
 	if status != "" {
 		query["status"] = status
+	}
+	if municipality != "" && municipality != "all" && municipality != "All Municipalities" {
+		if exactMunicipality {
+			query["municipality"] = bson.M{"$regex": "^" + municipality + "$", "$options": "i"}
+		} else {
+			query["$or"] = []bson.M{
+				{"municipality": bson.M{"$regex": "^" + municipality + "$", "$options": "i"}},
+				{"municipality": ""},
+				{"municipality": bson.M{"$exists": false}},
+				{"municipality": "All Municipalities"},
+			}
+		}
 	}
 
 	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}})

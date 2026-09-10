@@ -2,19 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { programApi } from '../api/program';
 import { getImageUrl } from '../api';
 import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
 import type { GovernmentProgram, ProgramApplication, ApplicationStatus } from '../types/program';
 
 export const ManageGovernmentProgramsPage: React.FC = () => {
+  const { user } = useAuth();
   const { success, error: toastError } = useToast();
+  const isLguStaff = user?.role === 'lgu_staff';
+  const assignedMunicipality = user?.municipality || '';
+
   const [programs, setPrograms] = useState<GovernmentProgram[]>([]);
   const [selectedProgId, setSelectedProgId] = useState<string>('');
   const [applications, setApplications] = useState<ProgramApplication[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Municipality filter for Super Admin (LGU Staff is locked to their municipality)
+  const [municipalityFilter, setMunicipalityFilter] = useState(isLguStaff ? assignedMunicipality : 'all');
+
   // New Program form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [agency, setAgency] = useState('Municipal Agriculture Office');
+  const [targetMunicipality, setTargetMunicipality] = useState(assignedMunicipality || 'All Municipalities');
   const [criteria, setCriteria] = useState('Registered in RSBSA, Smallholder farmer (< 3 hectares)');
   const [reqDocs, setReqDocs] = useState('RSBSA Card, Government ID');
   const [deadline, setDeadline] = useState(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
@@ -30,10 +39,16 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
   const fetchPrograms = async () => {
     setLoading(true);
     try {
-      const data = await programApi.listPrograms();
+      const filterMun = isLguStaff ? assignedMunicipality : (municipalityFilter !== 'all' ? municipalityFilter : undefined);
+      const data = await programApi.listPrograms(undefined, filterMun || undefined);
       setPrograms(data);
-      if (data.length > 0 && !selectedProgId) {
-        setSelectedProgId(data[0].id);
+      if (data.length > 0) {
+        if (!selectedProgId || !data.some((p) => p.id === selectedProgId)) {
+          setSelectedProgId(data[0].id);
+        }
+      } else {
+        setSelectedProgId('');
+        setApplications([]);
       }
     } catch (e) {
       console.error('Failed to fetch programs:', e);
@@ -43,8 +58,15 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
   };
 
   useEffect(() => {
+    if (assignedMunicipality) {
+      setTargetMunicipality(assignedMunicipality);
+      if (isLguStaff) setMunicipalityFilter(assignedMunicipality);
+    }
+  }, [assignedMunicipality, isLguStaff]);
+
+  useEffect(() => {
     fetchPrograms();
-  }, []);
+  }, [municipalityFilter, assignedMunicipality]);
 
   const fetchApplications = async (progId: string) => {
     if (!progId) return;
@@ -64,15 +86,19 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
     e.preventDefault();
     setCreating(true);
     try {
+      const munToSave = isLguStaff ? (assignedMunicipality || 'Malaybalay City') : targetMunicipality;
       await programApi.createProgram({
         title,
         description,
         agency,
+        municipality: munToSave,
+        province: user?.province,
+        region: user?.region,
         eligibilityCriteria: criteria.split(',').map((s) => s.trim()).filter(Boolean),
         requiredDocuments: reqDocs.split(',').map((s) => s.trim()).filter(Boolean),
         deadline,
       });
-      success('Program Published!', `"${title}" is now open for farmer applications.`);
+      success('Program Published!', `"${title}" is now open for farmer applications in ${munToSave || 'covered areas'}.`);
       setShowCreateForm(false);
       setTitle('');
       setDescription('');
@@ -134,12 +160,29 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
             >
               🏛️ LGU Subsidy Administration
             </span>
+            {assignedMunicipality && (
+              <span
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  padding: '3px 10px',
+                  borderRadius: '20px',
+                  background: '#ECFDF5',
+                  color: '#065F46',
+                  border: '1px solid #A7F3D0',
+                }}
+              >
+                📍 Jurisdiction: {assignedMunicipality}{user?.province ? `, ${user.province}` : ''}
+              </span>
+            )}
           </div>
           <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', margin: 0, lineHeight: 1.2 }}>
             Manage Government Programs
           </h1>
           <p style={{ color: '#64748B', fontSize: '14px', margin: '4px 0 0 0' }}>
-            Create agricultural assistance initiatives and evaluate farmer RSBSA applications.
+            {isLguStaff
+              ? `Manage agricultural assistance initiatives and evaluate RSBSA applications for ${assignedMunicipality || 'your municipality'}.`
+              : 'Create agricultural assistance initiatives and evaluate farmer RSBSA applications across municipalities.'}
           </p>
         </div>
 
@@ -234,7 +277,7 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
           </h2>
 
           <form onSubmit={handleCreateProgram}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                   Program Title *
@@ -259,6 +302,27 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
                   onChange={(e) => setAgency(e.target.value)}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
                 />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                  Target Municipality *
+                </label>
+                {isLguStaff ? (
+                  <input
+                    type="text"
+                    disabled
+                    value={`📍 ${assignedMunicipality || 'Malaybalay City'}`}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #CBD5E1', background: '#F8FAFC', color: '#0F172A', fontWeight: 700, fontSize: '14px', boxSizing: 'border-box' }}
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    value={targetMunicipality}
+                    onChange={(e) => setTargetMunicipality(e.target.value)}
+                    placeholder="e.g. Malolos City or All Municipalities"
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }}
+                  />
+                )}
               </div>
             </div>
 
@@ -346,7 +410,25 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {!isLguStaff && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 700, color: '#475569' }}>Filter Town:</label>
+                <input
+                  type="text"
+                  placeholder="All Municipalities"
+                  value={municipalityFilter === 'all' ? '' : municipalityFilter}
+                  onChange={(e) => setMunicipalityFilter(e.target.value.trim() || 'all')}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '10px',
+                    border: '1.5px solid #CBD5E1',
+                    fontSize: '13px',
+                    width: '160px',
+                  }}
+                />
+              </div>
+            )}
             <label style={{ fontSize: '13px', fontWeight: 700, color: '#475569' }}>Select Program:</label>
             <select
               value={selectedProgId}
@@ -361,7 +443,9 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
               }}
             >
               {programs.map((p) => (
-                <option key={p.id} value={p.id}>{p.title}</option>
+                <option key={p.id} value={p.id}>
+                  {p.title} {p.municipality ? `(📍 ${p.municipality})` : '(🌐 All Municipalities)'}
+                </option>
               ))}
             </select>
           </div>
@@ -382,7 +466,7 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
                 <tr style={{ borderBottom: '2px solid #E2E8F0', color: '#475569', fontWeight: 700 }}>
                   <th style={{ padding: '10px' }}>Farmer Name</th>
                   <th style={{ padding: '10px' }}>RSBSA ID</th>
-                  <th style={{ padding: '10px' }}>Region</th>
+                  <th style={{ padding: '10px' }}>Municipality / Region</th>
                   <th style={{ padding: '10px' }}>Farm Size</th>
                   <th style={{ padding: '10px' }}>Crops</th>
                   <th style={{ padding: '10px' }}>Status</th>
@@ -403,7 +487,13 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
                         <span style={{ color: '#94A3B8', fontSize: '12px' }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '12px 10px', color: '#475569' }}>{app.farmerRegion || '—'}</td>
+                    <td style={{ padding: '12px 10px', color: '#475569' }}>
+                      {app.farmerMunicipality ? (
+                        <span style={{ fontWeight: 600, color: '#0F172A' }}>📍 {app.farmerMunicipality}</span>
+                      ) : (
+                        app.farmerRegion || '—'
+                      )}
+                    </td>
                     <td style={{ padding: '12px 10px', color: '#475569' }}>{app.farmSizeHectares} ha</td>
                     <td style={{ padding: '12px 10px', color: '#475569' }}>{app.cropsGrown.join(', ')}</td>
                     <td style={{ padding: '12px 10px' }}>

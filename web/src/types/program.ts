@@ -7,6 +7,9 @@ export interface GovernmentProgram {
   title: string;
   description: string;
   agency: string;
+  municipality?: string;
+  province?: string;
+  region?: string;
   eligibilityCriteria: string[];
   requiredDocuments: string[];
   deadline: string;
@@ -23,6 +26,8 @@ export interface ProgramApplication {
   farmerName: string;
   farmerPhone?: string;
   farmerRegion?: string;
+  farmerProvince?: string;
+  farmerMunicipality?: string;
   farmSizeHectares: number;
   cropsGrown: string[];
   rsbsaNumber?: string;
@@ -40,6 +45,9 @@ export interface CreateProgramPayload {
   title: string;
   description: string;
   agency: string;
+  municipality?: string;
+  province?: string;
+  region?: string;
   eligibilityCriteria: string[];
   requiredDocuments: string[];
   deadline: string;
