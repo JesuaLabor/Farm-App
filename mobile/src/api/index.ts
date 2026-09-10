@@ -4,7 +4,9 @@ import type { CreateSupplyOrderPayload, SupplyOrder, UpdatePaymentStatusPayload 
 
 // API_URL is set via VITE_API_URL env variable (written to .env by launch script).
 // Falls back to the LAN IP if not configured.
-const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.100.164:8080';
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== 'undefined' ? '' : 'http://localhost:8080');
 console.log('[AgriConnect PWA] API Base URL:', API_URL);
 
 let userToken: string | null = null;

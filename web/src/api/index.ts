@@ -3,9 +3,7 @@ import type { AuthResponse, LoginPayload, RegisterPayload, UpdateProfilePayload,
 
 const API_URL =
   import.meta.env.VITE_API_URL ||
-  (typeof window !== 'undefined' && window.location.hostname
-    ? `http://${window.location.hostname}:8080`
-    : 'http://localhost:8080');
+  (typeof window !== 'undefined' ? '' : 'http://localhost:8080');
 
 export const apiClient = axios.create({
   baseURL: API_URL,

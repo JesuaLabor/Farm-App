@@ -194,7 +194,7 @@ if [ -n "$TUNNEL_URL" ]; then
 else
   echo -e " 📡 ${MAGENTA}Mobile API:${NC}   ${YELLOW}http://${LOCAL_IP}:8080${NC}  ← Phone must be on same Wi-Fi"
 fi
-echo -e " 🌐 ${MAGENTA}Web App:${NC}      http://localhost:5173"
+echo -e " 🌐 ${MAGENTA}Web App:${NC}      http://localhost:5173  |  http://${LOCAL_IP}:5173"
 echo -e " 📱 ${MAGENTA}Mobile PWA:${NC}   http://localhost:5174  |  http://${LOCAL_IP}:5174"
 echo -e "${CYAN}----------------------------------------------------------------------${NC}"
 echo -e "${YELLOW}Press [Ctrl + C] to stop all services.${NC}\n"

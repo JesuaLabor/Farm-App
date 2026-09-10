@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import { api } from '../api';
+import { api, getImageUrl } from '../api';
 import { supplyApi } from '../api/supply';
 import type { SupplyOrder, PaymentMethod, PaymentStatus } from '../types/supply';
 
@@ -185,7 +185,7 @@ export const ProfilePage: React.FC = () => {
               }}
             >
               {user.photoUrl ? (
-                <img src={`http://localhost:8080${user.photoUrl}`} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src={getImageUrl(user.photoUrl)} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
                 user.firstName[0]?.toUpperCase()
               )}

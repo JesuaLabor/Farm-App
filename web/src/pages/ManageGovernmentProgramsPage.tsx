@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { programApi } from '../api/program';
+import { getImageUrl } from '../api';
 import { useToast } from '../contexts/ToastContext';
 import type { GovernmentProgram, ProgramApplication, ApplicationStatus } from '../types/program';
 
@@ -478,7 +479,7 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
                 d.startsWith('/uploads') || d.startsWith('http') || d.startsWith('data:image') || /\.(png|jpe?g|webp)$/i.test(d)
               );
               if (!imgDoc) return null;
-              const fullUrl = imgDoc.startsWith('/uploads') ? `http://localhost:8080${imgDoc}` : imgDoc;
+              const fullUrl = getImageUrl(imgDoc);
               return (
                 <div style={{ marginBottom: '18px', background: '#F0FDF4', padding: '12px', borderRadius: '12px', border: '1.5px solid #86EFAC' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
