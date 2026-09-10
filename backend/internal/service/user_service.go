@@ -5,27 +5,25 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/agriconnect/backend/internal/models"
 	"github.com/agriconnect/backend/internal/repository"
+	"github.com/agriconnect/backend/internal/storage"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // UserService handles user profile business logic.
 type UserService struct {
-	repo      *repository.UserRepository
-	uploadDir string
+	repo    *repository.UserRepository
+	storage storage.StorageService
 }
 
 // NewUserService creates a new UserService.
-func NewUserService(repo *repository.UserRepository, uploadDir string) *UserService {
-	// Ensure the upload directory exists
-	_ = os.MkdirAll(uploadDir, os.ModePerm)
-	return &UserService{repo: repo, uploadDir: uploadDir}
+func NewUserService(repo *repository.UserRepository, storage storage.StorageService) *UserService {
+	return &UserService{repo: repo, storage: storage}
 }
 
 // GetProfile retrieves a user profile by ID.
@@ -94,7 +92,7 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID string, req mode
 	return s.repo.FindByID(ctx, oid)
 }
 
-// UploadPhoto saves a profile photo to disk and updates the user's photo URL.
+// UploadPhoto saves a profile photo using the configured storage service and updates the user's photo URL.
 func (s *UserService) UploadPhoto(ctx context.Context, userID string, filename string, file io.Reader) (*models.User, error) {
 	oid, err := bson.ObjectIDFromHex(userID)
 	if err != nil {
@@ -107,21 +105,25 @@ func (s *UserService) UploadPhoto(ctx context.Context, userID string, filename s
 		ext = ".jpg"
 	}
 	newName := fmt.Sprintf("%s_%d%s", userID, time.Now().UnixNano(), strings.ToLower(ext))
-	savePath := filepath.Join(s.uploadDir, newName)
 
-	// Save file to disk
-	dst, err := os.Create(savePath)
-	if err != nil {
-		return nil, fmt.Errorf("create file: %w", err)
+	// Detect content type from extension
+	contentType := "image/jpeg"
+	switch strings.ToLower(ext) {
+	case ".png":
+		contentType = "image/png"
+	case ".webp":
+		contentType = "image/webp"
+	case ".gif":
+		contentType = "image/gif"
 	}
-	defer dst.Close()
 
-	if _, err := io.Copy(dst, file); err != nil {
-		return nil, fmt.Errorf("save file: %w", err)
+	// Upload via storage service (local disk or Cloudflare R2)
+	photoURL, err := s.storage.Upload(ctx, newName, contentType, file)
+	if err != nil {
+		return nil, fmt.Errorf("upload photo: %w", err)
 	}
 
 	// Update user record
-	photoURL := "/uploads/" + newName
 	if err := s.repo.Update(ctx, oid, bson.M{"photo_url": photoURL}); err != nil {
 		return nil, err
 	}

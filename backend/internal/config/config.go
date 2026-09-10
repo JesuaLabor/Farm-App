@@ -13,17 +13,29 @@ type Config struct {
 	JWTExpiryHrs int
 	Port         string
 	UploadDir    string
+
+	// Cloudflare R2 / S3-compatible cloud storage
+	R2AccountID       string
+	R2AccessKeyID     string
+	R2SecretAccessKey string
+	R2BucketName      string
+	R2PublicURL       string
 }
 
 // Load reads configuration from environment variables with sensible defaults.
 func Load() *Config {
 	cfg := &Config{
-		MongoURI:     getEnv("MONGO_URI", "mongodb://localhost:27017"),
-		DBName:       getEnv("DB_NAME", "agriconnect"),
-		JWTSecret:    getEnv("JWT_SECRET", "change-me-to-a-secure-random-string"),
-		JWTExpiryHrs: getEnvInt("JWT_EXPIRY_HOURS", 24),
-		Port:         getEnv("PORT", "8080"),
-		UploadDir:    getEnv("UPLOAD_DIR", "./uploads"),
+		MongoURI:          getEnv("MONGO_URI", "mongodb://localhost:27017"),
+		DBName:            getEnv("DB_NAME", "agriconnect"),
+		JWTSecret:         getEnv("JWT_SECRET", "change-me-to-a-secure-random-string"),
+		JWTExpiryHrs:      getEnvInt("JWT_EXPIRY_HOURS", 24),
+		Port:              getEnv("PORT", "8080"),
+		UploadDir:         getEnv("UPLOAD_DIR", "./uploads"),
+		R2AccountID:       getEnv("R2_ACCOUNT_ID", ""),
+		R2AccessKeyID:     getEnv("R2_ACCESS_KEY_ID", ""),
+		R2SecretAccessKey: getEnv("R2_SECRET_ACCESS_KEY", ""),
+		R2BucketName:      getEnv("R2_BUCKET_NAME", ""),
+		R2PublicURL:       getEnv("R2_PUBLIC_URL", ""),
 	}
 	return cfg
 }

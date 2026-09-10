@@ -12,6 +12,7 @@ import (
 	"github.com/agriconnect/backend/internal/repository"
 	"github.com/agriconnect/backend/internal/router"
 	"github.com/agriconnect/backend/internal/service"
+	"github.com/agriconnect/backend/internal/storage"
 	"github.com/joho/godotenv"
 )
 
@@ -35,9 +36,15 @@ func main() {
 
 	db := mongoClient.Database(cfg.DBName)
 
-	// Ensure upload directory exists
+	// Ensure local upload directory exists (used as fallback when R2 is not configured)
 	if err := os.MkdirAll(cfg.UploadDir, os.ModePerm); err != nil {
 		log.Fatal("❌ Failed to create upload directory:", err)
+	}
+
+	// Initialize storage service (Cloudflare R2 if configured, otherwise local disk)
+	storageSvc, err := storage.New(cfg)
+	if err != nil {
+		log.Fatal("❌ Failed to initialize storage service:", err)
 	}
 
 	// Repositories
@@ -55,7 +62,7 @@ func main() {
 
 	// Services
 	authService := service.NewAuthService(userRepo, cfg.JWTSecret, cfg.JWTExpiryHrs)
-	userService := service.NewUserService(userRepo, cfg.UploadDir)
+	userService := service.NewUserService(userRepo, storageSvc)
 	adminService := service.NewAdminService(userRepo)
 	produceService := service.NewProduceService(produceRepo, userRepo, notifRepo)
 	supplyService := service.NewSupplyService(supplyRepo, userRepo, notifRepo)
@@ -86,7 +93,7 @@ func main() {
 	communityHandler := handler.NewCommunityHandler(communityService)
 	analyticsHandler := handler.NewAnalyticsHandler(analyticsService)
 	notifHandler := handler.NewNotificationHandler(notifService)
-	uploadHandler := handler.NewUploadHandler(cfg.UploadDir)
+	uploadHandler := handler.NewUploadHandler(storageSvc)
 	chatHandler := handler.NewChatHandler(chatService)
 
 	// Build router
