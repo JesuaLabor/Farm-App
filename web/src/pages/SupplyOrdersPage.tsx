@@ -88,6 +88,15 @@ export const SupplyOrdersPage: React.FC = () => {
   const [filterTab, setFilterTab] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
   const [orderToSetShipping, setOrderToSetShipping] = useState<SupplyOrder | null>(null);
   const [shippingFeeInput, setShippingFeeInput] = useState<number>(0);
+  const [shippingFeeDisplay, setShippingFeeDisplay] = useState<string>('0');
+
+  useEffect(() => {
+    if (orderToSetShipping) {
+      const fee = orderToSetShipping.shippingFee || 0;
+      setShippingFeeInput(fee);
+      setShippingFeeDisplay(fee === 0 ? '0' : fee.toLocaleString());
+    }
+  }, [orderToSetShipping]);
   const [orderToCancel, setOrderToCancel] = useState<SupplyOrder | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
 
@@ -1098,7 +1107,10 @@ export const SupplyOrdersPage: React.FC = () => {
                   <button
                     key={preset.label}
                     type="button"
-                    onClick={() => setShippingFeeInput(preset.fee)}
+                    onClick={() => {
+                      setShippingFeeInput(preset.fee);
+                      setShippingFeeDisplay(preset.fee === 0 ? '0' : preset.fee.toLocaleString());
+                    }}
                     style={{
                       padding: '8px 10px',
                       borderRadius: '10px',
@@ -1131,11 +1143,35 @@ export const SupplyOrdersPage: React.FC = () => {
                   ₱
                 </span>
                 <input
-                  type="number"
-                  min="0"
-                  step="10"
-                  value={shippingFeeInput}
-                  onChange={(e) => setShippingFeeInput(Math.max(0, Number(e.target.value) || 0))}
+                  type="text"
+                  inputMode="numeric"
+                  value={shippingFeeDisplay}
+                  onFocus={(e) => {
+                    if (shippingFeeDisplay === '0' || shippingFeeInput === 0) {
+                      setShippingFeeDisplay('');
+                    } else {
+                      e.target.select();
+                    }
+                  }}
+                  onChange={(e) => {
+                    const rawDigits = e.target.value.replace(/\D/g, '');
+                    if (!rawDigits) {
+                      setShippingFeeDisplay('');
+                      setShippingFeeInput(0);
+                    } else {
+                      const num = parseInt(rawDigits, 10);
+                      setShippingFeeInput(num);
+                      setShippingFeeDisplay(num.toLocaleString());
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!shippingFeeDisplay.trim()) {
+                      setShippingFeeDisplay('0');
+                      setShippingFeeInput(0);
+                    } else {
+                      setShippingFeeDisplay(shippingFeeInput.toLocaleString());
+                    }
+                  }}
                   style={{
                     width: '100%',
                     padding: '12px 14px 12px 34px',
