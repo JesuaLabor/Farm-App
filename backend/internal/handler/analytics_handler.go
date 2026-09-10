@@ -18,10 +18,11 @@ func NewAnalyticsHandler(analyticsService *service.AnalyticsService) *AnalyticsH
 func (h *AnalyticsHandler) GetLGUDashboard(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	region := q.Get("region")
+	municipality := q.Get("municipality")
 	startDate := q.Get("startDate")
 	endDate := q.Get("endDate")
 
-	summary, err := h.analyticsService.GetLGUDashboardSummary(r.Context(), region, startDate, endDate)
+	summary, err := h.analyticsService.GetLGUDashboardSummary(r.Context(), region, municipality, startDate, endDate)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to compute LGU dashboard metrics")
 		return

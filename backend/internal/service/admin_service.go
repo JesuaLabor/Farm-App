@@ -88,12 +88,11 @@ func (s *AdminService) ListUsers(ctx context.Context, requesterID string, roleFi
 			}
 			filter["role"] = roleFilter
 		} else {
-			// Only show farmer, buyer, supplier, expert
+			// Only show farmer, buyer, supplier
 			filter["role"] = bson.M{"$in": []models.Role{
 				models.RoleFarmer,
 				models.RoleBuyer,
 				models.RoleSupplier,
-				models.RoleExpert,
 			}}
 		}
 

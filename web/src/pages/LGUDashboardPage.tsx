@@ -4,26 +4,7 @@ import { analyticsApi } from '../api/analytics';
 import { PriceChart } from '../components/PriceChart';
 import { useAuth } from '../contexts/AuthContext';
 import type { LGUDashboardSummary } from '../types/analytics';
-
-const philippineRegions = [
-  'All Regions',
-  'NCR - National Capital Region',
-  'CAR - Cordillera Administrative Region',
-  'Region I - Ilocos Region',
-  'Region II - Cagayan Valley',
-  'Region III - Central Luzon',
-  'Region IV-A - CALABARZON',
-  'Region V - Bicol Region',
-  'Region VI - Western Visayas',
-  'Region VII - Central Visayas',
-  'Region VIII - Eastern Visayas',
-  'Region IX - Zamboanga Peninsula',
-  'Region X - Northern Mindanao',
-  'Region XI - Davao Region',
-  'Region XII - SOCCSKSARGEN',
-  'Region XIII - Caraga',
-  'BARMM - Bangsamoro Autonomous Region',
-];
+import { getRegions, getProvinces, getMunicipalities } from '../data/philippineLocations';
 
 function fmt(n: number) {
   return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -41,18 +22,36 @@ export const LGUDashboardPage: React.FC = () => {
   const isLguStaff = user?.role === 'lgu_staff';
 
   const defaultRegion = isLguStaff && user?.region ? user.region : 'All Regions';
+  const defaultProvince = isLguStaff && user?.province ? user.province : 'All Provinces';
+  const defaultMunicipality = isLguStaff && user?.municipality ? user.municipality : 'All Municipalities';
 
   const [selectedRegion, setSelectedRegion] = useState(defaultRegion);
+  const [selectedProvince, setSelectedProvince] = useState(defaultProvince);
+  const [selectedMunicipality, setSelectedMunicipality] = useState(defaultMunicipality);
+
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [data, setData] = useState<LGUDashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const regions = ['All Regions', ...getRegions()];
+  const provinces = selectedRegion !== 'All Regions'
+    ? ['All Provinces', ...getProvinces(selectedRegion)]
+    : ['All Provinces'];
+  const municipalities = (selectedRegion !== 'All Regions' && selectedProvince !== 'All Provinces')
+    ? ['All Municipalities', ...getMunicipalities(selectedRegion, selectedProvince)]
+    : ['All Municipalities'];
+
   const fetchMetrics = useCallback(async () => {
     setLoading(true);
     try {
       const summary = await analyticsApi.getLGUDashboard({
-        region: selectedRegion !== 'All Regions' ? selectedRegion : undefined,
+        region: isLguStaff
+          ? (user?.region || undefined)
+          : (selectedRegion !== 'All Regions' ? selectedRegion : undefined),
+        municipality: isLguStaff
+          ? (user?.municipality || undefined)
+          : (selectedMunicipality !== 'All Municipalities' ? selectedMunicipality : undefined),
         startDate: startDate || undefined,
         endDate: endDate || undefined,
       });
@@ -62,18 +61,24 @@ export const LGUDashboardPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedRegion, startDate, endDate]);
+  }, [isLguStaff, user?.region, user?.municipality, selectedRegion, selectedMunicipality, startDate, endDate]);
 
   useEffect(() => { fetchMetrics(); }, [fetchMetrics]);
 
   const maxCropCount = data?.topCrops.reduce((m, c) => Math.max(m, c.listingCount), 1) || 1;
+
+  const activeMunName = isLguStaff && user?.municipality
+    ? user.municipality
+    : selectedMunicipality !== 'All Municipalities'
+    ? selectedMunicipality
+    : null;
 
   const kpiCards = data ? [
     {
       icon: '👨‍🌾',
       label: 'Registered Farmers',
       value: data.totalRegisteredFarmers.toLocaleString(),
-      sub: 'Verified accounts in region',
+      sub: activeMunName ? `Verified accounts in ${activeMunName}` : 'Verified accounts across area',
       color: '#176B3A',
       bg: '#EAF6EE',
     },
@@ -89,7 +94,7 @@ export const LGUDashboardPage: React.FC = () => {
       icon: '🏛️',
       label: 'Program Applications',
       value: data.programApplicationsByStatus.reduce((s, a) => s + a.count, 0).toString(),
-      sub: 'Across all subsidy programs',
+      sub: activeMunName ? `For ${activeMunName} subsidy programs` : 'Across all subsidy programs',
       color: '#7C3AED',
       bg: '#F3E5F5',
     },
@@ -97,7 +102,7 @@ export const LGUDashboardPage: React.FC = () => {
       icon: '💬',
       label: 'Community Posts',
       value: data.communityActivity.totalPosts.toString(),
-      sub: `${data.communityActivity.totalComments} expert replies`,
+      sub: `${data.communityActivity.totalComments} community replies`,
       color: '#0D9488',
       bg: '#E0F2F1',
     },
@@ -175,30 +180,74 @@ export const LGUDashboardPage: React.FC = () => {
           flexWrap: 'wrap',
           boxShadow: '0 2px 8px rgba(26,28,26,0.05)',
         }}>
-          <div style={{ flex: 2, minWidth: '200px' }}>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#525450', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              🗺️ Region / Jurisdiction
-            </label>
-            {isLguStaff ? (
+          {isLguStaff ? (
+            <div style={{ flex: 2, minWidth: '220px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#525450', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                📍 Jurisdiction (Assigned Municipality)
+              </label>
               <div style={{
                 padding: '10px 14px', borderRadius: '10px',
                 border: '1.5px solid #C8EDD6', background: '#F6FCF8',
                 fontSize: '14px', fontWeight: 700, color: '#176B3A',
                 display: 'flex', alignItems: 'center', gap: '6px',
               }}>
-                📍 {selectedRegion}
+                📍 {user?.municipality ? `${user.municipality}, ` : ''}{user?.province ? `${user.province}, ` : ''}{selectedRegion}
               </div>
-            ) : (
-              <select
-                className="form-input"
-                value={selectedRegion}
-                onChange={(e) => setSelectedRegion(e.target.value)}
-                style={{ borderRadius: '10px' }}
-              >
-                {philippineRegions.map((r) => <option key={r} value={r}>{r}</option>)}
-              </select>
-            )}
-          </div>
+            </div>
+          ) : (
+            <>
+              <div style={{ flex: 1.5, minWidth: '180px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#525450', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  🗺️ Region
+                </label>
+                <select
+                  className="form-input"
+                  value={selectedRegion}
+                  onChange={(e) => {
+                    setSelectedRegion(e.target.value);
+                    setSelectedProvince('All Provinces');
+                    setSelectedMunicipality('All Municipalities');
+                  }}
+                  style={{ borderRadius: '10px' }}
+                >
+                  {regions.map((r) => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+
+              <div style={{ flex: 1.5, minWidth: '180px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#525450', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  🏛️ Province
+                </label>
+                <select
+                  className="form-input"
+                  value={selectedProvince}
+                  disabled={selectedRegion === 'All Regions'}
+                  onChange={(e) => {
+                    setSelectedProvince(e.target.value);
+                    setSelectedMunicipality('All Municipalities');
+                  }}
+                  style={{ borderRadius: '10px' }}
+                >
+                  {provinces.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+
+              <div style={{ flex: 1.5, minWidth: '180px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#525450', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  📍 Municipality / City
+                </label>
+                <select
+                  className="form-input"
+                  value={selectedMunicipality}
+                  disabled={selectedProvince === 'All Provinces'}
+                  onChange={(e) => setSelectedMunicipality(e.target.value)}
+                  style={{ borderRadius: '10px' }}
+                >
+                  {municipalities.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+            </>
+          )}
 
           <div style={{ flex: 1, minWidth: '160px' }}>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#525450', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>

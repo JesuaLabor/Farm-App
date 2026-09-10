@@ -17,6 +17,7 @@ export interface CommunityStat {
 
 export interface LGUDashboardSummary {
   region: string;
+  municipality?: string;
   totalRegisteredFarmers: number;
   totalTransactionsCount: number;
   totalTransactionsValue: number;

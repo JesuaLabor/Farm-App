@@ -85,7 +85,7 @@ export const SuperAdminApprovalsPage: React.FC = () => {
             <span className="page-header-label">System Administration</span>
             <h1 className="page-header-title">Super Admin — LGU Staff Account Approvals</h1>
             <p className="page-header-sub">
-              Review and approve LGU Staff accounts across all regions. Approved LGU staff can manage local farmers, buyers, suppliers, and experts.
+              Review and approve LGU Staff accounts across all regions. Approved LGU staff can manage local farmers, buyers, and suppliers.
             </p>
           </div>
         </div>
@@ -99,7 +99,6 @@ export const SuperAdminApprovalsPage: React.FC = () => {
               <option value="farmer">🧑‍🌾 Farmer</option>
               <option value="buyer">🛒 Buyer</option>
               <option value="supplier">📦 Supplier</option>
-              <option value="expert">🌿 Expert / Agronomist</option>
               <option value="lgu_staff">🏛️ LGU Staff</option>
             </select>
           </div>
@@ -195,7 +194,6 @@ export const SuperAdminApprovalsPage: React.FC = () => {
                 farmer: { bg: '#E8F5E9', text: '#1B5E20' },
                 buyer: { bg: '#E3F2FD', text: '#1565C0' },
                 supplier: { bg: '#FFF3E0', text: '#E65100' },
-                expert: { bg: '#F3E5F5', text: '#6A1B9A' },
                 lgu_staff: { bg: '#E0F2F1', text: '#00695C' },
                 super_admin: { bg: '#FCE4EC', text: '#880E4F' },
               };
@@ -282,7 +280,7 @@ export const SuperAdminApprovalsPage: React.FC = () => {
                         background: roleColor.bg, color: roleColor.text,
                         border: `1.5px solid ${roleColor.text}33`,
                       }}>
-                        {u.role === 'farmer' ? '🧑‍🌾' : u.role === 'buyer' ? '🛒' : u.role === 'supplier' ? '📦' : u.role === 'expert' ? '🌿' : u.role === 'lgu_staff' ? '🏛️' : '🔐'}
+                        {u.role === 'farmer' ? '🧑‍🌾' : u.role === 'buyer' ? '🛒' : u.role === 'supplier' ? '📦' : u.role === 'lgu_staff' ? '🏛️' : '🔐'}
                         {roleLabel}
                       </span>
                     </div>

@@ -17,7 +17,7 @@ func NewAnalyticsService(analyticsRepo *repository.AnalyticsRepository) *Analyti
 }
 
 // GetLGUDashboardSummary computes overview statistics for LGU offices.
-func (s *AnalyticsService) GetLGUDashboardSummary(ctx context.Context, region, startDateStr, endDateStr string) (*models.LGUDashboardSummary, error) {
+func (s *AnalyticsService) GetLGUDashboardSummary(ctx context.Context, region, municipality, startDateStr, endDateStr string) (*models.LGUDashboardSummary, error) {
 	var startDate, endDate *time.Time
 
 	if startDateStr != "" {
@@ -32,5 +32,5 @@ func (s *AnalyticsService) GetLGUDashboardSummary(ctx context.Context, region, s
 		}
 	}
 
-	return s.analyticsRepo.GetLGUDashboardSummary(ctx, region, startDate, endDate)
+	return s.analyticsRepo.GetLGUDashboardSummary(ctx, region, municipality, startDate, endDate)
 }

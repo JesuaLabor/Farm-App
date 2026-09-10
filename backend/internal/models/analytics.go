@@ -23,6 +23,7 @@ type MonthlyTrend struct {
 
 type LGUDashboardSummary struct {
 	Region                     string            `json:"region"`
+	Municipality               string            `json:"municipality,omitempty"`
 	TotalRegisteredFarmers     int64             `json:"totalRegisteredFarmers"`
 	TotalTransactionsCount     int64             `json:"totalTransactionsCount"`
 	TotalTransactionsValue     float64           `json:"totalTransactionsValue"`

@@ -31,10 +31,11 @@ func NewAnalyticsRepository(db *mongo.Database) *AnalyticsRepository {
 	}
 }
 
-// GetLGUDashboardSummary computes aggregated regional statistics.
-func (r *AnalyticsRepository) GetLGUDashboardSummary(ctx context.Context, region string, startDate, endDate *time.Time) (*models.LGUDashboardSummary, error) {
+// GetLGUDashboardSummary computes aggregated municipal / regional statistics.
+func (r *AnalyticsRepository) GetLGUDashboardSummary(ctx context.Context, region, municipality string, startDate, endDate *time.Time) (*models.LGUDashboardSummary, error) {
 	summary := &models.LGUDashboardSummary{
 		Region:                      region,
+		Municipality:                municipality,
 		TopCrops:                    []models.CropStat{},
 		ProgramApplicationsByStatus: []models.StatusStat{},
 		RecentMarketPrices:         []models.MarketPrice{},
@@ -43,7 +44,9 @@ func (r *AnalyticsRepository) GetLGUDashboardSummary(ctx context.Context, region
 
 	// 1. Registered Farmers count
 	userQuery := bson.M{"role": models.RoleFarmer}
-	if region != "" && region != "All Regions" {
+	if municipality != "" && municipality != "all" && municipality != "All Municipalities" {
+		userQuery["municipality"] = bson.M{"$regex": "^" + municipality + "$", "$options": "i"}
+	} else if region != "" && region != "All Regions" {
 		userQuery["region"] = bson.M{"$regex": region, "$options": "i"}
 	}
 	farmerCount, err := r.userColl.CountDocuments(ctx, userQuery)
@@ -100,13 +103,22 @@ func (r *AnalyticsRepository) GetLGUDashboardSummary(ctx context.Context, region
 		}
 	}
 
-	// 4. Program Applications by Status Aggregation
-	appPipeline := mongo.Pipeline{
-		bson.D{{Key: "$group", Value: bson.M{
-			"_id":   "$status",
-			"count": bson.M{"$sum": 1},
-		}}},
+	// 4. Program Applications by Status Aggregation (filtered by Municipality)
+	appMatch := bson.M{}
+	if municipality != "" && municipality != "all" && municipality != "All Municipalities" {
+		appMatch["farmer_municipality"] = bson.M{"$regex": "^" + municipality + "$", "$options": "i"}
+	} else if region != "" && region != "All Regions" {
+		appMatch["farmer_region"] = bson.M{"$regex": region, "$options": "i"}
 	}
+
+	appPipeline := mongo.Pipeline{}
+	if len(appMatch) > 0 {
+		appPipeline = append(appPipeline, bson.D{{Key: "$match", Value: appMatch}})
+	}
+	appPipeline = append(appPipeline, bson.D{{Key: "$group", Value: bson.M{
+		"_id":   "$status",
+		"count": bson.M{"$sum": 1},
+	}}})
 	appCursor, err := r.appColl.Aggregate(ctx, appPipeline)
 	if err == nil {
 		_ = appCursor.All(ctx, &summary.ProgramApplicationsByStatus)

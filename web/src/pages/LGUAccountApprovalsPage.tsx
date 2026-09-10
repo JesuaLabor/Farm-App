@@ -90,8 +90,6 @@ export const LGUAccountApprovalsPage: React.FC = () => {
         return '🚜';
       case 'buyer':
         return '📦';
-      case 'expert':
-        return '🎓';
       default:
         return '👤';
     }
@@ -124,7 +122,7 @@ export const LGUAccountApprovalsPage: React.FC = () => {
           Regional Account Approvals
         </h1>
         <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>
-          Verify and approve local Farmers, Wholesale Buyers, Agri-Suppliers, and Agronomic Experts in your jurisdiction.
+          Verify and approve local Farmers, Wholesale Buyers, and Agri-Suppliers in your jurisdiction.
         </p>
       </div>
 
@@ -244,7 +242,6 @@ export const LGUAccountApprovalsPage: React.FC = () => {
               <option value="farmer">🧑‍🌾 Farmers</option>
               <option value="supplier">🚜 Agri-Suppliers</option>
               <option value="buyer">📦 Wholesale Buyers</option>
-              <option value="expert">🎓 Agronomists</option>
             </select>
           </div>
 
