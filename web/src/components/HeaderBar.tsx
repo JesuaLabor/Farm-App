@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
 import { NotificationBell } from './NotificationBell';
+import { getImageUrl } from '../api';
 
 //UAT
 
@@ -242,6 +243,12 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   const userFullName = user ? `${user.firstName} ${user.lastName}` : 'User';
   const userEmail = user?.email || '';
   const userRoleLabel = user?.role ? roleLabels[user.role] || user.role : '';
+
+  const [avatarError, setAvatarError] = useState(false);
+
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user?.photoUrl]);
 
   return (
     <header
@@ -675,9 +682,28 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
                 fontSize: '16px',
                 transition: 'background 0.18s ease, box-shadow 0.18s ease',
                 boxShadow: showProfileDropdown ? '0 0 0 3px rgba(23, 107, 58, 0.3)' : '0 1px 3px rgba(0,0,0,0.1)',
+                overflow: 'hidden',
+                flexShrink: 0,
+                aspectRatio: '1 / 1',
               }}
             >
-              {userInitial}
+              {!avatarError && user?.photoUrl ? (
+                <img
+                  src={getImageUrl(user.photoUrl)}
+                  alt={userFullName}
+                  onError={() => setAvatarError(true)}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    borderRadius: '50%',
+                    display: 'block',
+                    aspectRatio: '1 / 1',
+                  }}
+                />
+              ) : (
+                userInitial
+              )}
             </div>
           </button>
 
@@ -724,9 +750,27 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
                     fontWeight: 800,
                     fontSize: '18px',
                     flexShrink: 0,
+                    overflow: 'hidden',
+                    aspectRatio: '1 / 1',
                   }}
                 >
-                  {userInitial}
+                  {!avatarError && user?.photoUrl ? (
+                    <img
+                      src={getImageUrl(user.photoUrl)}
+                      alt={userFullName}
+                      onError={() => setAvatarError(true)}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        borderRadius: '50%',
+                        display: 'block',
+                        aspectRatio: '1 / 1',
+                      }}
+                    />
+                  ) : (
+                    userInitial
+                  )}
                 </div>
                 <div style={{ overflow: 'hidden', flex: 1 }}>
                   <div
