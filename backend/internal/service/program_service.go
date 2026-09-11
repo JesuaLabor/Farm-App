@@ -13,14 +13,16 @@ import (
 )
 
 type ProgramService struct {
-	progRepo *repository.ProgramRepository
-	userRepo *repository.UserRepository
+	progRepo  *repository.ProgramRepository
+	userRepo  *repository.UserRepository
+	notifRepo *repository.NotificationRepository
 }
 
-func NewProgramService(progRepo *repository.ProgramRepository, userRepo *repository.UserRepository) *ProgramService {
+func NewProgramService(progRepo *repository.ProgramRepository, userRepo *repository.UserRepository, notifRepo *repository.NotificationRepository) *ProgramService {
 	return &ProgramService{
-		progRepo: progRepo,
-		userRepo: userRepo,
+		progRepo:  progRepo,
+		userRepo:  userRepo,
+		notifRepo: notifRepo,
 	}
 }
 
@@ -184,7 +186,7 @@ func (s *ProgramService) ListApplicationsByFarmer(ctx context.Context, farmerID 
 	return s.progRepo.ListApplicationsByFarmer(ctx, fOID)
 }
 
-// ReviewApplication updates application status with optional remarks.
+// ReviewApplication updates application status with optional remarks and notifies the farmer.
 func (s *ProgramService) ReviewApplication(ctx context.Context, reviewerID string, appIDStr string, req models.UpdateApplicationStatusRequest) error {
 	rOID, err := bson.ObjectIDFromHex(reviewerID)
 	if err != nil {
@@ -195,5 +197,54 @@ func (s *ProgramService) ReviewApplication(ctx context.Context, reviewerID strin
 		return fmt.Errorf("invalid application ID: %w", err)
 	}
 
-	return s.progRepo.UpdateApplicationStatus(ctx, aOID, req.Status, req.Remarks, rOID)
+	app, err := s.progRepo.GetApplicationByID(ctx, aOID)
+	if err != nil {
+		return err
+	}
+
+	if err := s.progRepo.UpdateApplicationStatus(ctx, aOID, req.Status, req.Remarks, rOID); err != nil {
+		return err
+	}
+
+	// Fetch program to get its title
+	progTitle := "Government Assistance Program"
+	if prog, err := s.progRepo.GetProgramByID(ctx, app.ProgramID); err == nil && prog.Title != "" {
+		progTitle = prog.Title
+	}
+
+	// Send in-app notification to the applicant farmer
+	if s.notifRepo != nil {
+		var notifTitle string
+		var notifMsg string
+
+		remarksDetail := ""
+		if strings.TrimSpace(req.Remarks) != "" {
+			remarksDetail = fmt.Sprintf(" Notes: %s", strings.TrimSpace(req.Remarks))
+		}
+
+		switch req.Status {
+		case models.ApplicationStatusApproved:
+			notifTitle = "🏛️ Program Application Approved!"
+			notifMsg = fmt.Sprintf("Congratulations! Your application for \"%s\" has been APPROVED by the LGU.%s", progTitle, remarksDetail)
+		case models.ApplicationStatusRejected:
+			notifTitle = "🏛️ Program Application Update"
+			notifMsg = fmt.Sprintf("Your application for \"%s\" was not approved by the LGU.%s", progTitle, remarksDetail)
+		case models.ApplicationStatusUnderReview:
+			notifTitle = "🏛️ Program Application Under Review"
+			notifMsg = fmt.Sprintf("Your application for \"%s\" is currently being reviewed by the LGU.%s", progTitle, remarksDetail)
+		default:
+			notifTitle = "🏛️ Program Application Status Updated"
+			notifMsg = fmt.Sprintf("Your application for \"%s\" status is now: %s.%s", progTitle, req.Status, remarksDetail)
+		}
+
+		_ = s.notifRepo.CreateNotification(ctx, &models.Notification{
+			UserID:  app.FarmerID,
+			Title:   notifTitle,
+			Message: notifMsg,
+			Type:    models.NotifTypeSystem,
+			Link:    "/programs",
+		})
+	}
+
+	return nil
 }

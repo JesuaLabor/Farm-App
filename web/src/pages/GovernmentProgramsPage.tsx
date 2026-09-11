@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiClient } from '../api';
 import { programApi } from '../api/program';
+import type { ProgramApplication, ApplicationStatus } from '../types/program';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -76,6 +77,12 @@ export const GovernmentProgramsPage: React.FC = () => {
   const [programs, setPrograms] = useState<UnifiedProgram[]>(samplePrograms);
   const [loading, setLoading] = useState(false);
 
+  // Farmer Applications State & Lookup Map
+  const [myApplications, setMyApplications] = useState<ProgramApplication[]>([]);
+  const [appliedMap, setAppliedMap] = useState<Record<string, ProgramApplication>>({});
+  const [trackingApp, setTrackingApp] = useState<{ program: UnifiedProgram; application: ProgramApplication } | null>(null);
+  const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
+
   // Modals
   const [selectedProgram, setSelectedProgram] = useState<UnifiedProgram | null>(null);
   const [isApplying, setIsApplying] = useState(false);
@@ -92,7 +99,12 @@ export const GovernmentProgramsPage: React.FC = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successApp, setSuccessApp] = useState<{ progTitle: string; refId: string } | null>(null);
+  const [successApp, setSuccessApp] = useState<{
+    progTitle: string;
+    refId: string;
+    program?: UnifiedProgram;
+    application?: ProgramApplication;
+  } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -138,10 +150,131 @@ export const GovernmentProgramsPage: React.FC = () => {
     fetchPrograms();
   }, []);
 
-  const categories = ['All Programs', 'Available', 'For You', 'Ending Soon', 'Past / Closed'];
+  // Fetch current farmer's applications
+  useEffect(() => {
+    const fetchMyApps = async () => {
+      if (user?.role !== 'farmer') return;
+      try {
+        const apps = await programApi.listMyApplications();
+        const map: Record<string, ProgramApplication> = {};
+        const mergedList: ProgramApplication[] = [...apps];
+
+        apps.forEach((a) => {
+          if (a.programId) {
+            map[a.programId] = a;
+          }
+        });
+
+        // Merge offline / cached local applications if any
+        try {
+          const stored = localStorage.getItem(`agriconnect_applied_programs_${user.id}`);
+          if (stored) {
+            const localApps: ProgramApplication[] = JSON.parse(stored);
+            localApps.forEach((la) => {
+              if (!map[la.programId]) {
+                map[la.programId] = la;
+                mergedList.push(la);
+              }
+            });
+          }
+        } catch (e) {}
+
+        setMyApplications(mergedList);
+        setAppliedMap(map);
+      } catch (err) {
+        console.warn('Could not fetch farmer applications from server, using local cache:', err);
+        try {
+          const stored = localStorage.getItem(`agriconnect_applied_programs_${user?.id}`);
+          if (stored) {
+            const localApps: ProgramApplication[] = JSON.parse(stored);
+            const map: Record<string, ProgramApplication> = {};
+            localApps.forEach((la) => { map[la.programId] = la; });
+            setMyApplications(localApps);
+            setAppliedMap(map);
+          }
+        } catch (e) {}
+      }
+    };
+
+    fetchMyApps();
+  }, [user?.id, user?.role]);
+
+  // Helper formatting for statuses
+  const getStatusLabel = (status: ApplicationStatus) => {
+    switch (status) {
+      case 'submitted':
+        return 'Submitted';
+      case 'under_review':
+        return 'Under Review';
+      case 'approved':
+        return 'Approved';
+      case 'rejected':
+        return 'Not Approved';
+      default:
+        return status;
+    }
+  };
+
+  const getStatusIcon = (status: ApplicationStatus) => {
+    switch (status) {
+      case 'submitted':
+        return '📋';
+      case 'under_review':
+        return '⏳';
+      case 'approved':
+        return '✅';
+      case 'rejected':
+        return '❌';
+      default:
+        return 'ℹ️';
+    }
+  };
+
+  const getStatusBadgeStyles = (status: ApplicationStatus): React.CSSProperties => {
+    switch (status) {
+      case 'submitted':
+        return { background: '#FEF3C7', color: '#92400E', border: '1.5px solid #FDE68A' };
+      case 'under_review':
+        return { background: '#EEF2FF', color: '#4338CA', border: '1.5px solid #C7D2FE' };
+      case 'approved':
+        return { background: '#ECFDF5', color: '#065F46', border: '1.5px solid #A7F3D0' };
+      case 'rejected':
+        return { background: '#FFF1F2', color: '#9F1239', border: '1.5px solid #FECDD3' };
+      default:
+        return { background: '#F1F5F9', color: '#475569', border: '1.5px solid #CBD5E1' };
+    }
+  };
+
+  const getStatusButtonStyles = (status: ApplicationStatus): React.CSSProperties => {
+    switch (status) {
+      case 'approved':
+        return { background: '#166534', color: '#FFFFFF', border: 'none', boxShadow: '0 3px 10px rgba(22, 101, 52, 0.25)' };
+      case 'rejected':
+        return { background: '#BE123C', color: '#FFFFFF', border: 'none', boxShadow: '0 3px 10px rgba(190, 18, 60, 0.25)' };
+      case 'under_review':
+        return { background: '#4338CA', color: '#FFFFFF', border: 'none', boxShadow: '0 3px 10px rgba(67, 56, 202, 0.25)' };
+      case 'submitted':
+      default:
+        return { background: '#0E4A27', color: '#FFFFFF', border: 'none', boxShadow: '0 3px 10px rgba(14, 74, 39, 0.2)' };
+    }
+  };
+
+  const categories = [
+    'All Programs',
+    ...(user?.role === 'farmer' ? [`My Applications${myApplications.length > 0 ? ` (${myApplications.length})` : ''}`] : []),
+    'Available',
+    'For You',
+    'Ending Soon',
+    'Past / Closed',
+  ];
 
   const filteredPrograms = programs.filter((prog) => {
-    // 1. Municipality filter
+    // 1. Check "My Applications" tab
+    if (selectedCat.startsWith('My Applications')) {
+      return !!appliedMap[prog.id];
+    }
+
+    // 2. Municipality filter
     if (municipalityScope === 'my_municipality' && user?.municipality) {
       const userMun = user.municipality.trim().toLowerCase();
       const progMun = (prog.municipality || '').trim().toLowerCase();
@@ -149,7 +282,7 @@ export const GovernmentProgramsPage: React.FC = () => {
       if (!isMatch) return false;
     }
 
-    // 2. Category filter
+    // 3. Category filter
     if (selectedCat === 'All Programs') return true;
     if (selectedCat === 'Available') return !prog.isExpired;
     if (selectedCat === 'For You') return prog.eligible && !prog.isExpired;
@@ -175,7 +308,19 @@ export const GovernmentProgramsPage: React.FC = () => {
     setErrorMsg(null);
   };
 
+  const handleOpenTracking = (prog: UnifiedProgram, app: ProgramApplication) => {
+    setTrackingApp({ program: prog, application: app });
+    setSelectedProgram(null);
+    setIsApplying(false);
+  };
+
   const handleStartApply = (prog: UnifiedProgram) => {
+    const existingApp = appliedMap[prog.id];
+    if (existingApp) {
+      handleOpenTracking(prog, existingApp);
+      return;
+    }
+
     if (isOutOfJurisdiction(prog)) {
       toastError(
         'Out of Jurisdiction',
@@ -280,13 +425,56 @@ export const GovernmentProgramsPage: React.FC = () => {
       };
 
       // Try submitting to backend API if it's a real backend ObjectID
+      let createdApp: ProgramApplication | null = null;
       if (selectedProgram.id && selectedProgram.id.length === 24) {
-        await programApi.submitApplication(selectedProgram.id, payload);
+        try {
+          createdApp = await programApi.submitApplication(selectedProgram.id, payload);
+        } catch (apiErr) {
+          console.warn('Backend API submission returned error:', apiErr);
+          throw apiErr;
+        }
       }
 
+      const newApplication: ProgramApplication = createdApp || {
+        id: `app-local-${Date.now()}`,
+        programId: selectedProgram.id,
+        farmerId: user?.id || 'farmer-current',
+        farmerName: `${user?.firstName || 'Farmer'} ${user?.lastName || ''}`.trim(),
+        farmerPhone: user?.phone,
+        farmerMunicipality: user?.municipality,
+        farmSizeHectares: parseFloat(farmSizeHectares) || 1.0,
+        cropsGrown: cropsGrown.split(',').map((c) => c.trim()).filter(Boolean),
+        rsbsaNumber: rsbsaNumber.trim(),
+        submittedDocs,
+        status: 'submitted',
+        submittedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        programTitle: selectedProgram.title,
+      };
+
+      setAppliedMap((prev) => ({ ...prev, [selectedProgram.id]: newApplication }));
+      setMyApplications((prev) => {
+        const next = [newApplication, ...prev.filter((a) => a.programId !== selectedProgram.id)];
+        if (user?.id) {
+          try {
+            localStorage.setItem(`agriconnect_applied_programs_${user.id}`, JSON.stringify(next));
+          } catch (e) {}
+        }
+        return next;
+      });
+
       // Show success modal state
-      const refCode = `APP-${Math.floor(100000 + Math.random() * 900000)}`;
-      setSuccessApp({ progTitle: selectedProgram.title, refId: refCode });
+      const refCode = newApplication.id.startsWith('app-local') || newApplication.id.startsWith('app-')
+        ? `APP-${Math.floor(100000 + Math.random() * 900000)}`
+        : `APP-${newApplication.id.slice(-6).toUpperCase()}`;
+
+      setSuccessApp({
+        progTitle: selectedProgram.title,
+        refId: refCode,
+        program: selectedProgram,
+        application: newApplication,
+      });
       toastSuccess('Applied Successfully!', `Application for "${selectedProgram.title}" submitted to LGU.`);
     } catch (err: any) {
       console.error('Submission failed:', err);
@@ -435,141 +623,213 @@ export const GovernmentProgramsPage: React.FC = () => {
         <div style={{ textAlign: 'center', padding: '48px', color: '#64748B' }}>
           Loading official government programs...
         </div>
+      ) : selectedCat.startsWith('My Applications') && filteredPrograms.length === 0 ? (
+        <div
+          style={{
+            textAlign: 'center',
+            padding: '60px 24px',
+            background: '#FFFFFF',
+            borderRadius: '24px',
+            border: '2px dashed #CBD5E1',
+            margin: '20px 0',
+          }}
+        >
+          <div style={{ fontSize: '50px', marginBottom: '14px' }}>🌾</div>
+          <h3 style={{ fontSize: '22px', fontWeight: 800, color: '#0E4A27', marginBottom: '8px' }}>
+            No Submitted Applications Yet
+          </h3>
+          <p style={{ fontSize: '15px', color: '#64748B', maxWidth: '480px', margin: '0 auto 24px auto', lineHeight: 1.6 }}>
+            You haven't submitted any applications for agricultural assistance programs yet. Browse our open government programs and apply using your RSBSA credentials!
+          </p>
+          <button
+            onClick={() => setSelectedCat('All Programs')}
+            className="btn btn-primary"
+            style={{ padding: '12px 28px', borderRadius: '12px', fontWeight: 700, fontSize: '15px' }}
+          >
+            Explore All Programs →
+          </button>
+        </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '26px' }}>
-          {filteredPrograms.map((prog) => (
-            <div
-              key={prog.id}
-              className="card card-interactive"
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                padding: '26px',
-                borderRadius: '20px',
-                borderTop: prog.eligible ? '6px solid #176B3A' : '3px solid #D8D6CF',
-                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
-                background: '#FFFFFF',
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span className="badge badge-info" style={{ fontSize: '13px', fontWeight: 700 }}>
-                      🏛️ {prog.organization}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        padding: '3px 8px',
-                        borderRadius: '8px',
-                        background: prog.municipality && prog.municipality !== 'All Municipalities' ? '#ECFDF5' : '#F1F5F9',
-                        color: prog.municipality && prog.municipality !== 'All Municipalities' ? '#065F46' : '#475569',
-                        border: prog.municipality && prog.municipality !== 'All Municipalities' ? '1px solid #A7F3D0' : '1px solid #CBD5E1',
-                      }}
-                    >
-                      📍 {prog.municipality || 'All Municipalities'}
-                    </span>
+          {filteredPrograms.map((prog) => {
+            const myApp = appliedMap[prog.id];
+            return (
+              <div
+                key={prog.id}
+                className="card card-interactive"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  padding: '26px',
+                  borderRadius: '20px',
+                  borderTop: myApp
+                    ? myApp.status === 'approved'
+                      ? '6px solid #166534'
+                      : myApp.status === 'rejected'
+                      ? '6px solid #BE123C'
+                      : '6px solid #F59E0B'
+                    : prog.eligible
+                    ? '6px solid #176B3A'
+                    : '3px solid #D8D6CF',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
+                  background: '#FFFFFF',
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span className="badge badge-info" style={{ fontSize: '13px', fontWeight: 700 }}>
+                        🏛️ {prog.organization}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          padding: '3px 8px',
+                          borderRadius: '8px',
+                          background: prog.municipality && prog.municipality !== 'All Municipalities' ? '#ECFDF5' : '#F1F5F9',
+                          color: prog.municipality && prog.municipality !== 'All Municipalities' ? '#065F46' : '#475569',
+                          border: prog.municipality && prog.municipality !== 'All Municipalities' ? '1px solid #A7F3D0' : '1px solid #CBD5E1',
+                        }}
+                      >
+                        📍 {prog.municipality || 'All Municipalities'}
+                      </span>
+                      {myApp && (
+                        <span
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 800,
+                            padding: '3px 10px',
+                            borderRadius: '12px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            ...getStatusBadgeStyles(myApp.status),
+                          }}
+                        >
+                          {getStatusIcon(myApp.status)} Applied ({getStatusLabel(myApp.status)})
+                        </span>
+                      )}
+                    </div>
+                    {prog.eligible && !myApp && (
+                      <span className="badge badge-verified" style={{ fontSize: '13px', fontWeight: 700 }}>
+                        ✓ Pre-Qualified
+                      </span>
+                    )}
                   </div>
-                  {prog.eligible && (
-                    <span className="badge badge-verified" style={{ fontSize: '13px', fontWeight: 700 }}>
-                      ✓ Pre-Qualified
-                    </span>
+
+                  <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0E4A27', marginBottom: '10px', lineHeight: 1.3 }}>
+                    {prog.title}
+                  </h2>
+
+                  <p style={{ fontSize: '15px', color: '#525450', lineHeight: 1.6, marginBottom: '20px' }}>
+                    {prog.description}
+                  </p>
+
+                  {/* Requirements Chips */}
+                  {prog.criteria && prog.criteria.length > 0 && (
+                    <div style={{ marginBottom: '18px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                        Primary Requirement:
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '13px', padding: '4px 10px', borderRadius: '8px', background: '#F1F5F9', color: '#334155', fontWeight: 600 }}>
+                          🆔 RSBSA Registration
+                        </span>
+                        <span style={{ fontSize: '13px', padding: '4px 10px', borderRadius: '8px', background: '#F1F5F9', color: '#334155', fontWeight: 600 }}>
+                          🌾 Smallholder
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {prog.isExpired ? (
+                    <div style={{ fontSize: '14px', color: '#64748B', fontWeight: 700, marginBottom: '22px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      ⛔ Deadline Passed: {prog.deadline} (Closed)
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '14px', color: '#BA3C3C', fontWeight: 700, marginBottom: '22px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      ⏳ Application Deadline: {prog.deadline}
+                    </div>
                   )}
                 </div>
 
-                <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0E4A27', marginBottom: '10px', lineHeight: 1.3 }}>
-                  {prog.title}
-                </h2>
-
-                <p style={{ fontSize: '15px', color: '#525450', lineHeight: 1.6, marginBottom: '20px' }}>
-                  {prog.description}
-                </p>
-
-                {/* Requirements Chips */}
-                {prog.criteria && prog.criteria.length > 0 && (
-                  <div style={{ marginBottom: '18px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
-                      Primary Requirement:
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '13px', padding: '4px 10px', borderRadius: '8px', background: '#F1F5F9', color: '#334155', fontWeight: 600 }}>
-                        🆔 RSBSA Registration
-                      </span>
-                      <span style={{ fontSize: '13px', padding: '4px 10px', borderRadius: '8px', background: '#F1F5F9', color: '#334155', fontWeight: 600 }}>
-                        🌾 Smallholder
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {prog.isExpired ? (
-                  <div style={{ fontSize: '14px', color: '#64748B', fontWeight: 700, marginBottom: '22px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    ⛔ Deadline Passed: {prog.deadline} (Closed)
-                  </div>
-                ) : (
-                  <div style={{ fontSize: '14px', color: '#BA3C3C', fontWeight: 700, marginBottom: '22px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    ⏳ Application Deadline: {prog.deadline}
-                  </div>
-                )}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    onClick={() => handleOpenDetails(prog)}
+                    className="btn btn-secondary"
+                    style={{ flex: 1, padding: '12px', borderRadius: '12px', fontWeight: 700, fontSize: '15px' }}
+                  >
+                    Details
+                  </button>
+                  {myApp ? (
+                    <button
+                      onClick={() => handleOpenTracking(prog, myApp)}
+                      style={{
+                        flex: 2,
+                        padding: '12px',
+                        borderRadius: '12px',
+                        fontWeight: 800,
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        ...getStatusButtonStyles(myApp.status),
+                      }}
+                    >
+                      <span>{getStatusIcon(myApp.status)} View Status ↗</span>
+                    </button>
+                  ) : prog.isExpired ? (
+                    <button
+                      disabled
+                      style={{
+                        flex: 2,
+                        padding: '12px',
+                        borderRadius: '12px',
+                        fontWeight: 700,
+                        fontSize: '15px',
+                        background: '#F1F5F9',
+                        color: '#94A3B8',
+                        border: '1px solid #E2E8F0',
+                        cursor: 'not-allowed',
+                      }}
+                    >
+                      Closed
+                    </button>
+                  ) : isOutOfJurisdiction(prog) ? (
+                    <button
+                      disabled
+                      title={`This program is exclusively for farmers registered in ${prog.municipality}.`}
+                      style={{
+                        flex: 2,
+                        padding: '12px',
+                        borderRadius: '12px',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        background: '#FEF3C7',
+                        color: '#92400E',
+                        border: '1px solid #FCD34D',
+                        cursor: 'not-allowed',
+                      }}
+                    >
+                      🔒 {prog.municipality} Only
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleStartApply(prog)}
+                      className="btn btn-primary"
+                      style={{ flex: 2, padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '15px' }}
+                    >
+                      Apply Now →
+                    </button>
+                  )}
+                </div>
               </div>
-
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  onClick={() => handleOpenDetails(prog)}
-                  className="btn btn-secondary"
-                  style={{ flex: 1, padding: '12px', borderRadius: '12px', fontWeight: 700, fontSize: '15px' }}
-                >
-                  Details
-                </button>
-                {prog.isExpired ? (
-                  <button
-                    disabled
-                    style={{
-                      flex: 2,
-                      padding: '12px',
-                      borderRadius: '12px',
-                      fontWeight: 700,
-                      fontSize: '15px',
-                      background: '#F1F5F9',
-                      color: '#94A3B8',
-                      border: '1px solid #E2E8F0',
-                      cursor: 'not-allowed',
-                    }}
-                  >
-                    Closed
-                  </button>
-                ) : isOutOfJurisdiction(prog) ? (
-                  <button
-                    disabled
-                    title={`This program is exclusively for farmers registered in ${prog.municipality}.`}
-                    style={{
-                      flex: 2,
-                      padding: '12px',
-                      borderRadius: '12px',
-                      fontWeight: 700,
-                      fontSize: '13px',
-                      background: '#FEF3C7',
-                      color: '#92400E',
-                      border: '1px solid #FCD34D',
-                      cursor: 'not-allowed',
-                    }}
-                  >
-                    🔒 {prog.municipality} Only
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleStartApply(prog)}
-                    className="btn btn-primary"
-                    style={{ flex: 2, padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '15px' }}
-                  >
-                    Apply Now →
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -594,6 +854,59 @@ export const GovernmentProgramsPage: React.FC = () => {
             <p style={{ fontSize: '16px', color: '#334155', lineHeight: 1.6, marginBottom: '24px' }}>
               {selectedProgram.description}
             </p>
+
+            {/* Application Status Banner (if already applied) */}
+            {(() => {
+              const myApp = appliedMap[selectedProgram.id];
+              return myApp ? (
+                <div
+                  style={{
+                    padding: '16px 20px',
+                    borderRadius: '16px',
+                    marginBottom: '22px',
+                    ...getStatusBadgeStyles(myApp.status),
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px', opacity: 0.85 }}>
+                        Your Application Status
+                      </div>
+                      <div style={{ fontSize: '18px', fontWeight: 800, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>{getStatusIcon(myApp.status)}</span>
+                        <span>{getStatusLabel(myApp.status)}</span>
+                      </div>
+                      <div style={{ fontSize: '13px', marginTop: '3px', opacity: 0.9 }}>
+                        Submitted on {new Date(myApp.submittedAt || myApp.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {myApp.rsbsaNumber ? ` · RSBSA: ${myApp.rsbsaNumber}` : ''}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const p = selectedProgram;
+                        const a = myApp;
+                        setSelectedProgram(null);
+                        handleOpenTracking(p, a);
+                      }}
+                      className="btn btn-primary"
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '10px',
+                        fontSize: '13px',
+                        fontWeight: 800,
+                      }}
+                    >
+                      Track Status ↗
+                    </button>
+                  </div>
+                  {myApp.remarks && (
+                    <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed rgba(0,0,0,0.15)', fontSize: '13px' }}>
+                      <strong>LGU Officer Note:</strong> <em>"{myApp.remarks}"</em>
+                    </div>
+                  )}
+                </div>
+              ) : null;
+            })()}
 
             {isOutOfJurisdiction(selectedProgram) && (
               <div style={{ padding: '14px 18px', borderRadius: '14px', background: '#FEF3C7', border: '1.5px solid #FCD34D', color: '#92400E', fontSize: '13px', fontWeight: 600, marginBottom: '22px', lineHeight: 1.5 }}>
@@ -631,7 +944,20 @@ export const GovernmentProgramsPage: React.FC = () => {
               <button onClick={() => setSelectedProgram(null)} className="btn btn-secondary btn-large" style={{ flex: 1, borderRadius: '12px' }}>
                 Close
               </button>
-              {isOutOfJurisdiction(selectedProgram) ? (
+              {appliedMap[selectedProgram.id] ? (
+                <button
+                  onClick={() => {
+                    const p = selectedProgram;
+                    const a = appliedMap[p.id];
+                    setSelectedProgram(null);
+                    handleOpenTracking(p, a);
+                  }}
+                  className="btn btn-primary btn-large"
+                  style={{ flex: 2, borderRadius: '12px', fontWeight: 800 }}
+                >
+                  Track Application Status ↗
+                </button>
+              ) : isOutOfJurisdiction(selectedProgram) ? (
                 <button
                   disabled
                   className="btn btn-secondary btn-large"
@@ -964,13 +1290,382 @@ export const GovernmentProgramsPage: React.FC = () => {
               The LGU Agriculture Officer will inspect your attached <strong>RSBSA Card</strong> and contact you via phone once your verification is completed.
             </p>
 
-            <button
-              onClick={() => { setSuccessApp(null); setSelectedProgram(null); setIsApplying(false); }}
-              className="btn btn-primary btn-large btn-full"
-              style={{ borderRadius: '12px', fontWeight: 800 }}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {successApp.program && successApp.application && (
+                <button
+                  onClick={() => {
+                    const prog = successApp.program!;
+                    const app = successApp.application!;
+                    setSuccessApp(null);
+                    setSelectedProgram(null);
+                    setIsApplying(false);
+                    handleOpenTracking(prog, app);
+                  }}
+                  className="btn btn-primary btn-large btn-full"
+                  style={{ borderRadius: '12px', fontWeight: 800, fontSize: '15px' }}
+                >
+                  Track Application Status ↗
+                </button>
+              )}
+              <button
+                onClick={() => { setSuccessApp(null); setSelectedProgram(null); setIsApplying(false); }}
+                className="btn btn-secondary btn-large btn-full"
+                style={{ borderRadius: '12px', fontWeight: 700, fontSize: '15px' }}
+              >
+                Return to Programs Feed
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Application Status Tracker Modal ─── */}
+      {trackingApp && (
+        <div className="modal-backdrop" onClick={() => setTrackingApp(null)}>
+          <div
+            className="modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '680px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              borderRadius: '24px',
+              padding: '32px',
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span className="badge badge-info" style={{ fontSize: '13px' }}>
+                    🏛️ {trackingApp.program.organization}
+                  </span>
+                  <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>
+                    📍 {trackingApp.program.municipality || 'All Municipalities'}
+                  </span>
+                </div>
+                <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
+                  {trackingApp.program.title}
+                </h2>
+              </div>
+              <button
+                onClick={() => setTrackingApp(null)}
+                style={{ background: '#F8F7F3', border: 'none', fontSize: '20px', cursor: 'pointer', width: '38px', height: '38px', borderRadius: '50%' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Main Status Hero Card */}
+            <div
+              style={{
+                padding: '20px 24px',
+                borderRadius: '18px',
+                marginBottom: '26px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                ...getStatusBadgeStyles(trackingApp.application.status),
+                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+              }}
             >
-              Done / Return to Programs
-            </button>
+              <span style={{ fontSize: '38px' }}>
+                {getStatusIcon(trackingApp.application.status)}
+              </span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.85 }}>
+                  Official Application Status
+                </div>
+                <div style={{ fontSize: '20px', fontWeight: 800, marginTop: '2px' }}>
+                  {trackingApp.application.status === 'submitted' && 'Application Submitted & Queued'}
+                  {trackingApp.application.status === 'under_review' && 'Under Active LGU Review'}
+                  {trackingApp.application.status === 'approved' && 'Application Approved! 🎉'}
+                  {trackingApp.application.status === 'rejected' && 'Application Not Approved'}
+                </div>
+                <div style={{ fontSize: '14px', marginTop: '4px', lineHeight: 1.4, opacity: 0.9 }}>
+                  {trackingApp.application.status === 'submitted' && 'Your documents are currently waiting in the Municipal Agriculture Office review queue.'}
+                  {trackingApp.application.status === 'under_review' && 'An LGU staff officer is verifying your RSBSA registry and farm parcel details.'}
+                  {trackingApp.application.status === 'approved' && 'Congratulations! Your farm subsidy / grant has been granted by the LGU.'}
+                  {trackingApp.application.status === 'rejected' && 'Your application did not meet eligibility or quota requirements for this cycle.'}
+                </div>
+              </div>
+            </div>
+
+            {/* 3-Step Progress Stepper */}
+            <div style={{ padding: '22px', borderRadius: '18px', background: '#F8FAFC', border: '1px solid #E2E8F0', marginBottom: '26px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '18px' }}>
+                Application Progress Timeline
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Step 1 */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    background: '#166534',
+                    color: '#FFFFFF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 800,
+                    fontSize: '14px',
+                    flexShrink: 0,
+                  }}>
+                    ✓
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
+                      1. Application Submitted
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
+                      Recorded on {new Date(trackingApp.application.submittedAt || trackingApp.application.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · RSBSA ID: {trackingApp.application.rsbsaNumber || 'On file'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 2 */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    background: trackingApp.application.status === 'submitted' ? '#FDE68A' : '#166534',
+                    color: trackingApp.application.status === 'submitted' ? '#92400E' : '#FFFFFF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 800,
+                    fontSize: '14px',
+                    flexShrink: 0,
+                  }}>
+                    {trackingApp.application.status === 'submitted' ? '2' : '✓'}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
+                      2. LGU Document & RSBSA Verification
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
+                      {trackingApp.application.status === 'submitted'
+                        ? 'Awaiting screening by Municipal Agriculture staff.'
+                        : trackingApp.application.status === 'under_review'
+                        ? 'Active evaluation in progress by authorized officer.'
+                        : 'Verification completed by LGU Agriculture Office.'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 3 */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    background: trackingApp.application.status === 'approved' ? '#166534' : trackingApp.application.status === 'rejected' ? '#BE123C' : '#E2E8F0',
+                    color: trackingApp.application.status === 'approved' || trackingApp.application.status === 'rejected' ? '#FFFFFF' : '#64748B',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 800,
+                    fontSize: '14px',
+                    flexShrink: 0,
+                  }}>
+                    {trackingApp.application.status === 'approved' ? '✓' : trackingApp.application.status === 'rejected' ? '✕' : '3'}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
+                      3. Official Decision & Disbursement
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
+                      {trackingApp.application.status === 'approved' && 'Approved · Ready for distribution or voucher collection.'}
+                      {trackingApp.application.status === 'rejected' && 'Application declined. Please read remarks below.'}
+                      {(trackingApp.application.status === 'submitted' || trackingApp.application.status === 'under_review') && 'Pending completion of document verification.'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* LGU Staff Evaluation Remarks (if present) */}
+            {trackingApp.application.remarks && (
+              <div
+                style={{
+                  padding: '18px 20px',
+                  borderRadius: '16px',
+                  background: trackingApp.application.status === 'approved' ? '#F0FDF4' : trackingApp.application.status === 'rejected' ? '#FFF1F2' : '#F8FAFC',
+                  border: `1.5px solid ${trackingApp.application.status === 'approved' ? '#86EFAC' : trackingApp.application.status === 'rejected' ? '#FECDD3' : '#CBD5E1'}`,
+                  marginBottom: '26px',
+                }}
+              >
+                <div style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                  🏛️ Municipal Agriculture Office Evaluation Notes:
+                </div>
+                <div style={{ fontSize: '15px', color: '#1E293B', fontStyle: 'italic', lineHeight: 1.5, background: '#FFFFFF', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.06)' }}>
+                  "{trackingApp.application.remarks}"
+                </div>
+              </div>
+            )}
+
+            {/* Next Steps Guide */}
+            {trackingApp.application.status === 'approved' && (
+              <div style={{ padding: '18px 20px', borderRadius: '16px', background: '#ECFDF5', border: '1.5px solid #6EE7B7', marginBottom: '26px' }}>
+                <div style={{ fontSize: '14px', fontWeight: 800, color: '#065F46', marginBottom: '6px' }}>
+                  🌾 Next Steps to Claim Subsidy / Assistance:
+                </div>
+                <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13.5px', color: '#047857', lineHeight: 1.6 }}>
+                  <li>Please bring your physical <strong>RSBSA Card or Certificate</strong> and <strong>1 valid Government ID</strong>.</li>
+                  <li>Proceed to the <strong>Municipal Agriculture Office</strong> in {trackingApp.program.municipality || user?.municipality || 'your municipality'}.</li>
+                  <li>Keep your phone active ({trackingApp.application.farmerPhone || user?.phone || 'registered number'}) for SMS scheduling.</li>
+                </ul>
+              </div>
+            )}
+
+            {/* Submitted Details Summary */}
+            <div style={{ padding: '20px', borderRadius: '18px', background: '#FFFFFF', border: '1.5px solid #E2E8F0', marginBottom: '24px' }}>
+              <div style={{ fontSize: '14px', fontWeight: 800, color: '#0E4A27', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                📋 Submitted Application Summary
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', fontSize: '13.5px', marginBottom: '16px' }}>
+                <div>
+                  <div style={{ color: '#64748B', fontSize: '12px', fontWeight: 600 }}>RSBSA ID Number</div>
+                  <div style={{ fontWeight: 800, color: '#1E293B', fontFamily: 'monospace', fontSize: '14px' }}>
+                    {trackingApp.application.rsbsaNumber || 'Not specified'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: '#64748B', fontSize: '12px', fontWeight: 600 }}>Farm Size (Hectares)</div>
+                  <div style={{ fontWeight: 800, color: '#1E293B' }}>
+                    {trackingApp.application.farmSizeHectares} ha
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: '#64748B', fontSize: '12px', fontWeight: 600 }}>Crops Grown</div>
+                  <div style={{ fontWeight: 700, color: '#1E293B' }}>
+                    {trackingApp.application.cropsGrown?.join(', ') || 'Rice'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: '#64748B', fontSize: '12px', fontWeight: 600 }}>Applicant Name</div>
+                  <div style={{ fontWeight: 700, color: '#1E293B' }}>
+                    {trackingApp.application.farmerName || `${user?.firstName} ${user?.lastName}`}
+                  </div>
+                </div>
+              </div>
+
+              {/* Attached Document Image Preview */}
+              {(() => {
+                const docUrl = trackingApp.application.submittedDocs?.find((d) => d.startsWith('http') || d.startsWith('/api') || d.startsWith('data:image'));
+                return docUrl ? (
+                  <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid #F1F5F9' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
+                      Attached RSBSA Verification Document:
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <img
+                        src={docUrl}
+                        alt="Attached RSBSA Card"
+                        onClick={() => setPreviewDocUrl(docUrl)}
+                        style={{
+                          width: '120px',
+                          height: '80px',
+                          objectFit: 'cover',
+                          borderRadius: '10px',
+                          border: '1.5px solid #CBD5E1',
+                          cursor: 'pointer',
+                        }}
+                        title="Click to zoom image"
+                      />
+                      <div style={{ fontSize: '12px', color: '#64748B' }}>
+                        <span style={{ fontWeight: 700, color: '#166534' }}>✓ Document on file</span>
+                        <div style={{ marginTop: '4px' }}>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewDocUrl(docUrl)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              color: '#0E4A27',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                              fontSize: '12px',
+                            }}
+                          >
+                            🔍 Click to view full size
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null;
+              })()}
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                onClick={() => setTrackingApp(null)}
+                className="btn btn-secondary btn-large"
+                style={{ padding: '12px 28px', borderRadius: '12px', fontWeight: 700 }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Full-Size Document Image Preview Modal ─── */}
+      {previewDocUrl && (
+        <div className="modal-backdrop" onClick={() => setPreviewDocUrl(null)} style={{ zIndex: 1100 }}>
+          <div
+            className="modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              padding: '16px',
+              borderRadius: '16px',
+              background: '#0F172A',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', padding: '0 8px' }}>
+              <span style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: 700 }}>
+                RSBSA Attached Verification Document
+              </span>
+              <button
+                onClick={() => setPreviewDocUrl(null)}
+                style={{
+                  background: '#334155',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '36px',
+                  height: '36px',
+                  cursor: 'pointer',
+                  fontSize: '18px',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <img
+              src={previewDocUrl}
+              alt="RSBSA Document Full"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '78vh',
+                objectFit: 'contain',
+                display: 'block',
+                margin: '0 auto',
+                borderRadius: '8px',
+                boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+              }}
+            />
           </div>
         </div>
       )}

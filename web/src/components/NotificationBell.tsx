@@ -8,6 +8,7 @@ const notifIcons: Record<NotificationType, string> = {
   payment_status: '💵',
   produce_inquiry: '🌾',
   community_reply: '💬',
+  program_status: '🏛️',
   system: '📢',
 };
 

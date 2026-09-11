@@ -205,6 +205,19 @@ func (r *ProgramRepository) ListApplicationsByFarmer(ctx context.Context, farmer
 	return apps, nil
 }
 
+// GetApplicationByID retrieves a single application by ID.
+func (r *ProgramRepository) GetApplicationByID(ctx context.Context, appID bson.ObjectID) (*models.ProgramApplication, error) {
+	var app models.ProgramApplication
+	err := r.appColl.FindOne(ctx, bson.M{"_id": appID}).Decode(&app)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, ErrApplicationNotFound
+		}
+		return nil, fmt.Errorf("find application: %w", err)
+	}
+	return &app, nil
+}
+
 // UpdateApplicationStatus reviews and updates application status & remarks.
 func (r *ProgramRepository) UpdateApplicationStatus(ctx context.Context, appID bson.ObjectID, status models.ApplicationStatus, remarks string, reviewerID bson.ObjectID) error {
 	update := bson.M{
@@ -224,3 +237,4 @@ func (r *ProgramRepository) UpdateApplicationStatus(ctx context.Context, appID b
 	}
 	return nil
 }
+
