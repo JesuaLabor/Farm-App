@@ -5,7 +5,7 @@ import { produceApi } from '../api/produce';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
-import type { ProduceListing, ListingStatus } from '../types/produce';
+import { PRODUCE_CATEGORIES, type ProduceListing, type ListingStatus } from '../types/produce';
 
 export const ManageProduceListingsPage: React.FC = () => {
   const { user } = useAuth();
@@ -16,23 +16,108 @@ export const ManageProduceListingsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Search & Filter state for listings
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState('All');
+
   // Add / Edit Modal state
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingListing, setEditingListing] = useState<ProduceListing | null>(null);
 
   // Form Fields
   const [cropName, setCropName] = useState('');
-  const [category, setCategory] = useState('vegetables');
+  const [category, setCategory] = useState('Vegetables');
   const [quantity, setQuantity] = useState('100');
   const [unit, setUnit] = useState('kg');
   const [price, setPrice] = useState('50');
   const [farmLocation, setFarmLocation] = useState('');
   const [availableDate, setAvailableDate] = useState(new Date().toISOString().split('T')[0]);
   const [description, setDescription] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
   const [existingPhotos, setExistingPhotos] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Helper to find category config
+  const currentCatConfig =
+    PRODUCE_CATEGORIES.find(
+      (c) =>
+        c.name.toLowerCase() === category.toLowerCase() ||
+        c.id === category.toLowerCase() ||
+        (category.toLowerCase().includes('livestock') && c.id === 'livestock') ||
+        (category.toLowerCase().includes('grain') && c.id === 'grains') ||
+        (category.toLowerCase().includes('fruit') && c.id === 'fruits') ||
+        (category.toLowerCase().includes('root') && c.id === 'root_crops') ||
+        (category.toLowerCase().includes('fish') && c.id === 'fisheries') ||
+        (category.toLowerCase().includes('spice') && c.id === 'spices')
+    ) || PRODUCE_CATEGORIES[0];
+
+  const isLivestock = category.toLowerCase().includes('livestock');
+  const isFisheries = category.toLowerCase().includes('fish');
+
+  // Category Icon resolver
+  const getCategoryIcon = (catName?: string): string => {
+    if (!catName) return '🌱';
+    const match = PRODUCE_CATEGORIES.find(
+      (c) =>
+        c.name.toLowerCase() === catName.toLowerCase() ||
+        c.id === catName.toLowerCase() ||
+        catName.toLowerCase().includes(c.id) ||
+        (catName.toLowerCase().includes('livestock') && c.id === 'livestock')
+    );
+    return match ? match.icon : '🌱';
+  };
+
+  // Adaptive suggested tags based on category
+  const getSuggestedTags = () => {
+    if (isLivestock) {
+      return [
+        'Free-Range / Pasture-Raised',
+        'Dewormed & Vaccinated',
+        'Breeder Quality',
+        'Live Weight Verified',
+        'Farmgate Pickup Ready',
+        'Organic-Fed',
+      ];
+    }
+    if (isFisheries) {
+      return [
+        'Fresh Catch of the Day',
+        'Live Fish Available',
+        'Cleaned & Gutted Option',
+        'Pond Harvested',
+        'Bulk Wholesale Ready',
+      ];
+    }
+    return [
+      'Fresh Harvest',
+      'Organically Grown',
+      'Grade A Premium',
+      'Farmgate Wholesale',
+      'Pesticide-Free',
+      'Same-Day Delivery Ready',
+    ];
+  };
+
+  // Switch category and adapt unit/price defaults smoothly
+  const handleCategoryChange = (newCatName: string) => {
+    setCategory(newCatName);
+    const catCfg = PRODUCE_CATEGORIES.find(
+      (c) => c.name.toLowerCase() === newCatName.toLowerCase() || c.id === newCatName.toLowerCase()
+    );
+    if (catCfg && catCfg.suggestedUnits.length > 0) {
+      if (newCatName.toLowerCase().includes('livestock') && (!unit || unit === 'kg')) {
+        setUnit('head');
+        setQuantity('5');
+        setPrice('3500');
+      } else if (!newCatName.toLowerCase().includes('livestock') && unit === 'head') {
+        setUnit(catCfg.suggestedUnits[0]);
+        setQuantity('100');
+        setPrice('50');
+      }
+    }
+  };
 
   // Load farmer's actual listings from backend
   const loadListings = async () => {
@@ -67,16 +152,27 @@ export const ManageProduceListingsPage: React.FC = () => {
     ? [user.barangay, user.municipality, user.province].filter(Boolean).join(', ') || user.address || ''
     : '';
 
-  const openAddModal = () => {
+  const openAddModal = (presetCategory?: string) => {
     setEditingListing(null);
     setCropName('');
-    setCategory('vegetables');
-    setQuantity('100');
-    setUnit('kg');
-    setPrice('50');
+    const initialCat = presetCategory || 'Vegetables';
+    setCategory(initialCat);
+    const catCfg = PRODUCE_CATEGORIES.find(
+      (c) => c.name.toLowerCase() === initialCat.toLowerCase() || c.id === initialCat.toLowerCase()
+    );
+    if (initialCat.toLowerCase().includes('livestock')) {
+      setUnit('head');
+      setQuantity('5');
+      setPrice('3500');
+    } else {
+      setUnit(catCfg?.suggestedUnits[0] || 'kg');
+      setQuantity('100');
+      setPrice('50');
+    }
     setFarmLocation(defaultUserLocation || 'Northern Mindanao');
     setAvailableDate(new Date().toISOString().split('T')[0]);
     setDescription('');
+    setSelectedTags([]);
     setImageFile(null);
     setImagePreview('');
     setExistingPhotos([]);
@@ -86,13 +182,25 @@ export const ManageProduceListingsPage: React.FC = () => {
   const openEditModal = (item: ProduceListing) => {
     setEditingListing(item);
     setCropName(item.cropName);
-    setCategory(item.category || 'vegetables');
+    const itemCat = item.category || 'Vegetables';
+    setCategory(itemCat);
     setQuantity(String(item.quantity));
     setUnit(item.unit || 'kg');
     setPrice(String(item.pricePerUnit));
     setFarmLocation(item.location || '');
     setAvailableDate(item.harvestDate ? String(item.harvestDate).split('T')[0] : '');
-    setDescription(item.description || '');
+    
+    // Parse tags from description if present
+    const tagsMatch = item.description?.match(/Tags:\s*(.+)$/i);
+    if (tagsMatch) {
+      const parsedTags = tagsMatch[1].split(',').map((t) => t.trim()).filter(Boolean);
+      setSelectedTags(parsedTags);
+      setDescription((item.description || '').replace(/\n*Tags:\s*.+$/i, '').trim());
+    } else {
+      setSelectedTags([]);
+      setDescription(item.description || '');
+    }
+
     setImageFile(null);
     setImagePreview('');
     setExistingPhotos(item.photos || []);
@@ -140,7 +248,13 @@ export const ManageProduceListingsPage: React.FC = () => {
       : [];
 
     try {
-      const finalDescription = description.trim() || `Fresh harvest from ${farmLocation.trim()}`;
+      const tagsSuffix = selectedTags.length > 0 ? `\n\nTags: ${selectedTags.join(', ')}` : '';
+      const defaultDesc = isLivestock
+        ? `Healthy livestock from ${farmLocation.trim()}`
+        : isFisheries
+        ? `Fresh fish/seafood from ${farmLocation.trim()}`
+        : `Fresh harvest from ${farmLocation.trim()}`;
+      const finalDescription = (description.trim() || defaultDesc) + tagsSuffix;
 
       if (editingListing) {
         // Update existing listing
@@ -231,6 +345,26 @@ export const ManageProduceListingsPage: React.FC = () => {
     }
   };
 
+  const filteredMyListings = myListings.filter((item) => {
+    const q = searchQuery.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      item.cropName.toLowerCase().includes(q) ||
+      (item.location && item.location.toLowerCase().includes(q)) ||
+      (item.description && item.description.toLowerCase().includes(q));
+
+    const catLower = (item.category || '').toLowerCase();
+    const filterLower = filterCategory.toLowerCase();
+    const matchesCategory =
+      filterCategory === 'All' ||
+      catLower === filterLower ||
+      catLower.includes(filterLower) ||
+      filterLower.includes(catLower) ||
+      (filterLower.includes('livestock') && catLower.includes('livestock'));
+
+    return matchesSearch && matchesCategory;
+  });
+
   return (
     <div className="app-container" style={{ paddingBottom: '40px' }}>
       {/* ─── Page Header ─── */}
@@ -238,39 +372,137 @@ export const ManageProduceListingsPage: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <h1 style={{ fontSize: '32px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
-              My Crops for Sale
+              My Farm Listings (Crops & Livestock)
             </h1>
             <p style={{ fontSize: '16px', color: '#525450', marginTop: '6px', margin: 0 }}>
-              Manage and list real harvests you are selling on the AgriConnect Marketplace.
+              Manage and list real harvests, livestock, and farm goods you are selling on the AgriConnect Marketplace.
             </p>
           </div>
 
           <button
-            onClick={openAddModal}
+            onClick={() => openAddModal()}
             className="btn btn-primary btn-large"
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', fontSize: '16px', fontWeight: 800 }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', fontSize: '15px', fontWeight: 800 }}
           >
-            <span>+ Add New Crop for Sale</span>
+            <span>+ Add Listing for Sale</span>
           </button>
         </div>
       </div>
 
-      {/* ─── Add / Edit Crop Modal Form ─── */}
+      {/* ─── Search & Category Filter Bar ─── */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '14px',
+          marginBottom: '24px',
+          backgroundColor: '#ffffff',
+          padding: '16px 20px',
+          borderRadius: '16px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '240px', position: 'relative' }}>
+            <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '16px', color: '#94a3b8' }}>
+              🔍
+            </span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search your listings by name, location, or notes..."
+              className="form-input"
+              style={{ paddingLeft: '38px', paddingRight: '14px', height: '42px', fontSize: '14px', width: '100%' }}
+            />
+          </div>
+
+          <div style={{ fontSize: '13px', fontWeight: 700, color: '#64748b' }}>
+            Showing {filteredMyListings.length} of {myListings.length} listing{myListings.length !== 1 ? 's' : ''}
+          </div>
+        </div>
+
+        {/* Category Pills */}
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+          <button
+            type="button"
+            onClick={() => setFilterCategory('All')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '20px',
+              border: filterCategory === 'All' ? '1.5px solid #0E4A27' : '1px solid #cbd5e1',
+              backgroundColor: filterCategory === 'All' ? '#0E4A27' : '#f8fafc',
+              color: filterCategory === 'All' ? '#ffffff' : '#475569',
+              fontSize: '13px',
+              fontWeight: filterCategory === 'All' ? 700 : 500,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            🌱 All ({myListings.length})
+          </button>
+
+          {PRODUCE_CATEGORIES.map((cat) => {
+            const count = myListings.filter((l) => {
+              const c = (l.category || '').toLowerCase();
+              return c.includes(cat.name.toLowerCase()) || c.includes(cat.id.toLowerCase());
+            }).length;
+
+            const isSelected = filterCategory === cat.name;
+
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setFilterCategory(cat.name)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  border: isSelected ? '1.5px solid #0E4A27' : '1px solid #cbd5e1',
+                  backgroundColor: isSelected ? '#0E4A27' : '#f8fafc',
+                  color: isSelected ? '#ffffff' : '#475569',
+                  fontSize: '13px',
+                  fontWeight: isSelected ? 700 : 500,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {cat.icon} {cat.name} ({count})
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ─── Add / Edit Modal Form ─── */}
       {showFormModal && (
         <div className="modal-backdrop" onClick={() => setShowFormModal(false)}>
           <div
             className="modal-content"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '620px', maxHeight: '90vh', overflowY: 'auto' }}
+            style={{ maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto', padding: '28px' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div>
                 <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
-                  {editingListing ? 'Edit Crop Details' : 'Add Crop for Sale'}
+                  {editingListing
+                    ? isLivestock
+                      ? 'Edit Livestock Listing'
+                      : 'Edit Product Listing'
+                    : isLivestock
+                    ? 'Add Livestock / Poultry for Sale'
+                    : isFisheries
+                    ? 'Add Fisheries / Aquaculture for Sale'
+                    : 'Add Crop / Produce for Sale'}
                 </h2>
                 <p style={{ fontSize: '14px', color: '#525450', marginTop: '4px', margin: 0 }}>
                   {editingListing
-                    ? 'Update the price, quantity, or details of your crop.'
+                    ? 'Update the price, quantity, or details of your listing.'
+                    : isLivestock
+                    ? 'Fill out details below to publish live cattle, swine, goats, poultry, or farm animals.'
                     : 'Fill out the details below to publish your harvest to local buyers.'}
                 </p>
               </div>
@@ -295,16 +527,20 @@ export const ManageProduceListingsPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveListing}>
-              {/* Crop Name */}
+              {/* Product / Animal Name */}
               <div className="form-group" style={{ marginBottom: '16px' }}>
                 <label className="form-label" style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>
-                  1. What crop are you selling? *
+                  {isLivestock
+                    ? '1. What livestock / poultry are you selling? *'
+                    : isFisheries
+                    ? '1. What fish / seafood are you selling? *'
+                    : '1. What crop / farm product are you selling? *'}
                 </label>
                 <input
                   type="text"
                   value={cropName}
                   onChange={(e) => setCropName(e.target.value)}
-                  placeholder="e.g. Tomato (Kamatis), Sweet Corn (Mais), Marang"
+                  placeholder={currentCatConfig.samplePlaceholder}
                   required
                   className="form-input"
                   style={{ fontSize: '15px', padding: '12px 14px' }}
@@ -314,24 +550,24 @@ export const ManageProduceListingsPage: React.FC = () => {
               {/* Category */}
               <div className="form-group" style={{ marginBottom: '16px' }}>
                 <label className="form-label" style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>
-                  2. Category
+                  2. Category *
                 </label>
                 <select
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
                   className="form-input"
                   style={{ fontSize: '15px', padding: '12px 14px' }}
                 >
-                  <option value="vegetables">Vegetables</option>
-                  <option value="fruits">Fruits</option>
-                  <option value="Grains & Cereals">Grains & Cereals</option>
-                  <option value="Root Crops">Root Crops</option>
-                  <option value="Spices & Herbs">Spices & Herbs</option>
+                  {PRODUCE_CATEGORIES.map((cat) => (
+                    <option key={cat.id} value={cat.name}>
+                      {cat.icon} {cat.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               {/* Quantity & Unit */}
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '14px', marginBottom: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '14px', marginBottom: '8px' }}>
                 <div className="form-group">
                   <label className="form-label" style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>
                     3. Total Quantity Available *
@@ -340,7 +576,7 @@ export const ManageProduceListingsPage: React.FC = () => {
                     type="number"
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
-                    placeholder="e.g. 100"
+                    placeholder="e.g. 10"
                     min="1"
                     required
                     className="form-input"
@@ -349,17 +585,57 @@ export const ManageProduceListingsPage: React.FC = () => {
                 </div>
                 <div className="form-group">
                   <label className="form-label" style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>
-                    Unit
+                    Unit *
                   </label>
                   <input
                     type="text"
                     value={unit}
                     onChange={(e) => setUnit(e.target.value)}
-                    placeholder="kg, sack, crate"
+                    placeholder="e.g. head, kg, sack"
                     required
                     className="form-input"
                     style={{ fontSize: '15px', padding: '12px 14px' }}
                   />
+                </div>
+              </div>
+
+              {/* Quick Unit Suggestion Chips */}
+              <div
+                style={{
+                  marginBottom: '16px',
+                  backgroundColor: '#F8FAFC',
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  border: '1px solid #E2E8F0',
+                }}
+              >
+                <div style={{ fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
+                  ⚡ Quick Units for {currentCatConfig.name}:
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {currentCatConfig.suggestedUnits.map((u) => {
+                    const isSelected = unit.toLowerCase() === u.toLowerCase();
+                    return (
+                      <button
+                        key={u}
+                        type="button"
+                        onClick={() => setUnit(u)}
+                        style={{
+                          padding: '5px 12px',
+                          borderRadius: '16px',
+                          border: isSelected ? '1.5px solid #0E4A27' : '1px solid #CBD5E1',
+                          backgroundColor: isSelected ? '#E8F5E9' : '#FFFFFF',
+                          color: isSelected ? '#0E4A27' : '#334155',
+                          fontSize: '12px',
+                          fontWeight: isSelected ? 800 : 500,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {isSelected ? '✓ ' : ''}{u}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -372,7 +648,7 @@ export const ManageProduceListingsPage: React.FC = () => {
                   type="number"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
-                  placeholder="e.g. 65"
+                  placeholder="e.g. 3500"
                   min="0"
                   step="any"
                   required
@@ -390,7 +666,7 @@ export const ManageProduceListingsPage: React.FC = () => {
                   type="text"
                   value={farmLocation}
                   onChange={(e) => setFarmLocation(e.target.value)}
-                  placeholder="e.g. Brgy. Carmen, Cagayan de Oro"
+                  placeholder="e.g. Brgy. Carmen, Cagayan de Oro, Misamis Oriental"
                   required
                   className="form-input"
                   style={{ fontSize: '15px', padding: '12px 14px' }}
@@ -400,7 +676,9 @@ export const ManageProduceListingsPage: React.FC = () => {
               {/* Available / Harvest Date */}
               <div className="form-group" style={{ marginBottom: '16px' }}>
                 <label className="form-label" style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>
-                  6. When is it harvested / ready for pickup? *
+                  {isLivestock
+                    ? '6. Date ready for live inspection / pickup *'
+                    : '6. When is it harvested / ready for pickup? *'}
                 </label>
                 <input
                   type="date"
@@ -412,16 +690,58 @@ export const ManageProduceListingsPage: React.FC = () => {
                 />
               </div>
 
+              {/* Quality Highlights & Badges */}
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label className="form-label" style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>
+                  7. Highlights & Quality Badges (optional)
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {getSuggestedTags().map((tag) => {
+                    const isSelected = selectedTags.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedTags(selectedTags.filter((t) => t !== tag));
+                          } else {
+                            setSelectedTags([...selectedTags, tag]);
+                          }
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '16px',
+                          border: isSelected ? '1.5px solid #0E4A27' : '1px solid #E2E8F0',
+                          backgroundColor: isSelected ? '#E8F5E9' : '#FFFFFF',
+                          color: isSelected ? '#0E4A27' : '#64748B',
+                          fontSize: '12px',
+                          fontWeight: isSelected ? 800 : 500,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {isSelected ? '✓ ' : '+ '}{tag}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Description */}
               <div className="form-group" style={{ marginBottom: '16px' }}>
                 <label className="form-label" style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>
-                  7. Produce Description (optional)
+                  8. Description & Notes (optional)
                 </label>
                 <textarea
                   rows={3}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe your crop (e.g. freshly picked, organically grown, grade A size, sweet variety, ideal for retail or bulk buyers)..."
+                  placeholder={
+                    isLivestock
+                      ? 'Describe your livestock (e.g. breed, approx. weight in kg, age in months, vaccination status, feeding regimen)...'
+                      : 'Describe your crop (e.g. freshly picked, organically grown, grade A size, sweet variety, ideal for retail or bulk buyers)...'
+                  }
                   className="form-input"
                   style={{ fontSize: '14px', padding: '10px 14px', width: '100%', borderRadius: '10px', fontFamily: 'inherit', resize: 'vertical' }}
                 />
@@ -430,7 +750,7 @@ export const ManageProduceListingsPage: React.FC = () => {
               {/* Image Upload */}
               <div className="form-group" style={{ marginBottom: '24px' }}>
                 <label className="form-label" style={{ fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>
-                  8. Attach Produce Photo (optional)
+                  9. Attach Photo (optional)
                 </label>
                 <input
                   ref={fileInputRef}
@@ -453,20 +773,22 @@ export const ManageProduceListingsPage: React.FC = () => {
                       transition: 'all 0.2s ease',
                     }}
                   >
-                    <div style={{ fontSize: '28px', marginBottom: '6px' }}>📷</div>
-                    <div style={{ fontWeight: 700, color: '#1d4ed8', fontSize: '15px' }}>Click to upload fresh harvest photo</div>
+                    <div style={{ fontSize: '28px', marginBottom: '6px' }}>{isLivestock ? '🐓' : '📷'}</div>
+                    <div style={{ fontWeight: 700, color: '#1d4ed8', fontSize: '15px' }}>
+                      {isLivestock ? 'Click to upload animal photo' : 'Click to upload fresh harvest photo'}
+                    </div>
                     <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Supports JPG, PNG, WEBP</div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '10px 14px', borderRadius: '14px', border: '1.5px solid #bfdbfe', backgroundColor: '#f0f9ff' }}>
                     <img
                       src={imagePreview || getImageUrl(existingPhotos[0], '')}
-                      alt="Crop preview"
+                      alt="Preview"
                       style={{ width: '64px', height: '64px', borderRadius: '10px', objectFit: 'cover' }}
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {imageFile?.name || 'Current crop photo'}
+                        {imageFile?.name || 'Current photo'}
                       </div>
                       <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>Ready with listing</div>
                     </div>
@@ -509,18 +831,27 @@ export const ManageProduceListingsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─── Crop List or Empty State ─── */}
+      {/* ─── Crop / Livestock List or Empty State ─── */}
       {isLoading ? (
         <div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>
           <div style={{ fontSize: '36px', animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</div>
-          <p style={{ marginTop: '12px', fontSize: '16px', fontWeight: 600 }}>Loading your live produce listings…</p>
+          <p style={{ marginTop: '12px', fontSize: '16px', fontWeight: 600 }}>Loading your live farm listings…</p>
         </div>
-      ) : myListings.length > 0 ? (
+      ) : filteredMyListings.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-          {myListings.map((item) => {
+          {filteredMyListings.map((item) => {
             const isSoldOut = item.status === 'sold' || item.quantity <= 0;
             const isLive = item.status === 'available' && item.quantity > 0;
-            const photoUrl = getImageUrl(item.photos?.[0], 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80');
+            const isItemLivestock = (item.category || '').toLowerCase().includes('livestock');
+            const defaultPhoto = isItemLivestock
+              ? 'https://images.unsplash.com/photo-1548550023-2bdb3c5beed7?auto=format&fit=crop&w=600&q=80'
+              : 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80';
+            const photoUrl = getImageUrl(item.photos?.[0], defaultPhoto);
+
+            // Extract tags from description if present
+            const tagsMatch = item.description?.match(/Tags:\s*(.+)$/i);
+            const itemTags = tagsMatch ? tagsMatch[1].split(',').map((t) => t.trim()).filter(Boolean) : [];
+            const cleanDesc = item.description ? item.description.replace(/\n*Tags:\s*.+$/i, '').trim() : '';
 
             return (
               <div
@@ -537,20 +868,33 @@ export const ManageProduceListingsPage: React.FC = () => {
                   boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1, minWidth: '300px' }}>
                   <img
                     src={photoUrl}
                     alt={item.cropName}
-                    style={{ width: '90px', height: '90px', borderRadius: '14px', objectFit: 'cover', border: '1px solid #e2e8f0' }}
+                    style={{ width: '95px', height: '95px', borderRadius: '14px', objectFit: 'cover', border: '1px solid #e2e8f0', flexShrink: 0 }}
                   />
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#1A1C1A', margin: 0 }}>
                         {item.cropName}
                       </h3>
                       {item.category && (
-                        <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '8px', backgroundColor: '#F0EFEA', color: '#555852' }}>
-                          {item.category}
+                        <span
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            padding: '3px 10px',
+                            borderRadius: '10px',
+                            backgroundColor: isItemLivestock ? '#FEF3C7' : '#E8F5E9',
+                            color: isItemLivestock ? '#92400E' : '#0E4A27',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <span>{getCategoryIcon(item.category)}</span>
+                          <span>{item.category}</span>
                         </span>
                       )}
                     </div>
@@ -559,8 +903,36 @@ export const ManageProduceListingsPage: React.FC = () => {
                       ₱{item.pricePerUnit} per {item.unit || 'kg'} • {item.quantity} {item.unit || 'kg'} available
                     </div>
                     <div style={{ fontSize: '14px', color: '#525450', fontWeight: 500 }}>
-                      📍 {item.location || 'Region X'} • Available: {item.harvestDate ? String(item.harvestDate).split('T')[0] : 'Ready'}
+                      📍 {item.location || 'Region X'} • Ready: {item.harvestDate ? String(item.harvestDate).split('T')[0] : 'Ready'}
                     </div>
+
+                    {/* Highlight Tags */}
+                    {itemTags.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                        {itemTags.map((t) => (
+                          <span
+                            key={t}
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              backgroundColor: '#F0FDF4',
+                              color: '#166534',
+                              border: '1px solid #BBF7D0',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                            }}
+                          >
+                            ✓ {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {cleanDesc && (
+                      <p style={{ fontSize: '13px', color: '#64748b', margin: '6px 0 0 0', lineHeight: 1.4 }}>
+                        {cleanDesc}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -619,21 +991,40 @@ export const ManageProduceListingsPage: React.FC = () => {
             );
           })}
         </div>
-      ) : (
-        <div className="card" style={{ padding: '60px 20px', textAlign: 'center', borderRadius: '20px' }}>
-          <div style={{ fontSize: '56px', marginBottom: '12px' }}>🌱</div>
-          <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', marginBottom: '8px' }}>
-            You don't have any crop listings yet
-          </h2>
-          <p style={{ fontSize: '16px', color: '#525450', marginBottom: '24px', maxWidth: '500px', margin: '0 auto 24px' }}>
-            Publish your fresh harvest to connect with direct buyers, wholesale markets, and local vendors across Northern Mindanao.
+      ) : myListings.length > 0 ? (
+        <div className="card" style={{ padding: '40px 20px', textAlign: 'center', borderRadius: '20px' }}>
+          <div style={{ fontSize: '40px', marginBottom: '8px' }}>🔍</div>
+          <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#1A1C1A', margin: '0 0 6px 0' }}>
+            No listings matched your filter
+          </h3>
+          <p style={{ color: '#64748b', fontSize: '14px', margin: '0 0 16px 0' }}>
+            No products found matching "{searchQuery || filterCategory}".
           </p>
           <button
-            onClick={openAddModal}
+            onClick={() => {
+              setSearchQuery('');
+              setFilterCategory('All');
+            }}
+            className="btn btn-secondary"
+          >
+            Clear Filters
+          </button>
+        </div>
+      ) : (
+        <div className="card" style={{ padding: '60px 20px', textAlign: 'center', borderRadius: '20px' }}>
+          <div style={{ fontSize: '56px', marginBottom: '12px' }}>🌾</div>
+          <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', marginBottom: '8px' }}>
+            You don't have any farm listings yet
+          </h2>
+          <p style={{ fontSize: '16px', color: '#525450', marginBottom: '24px', maxWidth: '520px', margin: '0 auto 24px' }}>
+            Publish your fresh harvest, livestock, or agricultural goods to connect directly with wholesale buyers and local vendors.
+          </p>
+          <button
+            onClick={() => openAddModal()}
             className="btn btn-primary btn-large"
             style={{ padding: '12px 28px', fontSize: '16px', fontWeight: 800 }}
           >
-            + Add Your First Crop
+            + Add Your First Listing
           </button>
         </div>
       )}
@@ -655,12 +1046,12 @@ export const ManageProduceListingsPage: React.FC = () => {
                 unit: listingToDelete.unit,
                 stock: listingToDelete.quantity,
                 image: listingToDelete.photos?.[0],
-                typeLabel: 'Crop Listing',
+                typeLabel: 'Produce Listing',
               }
             : null
         }
-        title="Delete Crop Listing?"
-        description={`Are you sure you want to remove your harvest listing for "${listingToDelete?.cropName}"? Once removed, it will no longer appear in the produce marketplace.`}
+        title="Delete Farm Listing?"
+        description={`Are you sure you want to remove your listing for "${listingToDelete?.cropName}"? Once removed, it will no longer appear in the marketplace.`}
         confirmText="Yes, Delete Listing"
         cancelText="Cancel, Keep Listing"
         isDeleting={isDeletingListing}

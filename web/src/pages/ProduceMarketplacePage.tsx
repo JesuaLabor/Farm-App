@@ -8,12 +8,15 @@ import { useChat } from '../contexts/ChatContext';
 import type { ProduceListing, ProduceTransaction } from '../types/produce';
 
 const categories = [
-  { label: 'All Crops', icon: '🌱' },
+  { label: 'All Products', icon: '🌱' },
   { label: 'Vegetables', icon: '🥬' },
   { label: 'Fruits', icon: '🍌' },
-  { label: 'Grains', icon: '🌾' },
+  { label: 'Grains & Cereals', icon: '🌾' },
   { label: 'Root Crops', icon: '🥔' },
-  { label: 'Livestock', icon: '🐓' },
+  { label: 'Livestock & Poultry', icon: '🐓' },
+  { label: 'Fisheries', icon: '🐟' },
+  { label: 'Spices & Herbs', icon: '🌶️' },
+  { label: 'Agri-Processed', icon: '🍯' },
 ];
 
 const sampleCropListings = [
@@ -34,7 +37,7 @@ const sampleCropListings = [
   {
     id: 'crop-2',
     cropName: 'Sweet Yellow Corn (Mais)',
-    category: 'Grains',
+    category: 'Grains & Cereals',
     pricePerUnit: 42,
     unit: 'kg',
     quantity: 500,
@@ -73,6 +76,34 @@ const sampleCropListings = [
     imageUrl: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=600&q=80',
     description: 'Organic eggplant harvested at peak freshness.',
   },
+  {
+    id: 'crop-5',
+    cropName: 'Free-Range Native Chicken (Manok)',
+    category: 'Livestock & Poultry',
+    pricePerUnit: 350,
+    unit: 'head',
+    quantity: 45,
+    location: 'Manolo Fortich, Bukidnon',
+    sellerName: 'Danilo Ramos',
+    sellerVerified: true,
+    rating: 4.9,
+    imageUrl: 'https://images.unsplash.com/photo-1548550023-2bdb3c5beed7?auto=format&fit=crop&w=600&q=80',
+    description: 'Healthy, pasture-raised native chickens fed with corn and green forage. Ready for breeding or meat.',
+  },
+  {
+    id: 'crop-6',
+    cropName: 'Boer Cross Goats (Kambing)',
+    category: 'Livestock & Poultry',
+    pricePerUnit: 4200,
+    unit: 'head',
+    quantity: 12,
+    location: 'Malaybalay, Bukidnon',
+    sellerName: 'Esteban Cruz',
+    sellerVerified: true,
+    rating: 5.0,
+    imageUrl: 'https://images.unsplash.com/photo-1524024973431-2ad916746881?auto=format&fit=crop&w=600&q=80',
+    description: 'Dewormed and vitamin-supplemented Boer cross goats. Average weight 18-25 kg live weight.',
+  },
 ];
 
 export const ProduceMarketplacePage: React.FC = () => {
@@ -108,7 +139,7 @@ export const ProduceMarketplacePage: React.FC = () => {
   const [listings, setListings] = useState<ProduceListing[]>([]);
   const [_loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All Crops');
+  const [selectedCategory, setSelectedCategory] = useState('All Products');
 
   // Produce Cart state (Shopee-style)
   const [produceCartMap, setProduceCartMap] = useState<Record<string, number>>({});
@@ -231,9 +262,19 @@ export const ProduceMarketplacePage: React.FC = () => {
   };
 
   const filteredListings = listings.filter((item: any) => {
+    const catLower = (item.category || '').toLowerCase();
+    const selLower = selectedCategory.toLowerCase();
     const matchesCategory =
+      selectedCategory === 'All Products' ||
       selectedCategory === 'All Crops' ||
-      item.category?.toLowerCase().includes(selectedCategory.toLowerCase());
+      selectedCategory === 'All' ||
+      catLower.includes(selLower) ||
+      selLower.includes(catLower) ||
+      (selLower.includes('livestock') && catLower.includes('livestock')) ||
+      (selLower.includes('grain') && catLower.includes('grain')) ||
+      (selLower.includes('root') && catLower.includes('root')) ||
+      (selLower.includes('fish') && catLower.includes('fish')) ||
+      (selLower.includes('spice') && catLower.includes('spice'));
     const matchesSearch =
       search.trim() === '' ||
       item.cropName?.toLowerCase().includes(search.toLowerCase()) ||
@@ -688,8 +729,8 @@ export const ProduceMarketplacePage: React.FC = () => {
           <p style={{ fontSize: '18px', color: '#525450', marginBottom: '24px' }}>
             Tap the button below to view all crop listings.
           </p>
-          <button onClick={() => setSelectedCategory('All Crops')} className="btn btn-primary btn-large">
-            Show All Crops
+          <button onClick={() => setSelectedCategory('All Products')} className="btn btn-primary btn-large">
+            Show All Products
           </button>
         </div>
       )}
