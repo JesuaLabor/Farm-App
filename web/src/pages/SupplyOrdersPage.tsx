@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useChat } from '../contexts/ChatContext';
 import { supplyApi } from '../api/supply';
+import { produceApi } from '../api/produce';
 import { getImageUrl } from '../api';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import type { PaymentMethod, PaymentStatus, SupplyOrder, SupplyOrderStatus } from '../types/supply';
@@ -100,6 +101,9 @@ export const SupplyOrdersPage: React.FC = () => {
   const [orderToCancel, setOrderToCancel] = useState<SupplyOrder | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
 
+  const [produceSalesCount, setProduceSalesCount] = useState<number | null>(null);
+  const [producePurchasesCount, setProducePurchasesCount] = useState<number | null>(null);
+
   const fetchOrders = async () => {
     setLoading(true);
     try {
@@ -114,7 +118,22 @@ export const SupplyOrdersPage: React.FC = () => {
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+
+    if (user?.role !== 'supplier') {
+      produceApi.listTransactions()
+        .then((txs) => {
+          if (Array.isArray(txs)) {
+            if (user?.role === 'farmer') {
+              setProduceSalesCount(txs.filter((t) => t.farmerId === user?.id).length);
+              setProducePurchasesCount(txs.filter((t) => t.buyerId === user?.id).length);
+            } else {
+              setProducePurchasesCount(txs.length);
+            }
+          }
+        })
+        .catch((err) => console.error('Failed to load produce counts:', err));
+    }
+  }, [user]);
 
   const handleUpdateStatus = async (id: string, status: SupplyOrderStatus, shippingFee?: number) => {
     setUpdatingStatusId(id);
@@ -201,36 +220,96 @@ export const SupplyOrdersPage: React.FC = () => {
       {/* ─── Order Category Navigation Switcher ─── */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '22px', flexWrap: 'wrap' }}>
         {!isSupplier && (
-          <button
-            type="button"
-            onClick={() => navigate('/produce/orders')}
-            style={{
-              padding: '10px 22px',
-              borderRadius: '24px',
-              border: '2px solid #e2e8f0',
-              backgroundColor: '#ffffff',
-              color: '#64748b',
-              fontWeight: 700,
-              fontSize: '15px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#176B3A';
-              e.currentTarget.style.color = '#0E4A27';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#e2e8f0';
-              e.currentTarget.style.color = '#64748b';
-            }}
-          >
-            <span>{isFarmer ? '🌾 Crop Sales Orders' : '🌱 My Produce Purchases'}</span>
-          </button>
+          <>
+            {/* Tab 1: Crop Sales Orders (Farmer) or My Produce Purchases (Buyer) */}
+            <button
+              type="button"
+              onClick={() => navigate('/produce/orders')}
+              style={{
+                padding: '10px 22px',
+                borderRadius: '24px',
+                border: '2px solid #e2e8f0',
+                backgroundColor: '#ffffff',
+                color: '#64748b',
+                fontWeight: 700,
+                fontSize: '15px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = '#176B3A';
+                e.currentTarget.style.color = '#0E4A27';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#e2e8f0';
+                e.currentTarget.style.color = '#64748b';
+              }}
+            >
+              <span>{isFarmer ? '🌾 Crop Sales Orders' : '🌱 My Produce Purchases'}</span>
+              {(isFarmer ? produceSalesCount : producePurchasesCount) !== null && (
+                <span style={{
+                  backgroundColor: '#cbd5e1',
+                  color: '#ffffff',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                }}>
+                  {isFarmer ? produceSalesCount : producePurchasesCount}
+                </span>
+              )}
+            </button>
+
+            {/* Tab 2: My Crop Purchases — only visible for Farmers */}
+            {isFarmer && (
+              <button
+                type="button"
+                onClick={() => navigate('/produce/orders?view=purchases')}
+                style={{
+                  padding: '10px 22px',
+                  borderRadius: '24px',
+                  border: '2px solid #e2e8f0',
+                  backgroundColor: '#ffffff',
+                  color: '#64748b',
+                  fontWeight: 700,
+                  fontSize: '15px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#7C3AED';
+                  e.currentTarget.style.color = '#4C1D95';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.color = '#64748b';
+                }}
+              >
+                <span>🛒 My Crop Purchases</span>
+                {producePurchasesCount !== null && (
+                  <span style={{
+                    backgroundColor: '#cbd5e1',
+                    color: '#ffffff',
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                  }}>
+                    {producePurchasesCount}
+                  </span>
+                )}
+              </button>
+            )}
+          </>
         )}
 
+        {/* Tab 3: My Supply Purchases (active) */}
         <button
           type="button"
           onClick={() => navigate('/supply/orders')}

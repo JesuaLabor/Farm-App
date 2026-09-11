@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useChat } from '../contexts/ChatContext';
 import { produceApi } from '../api/produce';
+import { supplyApi } from '../api/supply';
 import { getImageUrl } from '../api';
 
 export interface OrderItem {
@@ -131,6 +132,8 @@ export const ProduceTransactionsPage: React.FC = () => {
     const params = new URLSearchParams(location.search);
     if (params.get('view') === 'purchases' && isFarmer) {
       setViewMode('purchases');
+    } else {
+      setViewMode('sales');
     }
   }, [location.search, isFarmer]);
 
@@ -184,8 +187,19 @@ export const ProduceTransactionsPage: React.FC = () => {
     'Cancelled',
   ];
 
+  const [supplyOrdersCount, setSupplyOrdersCount] = useState<number | null>(null);
+
   useEffect(() => {
     loadTransactions();
+    if (user?.role !== 'super_admin') {
+      supplyApi.listOrders()
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setSupplyOrdersCount(data.length);
+          }
+        })
+        .catch((err) => console.error('Failed to load supply count:', err));
+    }
   }, [user?.id]);
 
   const loadTransactions = async () => {
@@ -455,7 +469,11 @@ export const ProduceTransactionsPage: React.FC = () => {
         {/* Sales Orders tab (farmer's default view) / Buyer Produce Purchases */}
         <button
           type="button"
-          onClick={() => { setViewMode('sales'); setSelectedTab('All Orders'); }}
+          onClick={() => {
+            setViewMode('sales');
+            setSelectedTab('All Orders');
+            navigate('/produce/orders', { replace: true });
+          }}
           style={{
             padding: '10px 22px',
             borderRadius: '24px',
@@ -489,7 +507,11 @@ export const ProduceTransactionsPage: React.FC = () => {
         {isFarmer && (
           <button
             type="button"
-            onClick={() => { setViewMode('purchases'); setSelectedTab('All Orders'); }}
+            onClick={() => {
+              setViewMode('purchases');
+              setSelectedTab('All Orders');
+              navigate('/produce/orders?view=purchases', { replace: true });
+            }}
             style={{
               padding: '10px 22px',
               borderRadius: '24px',
@@ -547,7 +569,18 @@ export const ProduceTransactionsPage: React.FC = () => {
           }}
         >
           <span>🏪 My Supply Purchases</span>
-          <span style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8' }}>→</span>
+          {supplyOrdersCount !== null && (
+            <span style={{
+              backgroundColor: '#cbd5e1',
+              color: '#ffffff',
+              fontSize: '11px',
+              fontWeight: 800,
+              padding: '2px 8px',
+              borderRadius: '10px',
+            }}>
+              {supplyOrdersCount}
+            </span>
+          )}
         </button>
       </div>
 
