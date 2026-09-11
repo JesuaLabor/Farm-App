@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { communityApi } from '../api/community';
+import { getImageUrl } from '../api';
 import { useToast } from '../contexts/ToastContext';
-import type { Post, Comment } from '../types/community';
+import type { Post, Comment, ReactionType } from '../types/community';
+import { ReactionPicker, ReactionBadgeList } from '../components/community/ReactionPicker';
+import { VideoPlayer } from '../components/community/VideoPlayer';
+import { ReactionModal } from '../components/community/ReactionModal';
+import { ShareModal } from '../components/community/ShareModal';
 
 export const CommunityPostDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -12,6 +17,8 @@ export const CommunityPostDetailPage: React.FC = () => {
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showReactionModal, setShowReactionModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // New comment state
   const [commentText, setCommentText] = useState('');
@@ -38,21 +45,24 @@ export const CommunityPostDetailPage: React.FC = () => {
     loadThread();
   }, [loadThread]);
 
-  const handleUpvote = async () => {
-    if (!post || !id) return;
+  useEffect(() => {
+    if (!loading && (window.location.hash === '#comments' || window.location.hash === '#discussion')) {
+      setTimeout(() => {
+        const el = document.getElementById('comments');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 150);
+    }
+  }, [loading]);
+
+  const handleReact = async (reaction: ReactionType) => {
+    if (!id) return;
     try {
-      const res = await communityApi.toggleUpvote(id);
-      setPost((prev) =>
-        prev
-          ? {
-            ...prev,
-            isUpvotedByMe: res.isUpvoted,
-            upvotes: res.isUpvoted ? prev.upvotes + 1 : Math.max(0, prev.upvotes - 1),
-          }
-          : null
-      );
+      const updated = await communityApi.reactToPost(id, reaction);
+      setPost(updated);
     } catch (e) {
-      console.error('Failed to upvote:', e);
+      console.error('Failed to react:', e);
     }
   };
 
@@ -119,7 +129,7 @@ export const CommunityPostDetailPage: React.FC = () => {
         <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27' }}>Post Not Found</h2>
         <p style={{ color: '#64748b', marginBottom: '24px' }}>This discussion thread may have been removed or does not exist.</p>
         <button onClick={() => navigate('/community')} className="btn btn-primary">
-          ← Return to Community Forum
+          ← Return to Community Feed
         </button>
       </div>
     );
@@ -128,7 +138,7 @@ export const CommunityPostDetailPage: React.FC = () => {
   const authorBadge = getRoleBadge(post.authorRole);
 
   return (
-    <div className="app-container" style={{ paddingBottom: '60px' }}>
+    <div className="app-container" style={{ paddingBottom: '60px', maxWidth: '820px', margin: '0 auto' }}>
       {/* ── Navigation Breadcrumb ── */}
       <button
         onClick={() => navigate('/community')}
@@ -146,14 +156,14 @@ export const CommunityPostDetailPage: React.FC = () => {
           padding: 0,
         }}
       >
-        ← Back to Community Forum
+        ← Back to Community Feed
       </button>
 
-      {/* ── Main Question / Discussion Card ── */}
+      {/* ── Main Post Card ── */}
       <div
         className="card"
         style={{
-          padding: '32px',
+          padding: '28px',
           borderRadius: '20px',
           marginBottom: '28px',
           borderLeft: post.authorRole === 'lgu_staff' ? '6px solid #0D9488' : '6px solid #16a34a',
@@ -163,9 +173,10 @@ export const CommunityPostDetailPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div
               style={{
-                width: '46px',
-                height: '46px',
+                width: '48px',
+                height: '48px',
                 borderRadius: '50%',
+                overflow: 'hidden',
                 backgroundColor: post.authorRole === 'lgu_staff' ? '#0D9488' : '#16a34a',
                 color: '#fff',
                 display: 'flex',
@@ -175,7 +186,11 @@ export const CommunityPostDetailPage: React.FC = () => {
                 fontSize: '18px',
               }}
             >
-              {post.authorName ? post.authorName[0]?.toUpperCase() : 'U'}
+              {post.authorPhotoUrl ? (
+                <img src={getImageUrl(post.authorPhotoUrl)} alt={post.authorName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                post.authorName ? post.authorName[0]?.toUpperCase() : 'U'
+              )}
             </div>
             <div>
               <div style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -214,153 +229,361 @@ export const CommunityPostDetailPage: React.FC = () => {
           </span>
         </div>
 
-        <h1 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27', margin: '0 0 16px 0', lineHeight: 1.3 }}>
-          {post.title}
-        </h1>
+        {post.title && post.title !== post.body && !post.title.startsWith('Shared a') && (
+          <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0E4A27', margin: '0 0 14px 0', lineHeight: 1.3 }}>
+            {post.title}
+          </h1>
+        )}
 
-        <p style={{ fontSize: '17px', color: '#334155', lineHeight: 1.7, whiteSpace: 'pre-wrap', marginBottom: '24px' }}>
-          {post.body}
-        </p>
+        {post.body && (
+          <p style={{ fontSize: '16px', color: '#334155', lineHeight: 1.7, whiteSpace: 'pre-wrap', marginBottom: '20px' }}>
+            {post.body}
+          </p>
+        )}
 
-        <div style={{ display: 'flex', gap: '16px', borderTop: '1px solid #E2E8F0', paddingTop: '18px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button
-            onClick={handleUpvote}
+        {/* Video Player */}
+        {post.videoUrl && (
+          <div style={{ marginBottom: '20px' }}>
+            <VideoPlayer src={post.videoUrl} />
+          </div>
+        )}
+
+        {/* Image Attachment */}
+        {!post.videoUrl && post.imageUrl && (
+          <div style={{ marginBottom: '20px', borderRadius: '16px', overflow: 'hidden', background: '#000' }}>
+            <img
+              src={getImageUrl(post.imageUrl)}
+              alt={post.title || 'Attachment'}
+              style={{ width: '100%', maxHeight: '550px', objectFit: 'contain', display: 'block', margin: '0 auto' }}
+            />
+          </div>
+        )}
+
+        {/* Embedded Quoted Post (if this is a repost) */}
+        {post.sharedPost && (
+          <div
+            onClick={() => navigate(`/community/posts/${post.sharedPost?.id}`)}
             style={{
-              padding: '8px 20px',
-              borderRadius: '20px',
-              fontWeight: 800,
-              fontSize: '15px',
-              border: post.isUpvotedByMe ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
+              marginBottom: '20px',
+              border: '1.5px solid #E2E8F0',
+              borderRadius: '16px',
+              padding: '18px',
+              backgroundColor: '#F8FAFC',
               cursor: 'pointer',
-              backgroundColor: post.isUpvotedByMe ? '#dcfce7' : '#fff',
-              color: post.isUpvotedByMe ? '#166534' : '#475569',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s ease',
+              transition: 'border-color 0.15s ease',
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#16A34A'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E2E8F0'; }}
           >
-            <span>▲</span> {post.upvotes} Upvotes
-          </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+              <div
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '50%',
+                  overflow: 'hidden',
+                  backgroundColor: '#0E4A27',
+                  color: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  flexShrink: 0,
+                  position: 'relative',
+                }}
+              >
+                <span>{post.sharedPost.authorName ? post.sharedPost.authorName.charAt(0).toUpperCase() : 'U'}</span>
+                {post.sharedPost.authorPhotoUrl && (
+                  <img
+                    src={getImageUrl(post.sharedPost.authorPhotoUrl)}
+                    alt={post.sharedPost.authorName}
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                )}
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>
+                    {post.sharedPost.authorName}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      color: getRoleBadge(post.sharedPost.authorRole).color,
+                      backgroundColor: getRoleBadge(post.sharedPost.authorRole).bg,
+                      padding: '1px 6px',
+                      borderRadius: '8px',
+                    }}
+                  >
+                    {getRoleBadge(post.sharedPost.authorRole).label}
+                  </span>
+                </div>
+                <span style={{ fontSize: '12px', color: '#64748B' }}>
+                  {new Date(post.sharedPost.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+              </div>
+            </div>
 
-          <span style={{ fontSize: '15px', color: '#64748b', fontWeight: 700 }}>
-            💬 {comments.length} {comments.length === 1 ? 'Response' : 'Responses'} / Replies
+            {post.sharedPost.title && post.sharedPost.title !== post.sharedPost.body && !post.sharedPost.title.startsWith('Shared a') && (
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: 800, color: '#0E4A27' }}>
+                {post.sharedPost.title}
+              </h4>
+            )}
+
+            {post.sharedPost.body && (
+              <p style={{ margin: 0, fontSize: '14px', color: '#334155', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                {post.sharedPost.body}
+              </p>
+            )}
+
+            {post.sharedPost.videoUrl && (
+              <div style={{ marginTop: '12px' }} onClick={(e) => e.stopPropagation()}>
+                <VideoPlayer src={post.sharedPost.videoUrl} />
+              </div>
+            )}
+
+            {!post.sharedPost.videoUrl && post.sharedPost.imageUrl && (
+              <div style={{ marginTop: '12px', borderRadius: '12px', overflow: 'hidden', maxHeight: '400px', background: '#000' }}>
+                <img
+                  src={getImageUrl(post.sharedPost.imageUrl)}
+                  alt={post.sharedPost.title || 'Attached media'}
+                  style={{ width: '100%', maxHeight: '400px', objectFit: 'contain', display: 'block', margin: '0 auto' }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Reaction Metrics & Stats Bar */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '12px 0',
+            borderTop: '1px solid #F1F5F9',
+            borderBottom: '1px solid #F1F5F9',
+            marginBottom: '8px',
+          }}
+        >
+          <ReactionBadgeList
+            reactionCounts={post.reactionCounts}
+            totalReactions={post.totalReactions || post.upvotes || 0}
+            onClick={() => setShowReactionModal(true)}
+          />
+          <span
+            onClick={() => {
+              document.getElementById('comments')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            style={{ fontSize: '14px', color: '#64748B', fontWeight: 600, cursor: 'pointer' }}
+            className="hover:underline"
+            title="Jump to discussion"
+          >
+            {comments.length} {comments.length === 1 ? 'Response' : 'Responses'}
           </span>
+        </div>
+
+        {/* Interactive LinkedIn Reactions & Actions */}
+        <div className="post-action-bar" style={{ maxWidth: '420px', marginTop: '4px' }}>
+          <ReactionPicker
+            myReaction={post.myReaction}
+            totalReactions={post.totalReactions}
+            reactionCounts={post.reactionCounts}
+            onReact={handleReact}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              const el = document.getElementById('comment-input');
+              el?.focus();
+              el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }}
+            className="post-action-btn"
+          >
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.8}
+                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+              />
+            </svg>
+            <span>Comment</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowShareModal(true)}
+            className="post-action-btn"
+          >
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.8}
+                d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+              />
+            </svg>
+            <span>Share</span>
+          </button>
         </div>
       </div>
 
-      {/* ── Add Comment / Answer Box ── */}
-      <div className="card" style={{ padding: '26px', borderRadius: '20px', marginBottom: '32px' }}>
-        <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0E4A27', marginBottom: '12px' }}>
-          Leave a Response or Farming Advice
+      {/* ── Add Comment / Discussion Input Box ── */}
+      <div className="card" style={{ padding: '24px', marginBottom: '24px', borderRadius: '18px' }}>
+        <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#0E4A27', marginBottom: '14px' }}>
+          Leave a Reply
         </h3>
-        <p style={{ fontSize: '14px', color: '#64748b', marginTop: 0, marginBottom: '14px' }}>
-          Join the conversation! Farmers, agronomists, and suppliers can share field recommendations, market updates, or answers.
-        </p>
         <form onSubmit={handleAddComment}>
           <textarea
-            required
-            rows={4}
+            id="comment-input"
+            rows={3}
+            placeholder="Share your advice, questions, or perspectives with the agricultural community..."
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
-            placeholder="Write your answer, recommendation, or advice here..."
-            className="form-input"
-            style={{ fontSize: '16px', marginBottom: '14px', resize: 'vertical' }}
+            style={{
+              width: '100%',
+              padding: '14px 16px',
+              borderRadius: '12px',
+              border: '1px solid #CBD5E1',
+              fontSize: '15px',
+              fontFamily: 'inherit',
+              marginBottom: '12px',
+              resize: 'vertical',
+              boxSizing: 'border-box',
+            }}
           />
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
               type="submit"
               disabled={submitting || !commentText.trim()}
               className="btn btn-primary"
-              style={{ padding: '12px 28px', fontSize: '16px', fontWeight: 800 }}
+              style={{ padding: '10px 24px', fontSize: '14px', fontWeight: 800, borderRadius: '12px' }}
             >
-              {submitting ? 'Posting Reply...' : 'Post Reply →'}
+              {submitting ? 'Posting...' : 'Post Reply →'}
             </button>
           </div>
         </form>
       </div>
 
-      {/* ── Comments / Replies Thread ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
-          Discussion Thread ({comments.length})
-        </h3>
-      </div>
+      {/* ── Responses Thread ── */}
+      <div id="comments" style={{ scrollMarginTop: '85px' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0E4A27', marginBottom: '18px' }}>
+          Community Discussion ({comments.length})
+        </h2>
 
-      {comments.length === 0 ? (
-        <div className="card" style={{ padding: '40px', borderRadius: '18px', textAlign: 'center', color: '#64748b' }}>
-          <div style={{ fontSize: '36px', marginBottom: '12px' }}>💬</div>
-          <div style={{ fontSize: '17px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-            No replies yet on this topic
+        {comments.length === 0 ? (
+          <div className="card" style={{ padding: '36px', textAlign: 'center', color: '#64748b' }}>
+            <div style={{ fontSize: '32px', marginBottom: '8px' }}>💬</div>
+            <div style={{ fontSize: '17px', fontWeight: 700, color: '#0E4A27', marginBottom: '4px' }}>No Replies Yet</div>
+            <p style={{ fontSize: '14px', margin: 0 }}>Be the first to share your knowledge or experience with this farmer!</p>
           </div>
-          <p style={{ fontSize: '15px', margin: 0 }}>
-            Be the first to provide helpful advice or share your farming experience!
-          </p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {comments.map((comment) => {
-            const cBadge = getRoleBadge(comment.authorRole);
-            const isLGU = comment.authorRole === 'lgu_staff';
-            return (
-              <div
-                key={comment.id}
-                className="card"
-                style={{
-                  padding: '24px',
-                  borderRadius: '18px',
-                  backgroundColor: isLGU ? '#f0fdfa' : '#FFFFFF',
-                  borderLeft: isLGU ? '6px solid #0D9488' : '4px solid #CBD5E1',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div
-                      style={{
-                        width: '38px',
-                        height: '38px',
-                        borderRadius: '50%',
-                        backgroundColor: isLGU ? '#0D9488' : '#16a34a',
-                        color: '#fff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 800,
-                        fontSize: '15px',
-                      }}
-                    >
-                      {comment.authorName ? comment.authorName[0]?.toUpperCase() : 'U'}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span>{comment.authorName}</span>
-                        <span
-                          style={{
-                            fontSize: '11px',
-                            fontWeight: 800,
-                            color: cBadge.color,
-                            backgroundColor: cBadge.bg,
-                            padding: '2px 8px',
-                            borderRadius: '10px',
-                          }}
-                        >
-                          {cBadge.label}
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {comments.map((c) => {
+              const cBadge = getRoleBadge(c.authorRole);
+              return (
+                <div
+                  key={c.id}
+                  className="card"
+                  style={{
+                    padding: '20px',
+                    borderRadius: '16px',
+                    background: c.authorRole === 'lgu_staff' ? '#F0FDF4' : '#FFFFFF',
+                    border: c.authorRole === 'lgu_staff' ? '1.5px solid #86EFAC' : '1px solid #E2E8F0',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div
+                        style={{
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '50%',
+                          overflow: 'hidden',
+                          backgroundColor: c.authorRole === 'lgu_staff' ? '#0D9488' : '#16a34a',
+                          color: '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 800,
+                          fontSize: '15px',
+                          position: 'relative',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span>{c.authorName ? c.authorName[0]?.toUpperCase() : 'U'}</span>
+                        {c.authorPhotoUrl && (
+                          <img
+                            src={getImageUrl(c.authorPhotoUrl)}
+                            alt={c.authorName}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>{c.authorName}</span>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 800,
+                              color: cBadge.color,
+                              backgroundColor: cBadge.bg,
+                              padding: '1px 8px',
+                              borderRadius: '10px',
+                            }}
+                          >
+                            {cBadge.label}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>
+                          {new Date(c.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <span style={{ fontSize: '12px', color: '#64748b' }}>
-                        {new Date(comment.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </span>
                     </div>
                   </div>
-                </div>
 
-                <p style={{ fontSize: '16px', color: '#334155', lineHeight: 1.6, margin: '8px 0 0 0', whiteSpace: 'pre-wrap' }}>
-                  {comment.body}
-                </p>
-              </div>
-            );
-          })}
-        </div>
+                  <p style={{ fontSize: '15px', color: '#334155', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
+                    {c.body}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Reaction Details Modal ── */}
+      {showReactionModal && (
+        <ReactionModal
+          postId={post.id}
+          isOpen={showReactionModal}
+          onClose={() => setShowReactionModal(false)}
+          initialReactions={post.reactions}
+        />
+      )}
+
+      {/* ── Social Share Modal ── */}
+      {showShareModal && (
+        <ShareModal
+          post={post}
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          onPostShared={(newPost) => navigate(`/community/posts/${newPost.id}`)}
+        />
       )}
     </div>
   );

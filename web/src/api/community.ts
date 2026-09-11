@@ -1,5 +1,5 @@
 import { apiClient } from './index';
-import type { Comment, CreateCommentPayload, CreatePostPayload, Post } from '../types/community';
+import type { Comment, CreateCommentPayload, CreatePostPayload, Post, PostReaction, ReactionType } from '../types/community';
 
 export const communityApi = {
   listPosts: async (category?: string): Promise<Post[]> => {
@@ -19,6 +19,16 @@ export const communityApi = {
     return res.data;
   },
 
+  reactToPost: async (postId: string, reaction: ReactionType): Promise<Post> => {
+    const res = await apiClient.post<Post>(`/api/community/posts/${postId}/react`, { reaction });
+    return res.data;
+  },
+
+  getPostReactions: async (postId: string): Promise<PostReaction[]> => {
+    const res = await apiClient.get<PostReaction[]>(`/api/community/posts/${postId}/reactions`);
+    return res.data;
+  },
+
   toggleUpvote: async (postId: string): Promise<{ isUpvoted: boolean }> => {
     const res = await apiClient.post<{ isUpvoted: boolean }>(`/api/community/posts/${postId}/upvote`);
     return res.data;
@@ -31,6 +41,15 @@ export const communityApi = {
 
   createComment: async (postId: string, payload: CreateCommentPayload): Promise<Comment> => {
     const res = await apiClient.post<Comment>(`/api/community/posts/${postId}/comments`, payload);
+    return res.data;
+  },
+
+  uploadMedia: async (file: File): Promise<{ url: string; filename: string; fileType: 'image' | 'video' }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await apiClient.post<{ url: string; filename: string; fileType: 'image' | 'video' }>('/api/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return res.data;
   },
 };

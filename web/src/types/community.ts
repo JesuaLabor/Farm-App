@@ -7,6 +7,23 @@ export type PostCategory =
   | 'market_talk'
   | 'equipment';
 
+export type ReactionType =
+  | 'like'
+  | 'celebrate'
+  | 'support'
+  | 'love'
+  | 'insight'
+  | 'funny';
+
+export interface PostReaction {
+  userId: string;
+  userName: string;
+  userRole?: Role;
+  userPhotoUrl?: string;
+  type: ReactionType;
+  createdAt: string;
+}
+
 export interface Post {
   id: string;
   authorId: string;
@@ -17,13 +34,20 @@ export interface Post {
   body: string;
   category: PostCategory;
   imageUrl?: string;
+  videoUrl?: string;
   upvotes: number;
+  reactions?: PostReaction[];
+  reactionCounts?: Record<ReactionType, number>;
+  totalReactions?: number;
   commentsCount: number;
   isFlagged: boolean;
   isRemoved: boolean;
   createdAt: string;
   updatedAt: string;
   isUpvotedByMe?: boolean;
+  myReaction?: ReactionType;
+  sharedPostId?: string;
+  sharedPost?: Post;
 }
 
 export interface Comment {
@@ -41,10 +65,12 @@ export interface Comment {
 }
 
 export interface CreatePostPayload {
-  title: string;
+  title?: string;
   body: string;
   category: PostCategory;
   imageUrl?: string;
+  videoUrl?: string;
+  sharedPostId?: string;
 }
 
 export interface CreateCommentPayload {

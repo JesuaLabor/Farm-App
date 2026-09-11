@@ -1,8 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { communityApi } from '../api/community';
+import { getImageUrl } from '../api';
 import { useToast } from '../contexts/ToastContext';
-import type { Post, PostCategory } from '../types/community';
+import { useAuth } from '../contexts/AuthContext';
+import type { Post, PostCategory, ReactionType, Comment } from '../types/community';
+import { ReactionPicker, ReactionBadgeList } from '../components/community/ReactionPicker';
+import { VideoPlayer } from '../components/community/VideoPlayer';
+import { ReactionModal } from '../components/community/ReactionModal';
+import { ShareModal } from '../components/community/ShareModal';
 
 interface FarmingGuide {
   id: string;
@@ -198,15 +204,15 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
   const navigate = useNavigate();
   const location = useLocation();
   const { success, error } = useToast();
+  const { user } = useAuth();
 
-  // Determine active tab from URL hash, props, or path
+  // Tab State
   const [activeTab, setActiveTab] = useState<'community' | 'guides'>(() => {
     if (initialTab) return initialTab;
     if (location.pathname.includes('/guides') || location.hash === '#guides') return 'guides';
     return 'community';
   });
 
-  // Sync state if URL hash or pathname changes
   useEffect(() => {
     if (location.pathname.includes('/guides') || location.hash === '#guides') {
       setActiveTab('guides');
@@ -228,18 +234,40 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
   const [posts, setPosts] = useState<Post[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [forumCategory, setForumCategory] = useState<string>('all');
-  const [showAskModal, setShowAskModal] = useState(false);
-  const [questionTitle, setQuestionTitle] = useState('');
-  const [questionCategory, setQuestionCategory] = useState<PostCategory>('crop_advice');
-  const [questionDetails, setQuestionDetails] = useState('');
-  const [submittingQuestion, setSubmittingQuestion] = useState(false);
+
+  // Facebook-Style Composer State
+  const [composerExpanded, setComposerExpanded] = useState(false);
+  const [composerTitle, setComposerTitle] = useState('');
+  const [composerBody, setComposerBody] = useState('');
+  const [composerCategory, setComposerCategory] = useState<PostCategory>('crop_advice');
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [publishingPost, setPublishingPost] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Inline Comment State (per post)
+  const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
+  const [showInlineCommentsList, setShowInlineCommentsList] = useState<Record<string, boolean>>({});
+  const [inlineCommentInputs, setInlineCommentInputs] = useState<Record<string, string>>({});
+  const [submittingComment, setSubmittingComment] = useState<Record<string, boolean>>({});
+  const [inlineComments, setInlineComments] = useState<Record<string, Comment[]>>({});
+  const [loadingInlineComments, setLoadingInlineComments] = useState<Record<string, boolean>>({});
+
+  // Reactions Modal State
+  const [activeReactionModalPost, setActiveReactionModalPost] = useState<Post | null>(null);
+
+  // Share Modal State
+  const [activeShareModalPost, setActiveShareModalPost] = useState<Post | null>(null);
 
   // Guides State
   const [guidesSearch, setGuidesSearch] = useState('');
   const [selectedGuideCategory, setSelectedGuideCategory] = useState('all');
   const [activeGuideModal, setActiveGuideModal] = useState<FarmingGuide | null>(null);
 
-  // Fetch real posts from backend
+  // Fetch posts from backend
   const loadPosts = useCallback(async () => {
     setLoadingPosts(true);
     try {
@@ -256,52 +284,172 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
     loadPosts();
   }, [loadPosts]);
 
-  // Handle post upvote directly in feed
-  const handleToggleUpvote = async (e: React.MouseEvent, postId: string) => {
-    e.stopPropagation();
+  // Handle LinkedIn-Style Reaction
+  const handleReact = async (postId: string, reaction: ReactionType) => {
     try {
-      const res = await communityApi.toggleUpvote(postId);
-      setPosts((prev) =>
-        prev.map((p) => {
-          if (p.id === postId) {
-            return {
-              ...p,
-              isUpvotedByMe: res.isUpvoted,
-              upvotes: res.isUpvoted ? p.upvotes + 1 : Math.max(0, p.upvotes - 1),
-            };
-          }
-          return p;
-        })
-      );
+      const updated = await communityApi.reactToPost(postId, reaction);
+      setPosts((prev) => prev.map((p) => (p.id === postId ? updated : p)));
     } catch (err) {
-      console.error('Failed to toggle upvote:', err);
+      console.error('Failed to react to post:', err);
     }
   };
 
-  // Create post via backend API
-  const handleCreatePost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!questionTitle.trim()) return;
+  // Open Share Dialog
+  const handleShare = (e: React.MouseEvent, post: Post) => {
+    e.stopPropagation();
+    setActiveShareModalPost(post);
+  };
 
-    setSubmittingQuestion(true);
+  // File Picker Trigger
+  const triggerFileSelect = (acceptType: 'image/*' | 'video/*') => {
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = acceptType;
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check size limit (max 60MB)
+    if (file.size > 60 * 1024 * 1024) {
+      error('File Too Large', 'Maximum upload size is 60MB. Please choose a smaller photo or video.');
+      return;
+    }
+
+    const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/i.test(file.name);
+    setMediaFile(file);
+    setMediaType(isVideo ? 'video' : 'image');
+    setMediaPreview(URL.createObjectURL(file));
+    setComposerExpanded(true);
+  };
+
+  const clearMediaAttachment = () => {
+    if (mediaPreview) URL.revokeObjectURL(mediaPreview);
+    setMediaFile(null);
+    setMediaPreview(null);
+    setMediaType(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Publish Post via Facebook-style Composer
+  const handlePublishPost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!composerBody.trim() && !mediaFile) {
+      error('Post Content Required', 'Please write something or attach a photo/video.');
+      return;
+    }
+
+    setPublishingPost(true);
     try {
+      let imageUrl: string | undefined;
+      let videoUrl: string | undefined;
+
+      // Upload media if present
+      if (mediaFile) {
+        setUploadingMedia(true);
+        const uploadRes = await communityApi.uploadMedia(mediaFile);
+        if (uploadRes.fileType === 'video' || mediaType === 'video') {
+          videoUrl = uploadRes.url;
+        } else {
+          imageUrl = uploadRes.url;
+        }
+        setUploadingMedia(false);
+      }
+
       const newPost = await communityApi.createPost({
-        title: questionTitle.trim(),
-        body: questionDetails.trim() || questionTitle.trim(),
-        category: questionCategory,
+        title: composerTitle.trim() || undefined,
+        body: composerBody.trim(),
+        category: composerCategory,
+        imageUrl,
+        videoUrl,
       });
 
-      setShowAskModal(false);
-      setQuestionTitle('');
-      setQuestionDetails('');
-      setQuestionCategory('crop_advice');
+      // Prepend to posts list
       setPosts((prev) => [newPost, ...prev]);
 
-      success('Question Posted Successfully!', 'Your question is now visible to all farmers, buyers, and agronomists.');
+      // Reset composer
+      setComposerTitle('');
+      setComposerBody('');
+      setComposerCategory('crop_advice');
+      clearMediaAttachment();
+      setComposerExpanded(false);
+
+      success('Post Published!', 'Your post has been shared with the community.');
     } catch (err: any) {
-      error('Failed to Post Question', err.response?.data?.error || 'Please check your connection and try again.');
+      console.error('Failed to create post:', err);
+      error('Failed to Post', err.response?.data?.error || 'Please check your connection and try again.');
     } finally {
-      setSubmittingQuestion(false);
+      setPublishingPost(false);
+      setUploadingMedia(false);
+    }
+  };
+
+  const loadInlineComments = async (postId: string) => {
+    setLoadingInlineComments((prev) => ({ ...prev, [postId]: true }));
+    try {
+      const data = await communityApi.listComments(postId);
+      setInlineComments((prev) => ({ ...prev, [postId]: data || [] }));
+    } catch (err) {
+      console.error('Failed to load inline comments:', err);
+    } finally {
+      setLoadingInlineComments((prev) => ({ ...prev, [postId]: false }));
+    }
+  };
+
+  // User clicks on existing comments count ("2 comments", "1 comment"):
+  // Show Image 1 UI: existing comments list + reply input + view full thread link
+  const handleClickExistingComments = (postId: string) => {
+    if (activeCommentPostId === postId && showInlineCommentsList[postId]) {
+      // Toggle close
+      setActiveCommentPostId(null);
+      setShowInlineCommentsList((prev) => ({ ...prev, [postId]: false }));
+    } else {
+      setActiveCommentPostId(postId);
+      setShowInlineCommentsList((prev) => ({ ...prev, [postId]: true }));
+      if (!inlineComments[postId]) {
+        loadInlineComments(postId);
+      }
+    }
+  };
+
+  // User clicks on "Comment" action button:
+  // Show Image 2 UI: ONLY the comment input composer box!
+  const handleClickCommentButton = (postId: string) => {
+    if (activeCommentPostId === postId && !showInlineCommentsList[postId]) {
+      // Toggle close if already open in input-only mode
+      setActiveCommentPostId(null);
+    } else {
+      setActiveCommentPostId(postId);
+      setShowInlineCommentsList((prev) => ({ ...prev, [postId]: false }));
+      setTimeout(() => {
+        document.getElementById(`comment-input-${postId}`)?.focus();
+      }, 50);
+    }
+  };
+
+  // Inline comment submission
+  const handleInlineCommentSubmit = async (postId: string) => {
+    const text = inlineCommentInputs[postId]?.trim();
+    if (!text) return;
+
+    setSubmittingComment((prev) => ({ ...prev, [postId]: true }));
+    try {
+      const newComment = await communityApi.createComment(postId, { body: text });
+      setInlineCommentInputs((prev) => ({ ...prev, [postId]: '' }));
+      setPosts((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, commentsCount: (p.commentsCount || 0) + 1 } : p))
+      );
+      setInlineComments((prev) => ({
+        ...prev,
+        [postId]: [...(prev[postId] || []), newComment],
+      }));
+      success('Comment Posted', 'Your reply has been added.');
+    } catch (err: any) {
+      error('Failed to post reply', err.response?.data?.error || 'Please try again.');
+    } finally {
+      setSubmittingComment((prev) => ({ ...prev, [postId]: false }));
     }
   };
 
@@ -310,7 +458,7 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
       case 'farmer':
         return { label: '🌾 Farmer', bg: '#dcfce7', color: '#15803d' };
       case 'supplier':
-        return { label: '📦 Supplier', bg: '#e0f2fe', color: '#0369a1' };
+        return { label: '🏪 Supplier', bg: '#e0f2fe', color: '#0369a1' };
       case 'lgu':
       case 'lgu_staff':
       case 'lgu_officer':
@@ -363,18 +511,20 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
   });
 
   return (
-    <div className="app-container" style={{ paddingBottom: '50px' }}>
+    <div className="app-container" style={{ paddingBottom: '60px' }}>
       {/* ─── Page Header ─── */}
       <div style={{ marginBottom: '24px' }}>
-        <div>
-          <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
-            {activeTab === 'community' ? 'Farmer Forum & Community Q&A' : 'Agricultural Learning Hub & Field Guides'}
-          </h1>
-          <p style={{ fontSize: '19px', color: '#525450', marginTop: '6px', marginBottom: '20px' }}>
-            {activeTab === 'community'
-              ? 'Ask crop questions, discuss local farm prices, and receive verified recommendations from licensed agronomists and peer farmers.'
-              : 'Practical, step-by-step agricultural handbooks, pest identification sheets, and crop management manuals.'}
-          </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
+          <div>
+            <h1 style={{ fontSize: '32px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
+              {activeTab === 'community' ? 'Agricultural Community & Media Feed' : 'Agricultural Learning Hub & Field Guides'}
+            </h1>
+            <p style={{ fontSize: '16px', color: '#525450', marginTop: '6px', marginBottom: 0, maxWidth: '780px', lineHeight: 1.5 }}>
+              {activeTab === 'community'
+                ? 'Share crop videos, field photos, discuss wholesale market prices, and connect with farmers, suppliers, and agronomists across regions.'
+                : 'Practical, step-by-step agricultural handbooks, pest identification sheets, and crop management manuals.'}
+            </p>
+          </div>
         </div>
 
         {/* ─── Top Segregated Navigation Tabs ─── */}
@@ -382,9 +532,9 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
           style={{
             display: 'inline-flex',
             background: '#EAECE9',
-            padding: '6px',
+            padding: '5px',
             borderRadius: '16px',
-            gap: '6px',
+            gap: '4px',
           }}
         >
           <button
@@ -393,11 +543,11 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              padding: '12px 24px',
+              padding: '10px 22px',
               borderRadius: '12px',
               border: 'none',
               fontWeight: 800,
-              fontSize: '17px',
+              fontSize: '15px',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
               background: activeTab === 'community' ? '#FFFFFF' : 'transparent',
@@ -405,8 +555,8 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
               boxShadow: activeTab === 'community' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
             }}
           >
-            <span>💬</span>
-            <span>Community Forum</span>
+            <span>🌾</span>
+            <span>Community Feed</span>
           </button>
 
           <button
@@ -415,11 +565,11 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              padding: '12px 24px',
+              padding: '10px 22px',
               borderRadius: '12px',
               border: 'none',
               fontWeight: 800,
-              fontSize: '17px',
+              fontSize: '15px',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
               background: activeTab === 'guides' ? '#FFFFFF' : 'transparent',
@@ -434,27 +584,354 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════════
-          TAB 1: COMMUNITY FORUM (Q&A Feed & Verified Community Answers)
+          TAB 1: COMMUNITY FORUM & FACEBOOK-STYLE MEDIA FEED
       ══════════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'community' && (
-        <div>
-          {/* Forum Action & Filter Bar */}
+        <div style={{ maxWidth: '820px', margin: '0 auto' }}>
+          {/* Hidden File Input for Image/Video Attachments */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+          />
+
+          {/* ─── Facebook-Style Rich Feed Composer Card ─── */}
           <div
             className="card"
             style={{
               padding: '20px',
-              marginBottom: '28px',
+              marginBottom: '24px',
+              borderRadius: '20px',
+              border: '1.5px solid #D1E7D8',
+              background: '#FFFFFF',
+              boxShadow: '0 4px 18px rgba(14, 74, 39, 0.06)',
+            }}
+          >
+            <form onSubmit={handlePublishPost}>
+              {/* Top Row: User Avatar & Input / Textarea */}
+              <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                <div
+                  style={{
+                    width: '46px',
+                    height: '46px',
+                    borderRadius: '50%',
+                    overflow: 'hidden',
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#0E4A27',
+                    color: '#FFFFFF',
+                    fontWeight: 800,
+                    fontSize: '18px',
+                    border: '2px solid #C8E6D2',
+                  }}
+                >
+                  {user?.photoUrl ? (
+                    <img
+                      src={getImageUrl(user.photoUrl)}
+                      alt={user.firstName}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    user?.firstName ? user.firstName.charAt(0).toUpperCase() : '👨‍🌾'
+                  )}
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  {!composerExpanded ? (
+                    <div
+                      onClick={() => setComposerExpanded(true)}
+                      style={{
+                        background: '#F8FAFC',
+                        borderRadius: '24px',
+                        padding: '12px 20px',
+                        border: '1px solid #CBD5E1',
+                        color: '#64748B',
+                        fontSize: '15px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#F1F5F9';
+                        e.currentTarget.style.borderColor = '#176B3A';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = '#F8FAFC';
+                        e.currentTarget.style.borderColor = '#CBD5E1';
+                      }}
+                    >
+                      <span>What's happening on your farm, {user?.firstName || 'farmer'}? Share photo, video or advice...</span>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <input
+                        type="text"
+                        placeholder="Post Title (optional)"
+                        value={composerTitle}
+                        onChange={(e) => setComposerTitle(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '10px 14px',
+                          borderRadius: '12px',
+                          border: '1.5px solid #E2E8F0',
+                          fontSize: '16px',
+                          fontWeight: 700,
+                          outline: 'none',
+                        }}
+                      />
+                      <textarea
+                        rows={3}
+                        autoFocus
+                        placeholder={`What's happening on your farm, ${user?.firstName || 'farmer'}? Write details, ask questions, or describe your video/photo...`}
+                        value={composerBody}
+                        onChange={(e) => setComposerBody(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '12px 14px',
+                          borderRadius: '12px',
+                          border: '1.5px solid #E2E8F0',
+                          fontSize: '15px',
+                          outline: 'none',
+                          resize: 'vertical',
+                          lineHeight: 1.5,
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Media Attachment Live Preview (Image or Video) */}
+              {mediaPreview && (
+                <div
+                  style={{
+                    position: 'relative',
+                    marginTop: '16px',
+                    borderRadius: '14px',
+                    overflow: 'hidden',
+                    border: '1px solid #E2E8F0',
+                    background: '#000000',
+                  }}
+                >
+                  {mediaType === 'video' ? (
+                    <video
+                      src={mediaPreview}
+                      controls
+                      style={{ width: '100%', maxHeight: '380px', objectFit: 'contain' }}
+                    />
+                  ) : (
+                    <img
+                      src={mediaPreview}
+                      alt="Upload preview"
+                      style={{ width: '100%', maxHeight: '380px', objectFit: 'contain', background: '#F8FAFC' }}
+                    />
+                  )}
+
+                  {/* Remove Button */}
+                  <button
+                    type="button"
+                    onClick={clearMediaAttachment}
+                    style={{
+                      position: 'absolute',
+                      top: '12px',
+                      right: '12px',
+                      background: 'rgba(0, 0, 0, 0.7)',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '32px',
+                      height: '32px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      fontSize: '16px',
+                      fontWeight: 800,
+                    }}
+                    title="Remove attachment"
+                  >
+                    ✕
+                  </button>
+
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: '10px',
+                      left: '12px',
+                      background: 'rgba(0,0,0,0.7)',
+                      color: '#FFFFFF',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      backdropFilter: 'blur(4px)',
+                    }}
+                  >
+                    {mediaType === 'video' ? '🎥 Video Attached' : '📷 Photo Attached'}
+                    {mediaFile && ` • ${(mediaFile.size / (1024 * 1024)).toFixed(1)} MB`}
+                  </div>
+                </div>
+              )}
+
+              {/* Upload Progress Alert */}
+              {uploadingMedia && (
+                <div
+                  style={{
+                    marginTop: '14px',
+                    padding: '10px 14px',
+                    background: '#EAF6EE',
+                    borderRadius: '10px',
+                    color: '#0E4A27',
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  <span className="animate-spin">⏳</span>
+                  <span>Uploading media to Cloudflare R2 storage... please wait.</span>
+                </div>
+              )}
+
+              {/* Bottom Quick Attachment & Post Controls */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginTop: '16px',
+                  paddingTop: '12px',
+                  borderTop: '1px solid #F1F5F9',
+                  flexWrap: 'wrap',
+                  gap: '10px',
+                }}
+              >
+                {/* Left Attachment Buttons */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => triggerFileSelect('image/*')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 14px',
+                      borderRadius: '12px',
+                      border: '1px solid #CBD5E1',
+                      background: '#FFFFFF',
+                      color: '#15803d',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#DCFCE7'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = '#FFFFFF'; }}
+                  >
+                    <span>📷</span>
+                    <span>Photo</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => triggerFileSelect('video/*')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 14px',
+                      borderRadius: '12px',
+                      border: '1px solid #CBD5E1',
+                      background: '#FFFFFF',
+                      color: '#2563EB',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#DBEAFE'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = '#FFFFFF'; }}
+                  >
+                    <span>🎥</span>
+                    <span>Video</span>
+                  </button>
+
+                  {/* Category Selector */}
+                  <select
+                    value={composerCategory}
+                    onChange={(e) => setComposerCategory(e.target.value as PostCategory)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '12px',
+                      border: '1px solid #CBD5E1',
+                      background: '#F8FAFC',
+                      color: '#334155',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="crop_advice">🌱 Crop Care</option>
+                    <option value="pest_control">🐛 Pest Control</option>
+                    <option value="market_talk">💰 Market & Prices</option>
+                    <option value="equipment">🚜 Equipment</option>
+                    <option value="general">🌾 General Farming</option>
+                  </select>
+                </div>
+
+                {/* Right Post Trigger Button */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {composerExpanded && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setComposerExpanded(false);
+                        clearMediaAttachment();
+                      }}
+                      className="btn btn-secondary"
+                      style={{ padding: '8px 16px', borderRadius: '12px', fontSize: '14px' }}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={publishingPost || (!composerBody.trim() && !mediaFile)}
+                    className="btn btn-primary"
+                    style={{
+                      padding: '8px 22px',
+                      borderRadius: '12px',
+                      fontSize: '14px',
+                      fontWeight: 800,
+                      boxShadow: '0 2px 8px rgba(23, 107, 58, 0.25)',
+                      opacity: publishingPost || (!composerBody.trim() && !mediaFile) ? 0.6 : 1,
+                      cursor: publishingPost || (!composerBody.trim() && !mediaFile) ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {publishingPost ? 'Publishing...' : 'Post Update'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* ─── Streamlined Category Filter Bar ─── */}
+          <div
+            style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
+              marginBottom: '20px',
               flexWrap: 'wrap',
-              gap: '16px',
+              gap: '12px',
             }}
           >
-            {/* Category Pills */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '2px', flexWrap: 'wrap' }}>
               {[
-                { key: 'all', label: 'All Topics' },
+                { key: 'all', label: 'All Feeds' },
                 { key: 'crop_advice', label: '🌱 Crop Care' },
                 { key: 'pest_control', label: '🐛 Pest Control' },
                 { key: 'market_talk', label: '💰 Market & Prices' },
@@ -467,13 +944,15 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
                   style={{
                     padding: '8px 18px',
                     borderRadius: '20px',
-                    border: forumCategory === cat.key ? '2px solid #0E4A27' : '1px solid #CBD5E1',
-                    background: forumCategory === cat.key ? '#EAF6EE' : '#FFFFFF',
-                    color: forumCategory === cat.key ? '#0E4A27' : '#525450',
+                    border: forumCategory === cat.key ? '2px solid #0E4A27' : '1.5px solid #CBD5E1',
+                    background: forumCategory === cat.key ? '#0E4A27' : '#FFFFFF',
+                    color: forumCategory === cat.key ? '#FFFFFF' : '#475569',
                     fontWeight: 700,
-                    fontSize: '15px',
+                    fontSize: '14px',
                     cursor: 'pointer',
+                    whiteSpace: 'nowrap',
                     transition: 'all 0.15s ease',
+                    boxShadow: forumCategory === cat.key ? '0 2px 8px rgba(14, 74, 39, 0.2)' : 'none',
                   }}
                 >
                   {cat.label}
@@ -481,31 +960,27 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
               ))}
             </div>
 
-            <button
-              onClick={() => setShowAskModal(true)}
-              className="btn btn-primary btn-large"
-              style={{ fontSize: '17px' }}
-            >
-              + Ask a Farming Question
-            </button>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: '#64748B' }}>
+              {posts.length} {posts.length === 1 ? 'post' : 'posts'}
+            </div>
           </div>
 
-          {/* Forum Feed */}
+          {/* ─── Feed Posts List ─── */}
           {loadingPosts ? (
             <div className="card" style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>
-              <div style={{ fontSize: '18px', fontWeight: 600 }}>Loading community discussions...</div>
+              <div style={{ fontSize: '18px', fontWeight: 600 }}>Loading community feed...</div>
             </div>
           ) : posts.length === 0 ? (
             <div className="card" style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>
               <div style={{ fontSize: '40px', marginBottom: '12px' }}>🌱</div>
               <div style={{ fontSize: '20px', fontWeight: 800, color: '#0E4A27', marginBottom: '8px' }}>
-                No Discussions in this Category Yet
+                No Posts in this Category Yet
               </div>
               <p style={{ fontSize: '16px', marginBottom: '20px' }}>
-                Be the first to ask a question or start a topic with fellow farmers!
+                Be the first to share a farm photo, video update, or agricultural question!
               </p>
-              <button onClick={() => setShowAskModal(true)} className="btn btn-primary">
-                + Ask the First Question
+              <button onClick={() => setComposerExpanded(true)} className="btn btn-primary">
+                + Write the First Post
               </button>
             </div>
           ) : (
@@ -513,144 +988,521 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
               {posts.map((post) => {
                 const rBadge = getRoleBadge(post.authorRole);
                 const isLGU = post.authorRole === 'lgu_staff';
+                const isCommentOpen = activeCommentPostId === post.id;
+
                 return (
                   <div
                     key={post.id}
-                    className="card"
-                    onClick={() => navigate(`/community/posts/${post.id}`)}
+                    className="feed-post-card"
                     style={{
-                      padding: '26px',
-                      cursor: 'pointer',
-                      transition: 'transform 0.15s ease, box-shadow 0.15s ease',
                       borderLeft: isLGU ? '6px solid #0D9488' : '4px solid #16a34a',
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '';
-                    }}
                   >
+                    {/* Author Header */}
                     <div
                       style={{
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        marginBottom: '12px',
+                        marginBottom: '14px',
                         flexWrap: 'wrap',
                         gap: '10px',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                        <span
-                          className="badge"
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div
                           style={{
-                            background: '#EAF6EE',
-                            color: '#0E4A27',
-                            fontSize: '13px',
-                            fontWeight: 700,
-                            border: '1px solid #C8E6D0',
+                            width: '44px',
+                            height: '44px',
+                            borderRadius: '50%',
+                            overflow: 'hidden',
+                            backgroundColor: isLGU ? '#0D9488' : '#16a34a',
+                            color: '#FFFFFF',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 800,
+                            fontSize: '17px',
+                            position: 'relative',
+                            flexShrink: 0,
                           }}
                         >
-                          {getCategoryLabel(post.category)}
-                        </span>
-                        <span style={{ fontSize: '15px', color: '#1A1C1A', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>👤 {post.authorName}</span>
-                          <span
-                            style={{
-                              fontSize: '11px',
-                              fontWeight: 800,
-                              color: rBadge.color,
-                              backgroundColor: rBadge.bg,
-                              padding: '2px 8px',
-                              borderRadius: '10px',
-                            }}
-                          >
-                            {rBadge.label}
-                          </span>
-                        </span>
-                        <span style={{ fontSize: '14px', color: '#64748b' }}>
-                          • {formatTimeAgo(post.createdAt)}
-                        </span>
+                          <span>{post.authorName ? post.authorName.charAt(0).toUpperCase() : 'U'}</span>
+                          {post.authorPhotoUrl && (
+                            <img
+                              src={getImageUrl(post.authorPhotoUrl)}
+                              alt={post.authorName}
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                              }}
+                            />
+                          )}
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>
+                              {post.authorName}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: 800,
+                                color: rBadge.color,
+                                backgroundColor: rBadge.bg,
+                                padding: '2px 8px',
+                                borderRadius: '10px',
+                              }}
+                            >
+                              {rBadge.label}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{formatTimeAgo(post.createdAt)}</span>
+                            <span>•</span>
+                            <span
+                              style={{
+                                color: '#0E4A27',
+                                fontWeight: 700,
+                              }}
+                            >
+                              {getCategoryLabel(post.category)}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0E4A27', marginBottom: '8px', lineHeight: 1.3 }}>
-                      {post.title}
-                    </h2>
+                    {/* Post Title (if custom title provided and differs from short body) */}
+                    {post.title && post.title !== post.body && !post.title.startsWith('Shared a') && (
+                      <h2
+                        onClick={() => navigate(`/community/posts/${post.id}`)}
+                        style={{
+                          fontSize: '19px',
+                          fontWeight: 800,
+                          color: '#0E4A27',
+                          marginBottom: '8px',
+                          lineHeight: 1.35,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {post.title}
+                      </h2>
+                    )}
 
+                    {/* Post Text Description */}
                     {post.body && (
                       <p
                         style={{
-                          fontSize: '16px',
-                          color: '#475569',
+                          fontSize: '15px',
+                          color: '#334155',
                           lineHeight: 1.6,
-                          marginBottom: '18px',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
+                          marginBottom: '16px',
+                          whiteSpace: 'pre-wrap',
                         }}
                       >
                         {post.body}
                       </p>
                     )}
 
-                    {/* Footer Actions */}
+                    {/* Video Player Media Rendering */}
+                    {post.videoUrl && (
+                      <div style={{ marginBottom: '16px' }}>
+                        <VideoPlayer src={post.videoUrl} />
+                      </div>
+                    )}
+
+                    {/* Image Media Rendering */}
+                    {!post.videoUrl && post.imageUrl && (
+                      <div
+                        onClick={() => navigate(`/community/posts/${post.id}`)}
+                        style={{
+                          marginBottom: '16px',
+                          borderRadius: '16px',
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          background: '#000000',
+                        }}
+                      >
+                        <img
+                          src={getImageUrl(post.imageUrl)}
+                          alt={post.title || 'Post attachment'}
+                          style={{
+                            width: '100%',
+                            maxHeight: '520px',
+                            objectFit: 'contain',
+                            display: 'block',
+                            margin: '0 auto',
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Embedded Quoted Post (if this is a repost) */}
+                    {post.sharedPost && (
+                      <div
+                        onClick={() => navigate(`/community/posts/${post.sharedPost?.id}`)}
+                        style={{
+                          marginBottom: '16px',
+                          border: '1.5px solid #E2E8F0',
+                          borderRadius: '16px',
+                          padding: '16px',
+                          backgroundColor: '#F8FAFC',
+                          cursor: 'pointer',
+                          transition: 'border-color 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#16A34A'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E2E8F0'; }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                          <div
+                            style={{
+                              width: '34px',
+                              height: '34px',
+                              borderRadius: '50%',
+                              overflow: 'hidden',
+                              backgroundColor: '#0E4A27',
+                              color: '#FFFFFF',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 800,
+                              fontSize: '13px',
+                              flexShrink: 0,
+                              position: 'relative',
+                            }}
+                          >
+                            <span>{post.sharedPost.authorName ? post.sharedPost.authorName.charAt(0).toUpperCase() : 'U'}</span>
+                            {post.sharedPost.authorPhotoUrl && (
+                              <img
+                                src={getImageUrl(post.sharedPost.authorPhotoUrl)}
+                                alt={post.sharedPost.authorName}
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            )}
+                          </div>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>
+                                {post.sharedPost.authorName}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: '10px',
+                                  fontWeight: 800,
+                                  color: getRoleBadge(post.sharedPost.authorRole).color,
+                                  backgroundColor: getRoleBadge(post.sharedPost.authorRole).bg,
+                                  padding: '1px 6px',
+                                  borderRadius: '8px',
+                                }}
+                              >
+                                {getRoleBadge(post.sharedPost.authorRole).label}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '11px', color: '#64748B' }}>
+                              {formatTimeAgo(post.sharedPost.createdAt)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {post.sharedPost.title && post.sharedPost.title !== post.sharedPost.body && !post.sharedPost.title.startsWith('Shared a') && (
+                          <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: 800, color: '#0E4A27' }}>
+                            {post.sharedPost.title}
+                          </h4>
+                        )}
+
+                        {post.sharedPost.body && (
+                          <p style={{ margin: 0, fontSize: '13px', color: '#334155', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                            {post.sharedPost.body}
+                          </p>
+                        )}
+
+                        {post.sharedPost.videoUrl && (
+                          <div style={{ marginTop: '10px' }} onClick={(e) => e.stopPropagation()}>
+                            <VideoPlayer src={post.sharedPost.videoUrl} />
+                          </div>
+                        )}
+
+                        {!post.sharedPost.videoUrl && post.sharedPost.imageUrl && (
+                          <div style={{ marginTop: '10px', borderRadius: '12px', overflow: 'hidden', maxHeight: '350px', background: '#000' }}>
+                            <img
+                              src={getImageUrl(post.sharedPost.imageUrl)}
+                              alt={post.sharedPost.title || 'Attached media'}
+                              style={{ width: '100%', maxHeight: '350px', objectFit: 'contain', display: 'block', margin: '0 auto' }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* LinkedIn-Style Reaction Counts & Comment Metrics Bar */}
                     <div
                       style={{
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        borderTop: '1px solid #F1F5F9',
-                        paddingTop: '16px',
-                        flexWrap: 'wrap',
-                        gap: '12px',
+                        padding: '10px 4px 12px 4px',
+                        borderBottom: '1px solid #F1F5F9',
+                        fontSize: '13px',
+                        color: '#64748B',
                       }}
                     >
+                      <div>
+                        <ReactionBadgeList
+                          reactionCounts={post.reactionCounts}
+                          totalReactions={post.totalReactions || post.upvotes || 0}
+                          onClick={() => setActiveReactionModalPost(post)}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '14px' }}>
+                        <span
+                          onClick={() => handleClickExistingComments(post.id)}
+                          style={{ cursor: 'pointer', fontWeight: 600 }}
+                          className="hover:underline"
+                          title="View existing comments"
+                        >
+                          {post.commentsCount || 0} {post.commentsCount === 1 ? 'comment' : 'comments'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Interactive Action Bar: LinkedIn Multi-Reaction + Comment + Share */}
+                    <div className="post-action-bar">
+                      {/* LinkedIn Multi-Reaction Picker */}
+                      <ReactionPicker
+                        myReaction={post.myReaction}
+                        totalReactions={post.totalReactions}
+                        reactionCounts={post.reactionCounts}
+                        onReact={(r) => handleReact(post.id, r)}
+                      />
+
+                      {/* Comment Button (Opens input-only composer: Image 2) */}
                       <button
-                        onClick={(e) => handleToggleUpvote(e, post.id)}
-                        style={{
-                          padding: '6px 16px',
-                          borderRadius: '20px',
-                          fontWeight: 700,
-                          fontSize: '14px',
-                          border: post.isUpvotedByMe ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
-                          cursor: 'pointer',
-                          backgroundColor: post.isUpvotedByMe ? '#dcfce7' : '#fff',
-                          color: post.isUpvotedByMe ? '#166534' : '#475569',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                        }}
+                        type="button"
+                        onClick={() => handleClickCommentButton(post.id)}
+                        className={`post-action-btn ${isCommentOpen && !showInlineCommentsList[post.id] ? 'active-like' : ''}`}
                       >
-                        <span>▲</span> {post.upvotes} Upvotes
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.8}
+                            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                          />
+                        </svg>
+                        <span>Comment</span>
                       </button>
 
+                      {/* Share Button */}
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/community/posts/${post.id}`);
-                        }}
-                        style={{
-                          padding: '8px 18px',
-                          borderRadius: '12px',
-                          backgroundColor: '#EAF6EE',
-                          color: '#0E4A27',
-                          border: '1.5px solid #176B3A',
-                          fontWeight: 800,
-                          fontSize: '15px',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                        }}
+                        type="button"
+                        onClick={(e) => handleShare(e, post)}
+                        className="post-action-btn"
                       >
-                        💬 View Thread & Replies ({post.commentsCount}) →
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.8}
+                            d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                          />
+                        </svg>
+                        <span>Share</span>
                       </button>
                     </div>
+
+                    {/* Inline Comment Thread & Input Box (Facebook-style) */}
+                    {isCommentOpen && (
+                      <div
+                        style={{
+                          marginTop: '14px',
+                          paddingTop: '14px',
+                          borderTop: '1px solid #F1F5F9',
+                        }}
+                      >
+                        {/* Inline Comments from Others: ONLY displayed if user clicked existing comments (Image 1) */}
+                        {showInlineCommentsList[post.id] && (
+                          loadingInlineComments[post.id] ? (
+                            <div style={{ padding: '12px 0', textAlign: 'center', color: '#64748B', fontSize: '13px' }}>
+                              Loading comments...
+                            </div>
+                          ) : inlineComments[post.id] && inlineComments[post.id].length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+                              {inlineComments[post.id].map((c) => {
+                                const cBadge = getRoleBadge(c.authorRole);
+                                return (
+                                  <div key={c.id} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                                    <div
+                                      style={{
+                                        width: '34px',
+                                        height: '34px',
+                                        borderRadius: '50%',
+                                        overflow: 'hidden',
+                                        backgroundColor: c.authorRole === 'lgu_staff' ? '#0D9488' : '#0E4A27',
+                                        color: '#FFFFFF',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontWeight: 800,
+                                        fontSize: '13px',
+                                        flexShrink: 0,
+                                        position: 'relative',
+                                      }}
+                                    >
+                                      <span>{c.authorName ? c.authorName.charAt(0).toUpperCase() : 'U'}</span>
+                                      {c.authorPhotoUrl && (
+                                        <img
+                                          src={getImageUrl(c.authorPhotoUrl)}
+                                          alt={c.authorName}
+                                          onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                          }}
+                                          style={{
+                                            position: 'absolute',
+                                            top: 0,
+                                            left: 0,
+                                            width: '100%',
+                                            height: '100%',
+                                            objectFit: 'cover',
+                                          }}
+                                        />
+                                      )}
+                                    </div>
+                                    <div
+                                      style={{
+                                        flex: 1,
+                                        backgroundColor: '#F1F5F9',
+                                        borderRadius: '16px',
+                                        padding: '8px 14px',
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px', flexWrap: 'wrap' }}>
+                                        <span style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>
+                                          {c.authorName}
+                                        </span>
+                                        <span
+                                          style={{
+                                            fontSize: '10px',
+                                            fontWeight: 800,
+                                            color: cBadge.color,
+                                            backgroundColor: cBadge.bg,
+                                            padding: '1px 6px',
+                                            borderRadius: '8px',
+                                          }}
+                                        >
+                                          {cBadge.label}
+                                        </span>
+                                        <span style={{ fontSize: '11px', color: '#94A3B8', marginLeft: 'auto' }}>
+                                          {formatTimeAgo(c.createdAt)}
+                                        </span>
+                                      </div>
+                                      <p style={{ margin: 0, fontSize: '13px', color: '#334155', whiteSpace: 'pre-wrap' }}>
+                                        {c.body}
+                                      </p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div style={{ padding: '8px 0 14px 0', textAlign: 'center', color: '#94A3B8', fontSize: '13px' }}>
+                              No comments yet. Be the first to share your thoughts!
+                            </div>
+                          )
+                        )}
+
+                        {/* Comment Input Composer (Image 2 portion) */}
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: 0 }}>
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              overflow: 'hidden',
+                              backgroundColor: '#0E4A27',
+                              color: '#FFFFFF',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 800,
+                              fontSize: '14px',
+                              flexShrink: 0,
+                              position: 'relative',
+                            }}
+                          >
+                            <span>{user?.firstName ? user.firstName.charAt(0).toUpperCase() : '👨‍🌾'}</span>
+                            {user?.photoUrl && (
+                              <img
+                                src={getImageUrl(user.photoUrl)}
+                                alt={user.firstName}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                                style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                }}
+                              />
+                            )}
+                          </div>
+
+                          <div style={{ flex: 1, display: 'flex', gap: '8px' }}>
+                            <input
+                              id={`comment-input-${post.id}`}
+                              type="text"
+                              placeholder={`Comment as ${user?.firstName || 'farmer'}...`}
+                              value={inlineCommentInputs[post.id] || ''}
+                              onChange={(e) =>
+                                setInlineCommentInputs((prev) => ({ ...prev, [post.id]: e.target.value }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  handleInlineCommentSubmit(post.id);
+                                }
+                              }}
+                              style={{
+                                flex: 1,
+                                padding: '9px 16px',
+                                borderRadius: '20px',
+                                border: '1px solid #CBD5E1',
+                                background: '#F8FAFC',
+                                fontSize: '14px',
+                                outline: 'none',
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleInlineCommentSubmit(post.id)}
+                              disabled={submittingComment[post.id] || !inlineCommentInputs[post.id]?.trim()}
+                              className="btn btn-primary"
+                              style={{
+                                padding: '8px 16px',
+                                borderRadius: '18px',
+                                fontSize: '13px',
+                                fontWeight: 800,
+                              }}
+                            >
+                              {submittingComment[post.id] ? 'Posting...' : 'Reply'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -797,77 +1649,6 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
         </div>
       )}
 
-      {/* ─── Ask Question Modal ─── */}
-      {showAskModal && (
-        <div className="modal-backdrop" onClick={() => setShowAskModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
-                + Ask a Farming Question
-              </h2>
-              <button
-                onClick={() => setShowAskModal(false)}
-                style={{ background: '#F8F7F3', border: 'none', fontSize: '22px', cursor: 'pointer', width: '40px', height: '40px', borderRadius: '50%' }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreatePost}>
-              <div className="form-group">
-                <label className="form-label">Question Title / Crop Issue</label>
-                <input
-                  type="text"
-                  required
-                  value={questionTitle}
-                  onChange={(e) => setQuestionTitle(e.target.value)}
-                  placeholder="e.g. Yellow leaves on bell peppers after transplanting..."
-                  className="form-input"
-                  style={{ fontSize: '18px' }}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Category</label>
-                <select
-                  value={questionCategory}
-                  onChange={(e) => setQuestionCategory(e.target.value as PostCategory)}
-                  className="form-input"
-                  style={{ fontSize: '17px' }}
-                >
-                  <option value="crop_advice">🌱 Crop Care & Health</option>
-                  <option value="pest_control">🐛 Pest & Disease Control</option>
-                  <option value="market_talk">💰 Market Prices & Bulk Selling</option>
-                  <option value="equipment">🚜 Tools & Farm Equipment</option>
-                  <option value="general">🌾 General Farming</option>
-                </select>
-              </div>
-
-              <div className="form-group" style={{ marginBottom: '26px' }}>
-                <label className="form-label">Additional Details (Symptoms, Crop Age, Soil Condition)</label>
-                <textarea
-                  value={questionDetails}
-                  onChange={(e) => setQuestionDetails(e.target.value)}
-                  placeholder="Provide details to help licensed agronomists and fellow farmers accurately diagnose..."
-                  rows={4}
-                  className="form-input"
-                  style={{ fontSize: '17px', resize: 'vertical' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '14px' }}>
-                <button type="button" onClick={() => setShowAskModal(false)} className="btn btn-secondary btn-large" style={{ flex: 1 }}>
-                  Cancel
-                </button>
-                <button type="submit" disabled={submittingQuestion} className="btn btn-primary btn-large" style={{ flex: 2 }}>
-                  {submittingQuestion ? 'Posting...' : 'Post Question →'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* ─── Guide Reader Modal ─── */}
       {activeGuideModal && (
         <div className="modal-backdrop" onClick={() => setActiveGuideModal(null)}>
@@ -963,6 +1744,26 @@ export const CommunityHubPage: React.FC<CommunityHubPageProps> = ({ initialTab }
             </button>
           </div>
         </div>
+      )}
+
+      {/* ─── Reaction Details Modal ─── */}
+      {activeReactionModalPost && (
+        <ReactionModal
+          postId={activeReactionModalPost.id}
+          isOpen={!!activeReactionModalPost}
+          onClose={() => setActiveReactionModalPost(null)}
+          initialReactions={activeReactionModalPost.reactions}
+        />
+      )}
+
+      {/* ─── Social Share Modal ─── */}
+      {activeShareModalPost && (
+        <ShareModal
+          post={activeShareModalPost}
+          isOpen={!!activeShareModalPost}
+          onClose={() => setActiveShareModalPost(null)}
+          onPostShared={(newPost) => setPosts((prev) => [newPost, ...prev])}
+        />
       )}
     </div>
   );
