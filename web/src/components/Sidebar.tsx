@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import agriConnectLogo from '../assets/AgriConnect.jpg';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -395,23 +396,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
               textDecoration: 'none',
             }}
           >
-            <div
+            <img
+              src={agriConnectLogo}
+              alt="AgriConnect Logo"
               style={{
                 width: '42px',
                 height: '42px',
                 borderRadius: '12px',
-                background: '#176B3A',
-                color: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '22px',
+                objectFit: 'cover',
                 boxShadow: '0 4px 12px rgba(23, 107, 58, 0.25)',
                 flexShrink: 0,
+                display: 'block',
               }}
-            >
-              🌾
-            </div>
+            />
             {!collapsed && (
               <div>
                 <div
@@ -433,7 +430,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     marginTop: '2px',
                   }}
                 >
-                  Connect. Grow. Prosper.
+                  Where Agriculture Meets Opportunity.
                 </div>
               </div>
             )}

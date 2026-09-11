@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import agriConnectLogo from '../assets/AgriConnect.jpg';
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
@@ -103,22 +104,19 @@ export const LoginPage: React.FC = () => {
 
         {/* Brand Logo & Platform Title */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', position: 'relative', zIndex: 2 }}>
-          <div
+          <img
+            src={agriConnectLogo}
+            alt="AgriConnect Logo"
             style={{
               width: '48px',
               height: '48px',
               borderRadius: '14px',
-              backgroundColor: 'rgba(255,255,255,0.18)',
+              objectFit: 'cover',
               border: '1.5px solid rgba(255,255,255,0.35)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '26px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+              flexShrink: 0,
             }}
-          >
-            🌾
-          </div>
+          />
           <div>
             <div style={{ fontSize: '26px', fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1.1, color: '#FFFFFF' }}>
               AgriConnect
