@@ -64,7 +64,7 @@ const getBreadcrumbs = (pathname: string, role?: string): BreadcrumbInfo => {
     return { parent: 'Marketplace', parentPath: '/supply', current: 'Shopping Cart', icon: '🛒' };
   }
   if (pathname === '/supply/manage') {
-    return { parent: 'Marketplace', parentPath: '/supply', current: 'Manage Catalog', icon: '🏷️' };
+    return { parent: 'Marketplace', parentPath: '/supply', current: 'Manage Products', icon: '🏷️' };
   }
   if (pathname === '/supply/orders') {
     return {

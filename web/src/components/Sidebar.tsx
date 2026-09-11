@@ -242,7 +242,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {
         title: 'MY BUSINESS',
         items: [
-          { label: 'Manage Catalog', to: '/supply/manage', icon: icons.manageProducts },
+          { label: 'Manage Products', to: '/supply/manage', icon: icons.manageProducts },
           { label: 'Customer Orders', to: '/supply/orders', icon: icons.orders },
         ],
       },
