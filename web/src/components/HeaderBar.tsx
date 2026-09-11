@@ -4,6 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
 import { NotificationBell } from './NotificationBell';
 
+//UAT
+
 interface BreadcrumbInfo {
   parent: string;
   parentPath?: string;
