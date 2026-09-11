@@ -58,11 +58,18 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID string, req mode
 		update["phone"] = *req.Phone
 	}
 
+	// Jurisdiction Locking Rule:
+	// If an account in any role (except SuperAdmin) is already approved (or active verified account),
+	// their official jurisdiction (Region, Province, Municipality, Barangay) is locked and cannot be changed by the user.
+	isApproved := (existingUser.Status == models.StatusApproved || existingUser.Status == "" || existingUser.IsVerified) &&
+		existingUser.Status != models.StatusPending && existingUser.Status != models.StatusRejected
+	isLocationLocked := isApproved && existingUser.Role != models.RoleSuperAdmin
+
 	// LGU Staff jurisdiction (Region, Province, Municipality) is locked to prevent data leaks.
 	// Barangay is explicitly excluded/cleared for LGU Staff since their jurisdiction covers the entire Municipality.
 	if existingUser.Role == models.RoleLGUStaff {
 		update["barangay"] = "" // LGU Staff represents the entire Municipality, no specific barangay
-	} else {
+	} else if !isLocationLocked {
 		if req.Region != nil {
 			update["region"] = *req.Region
 		}

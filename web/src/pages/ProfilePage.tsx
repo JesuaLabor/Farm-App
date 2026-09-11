@@ -96,6 +96,12 @@ export const ProfilePage: React.FC = () => {
 
   if (!user) return null;
 
+  const isApproved =
+    (user.status === 'approved' || !user.status || user.isVerified) &&
+    user.status !== 'pending' &&
+    user.status !== 'rejected';
+  const isLocationLocked = isApproved && user.role !== 'super_admin';
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -181,10 +187,23 @@ export const ProfilePage: React.FC = () => {
                 fontWeight: 800,
                 overflow: 'hidden',
                 boxShadow: '0 4px 14px rgba(23, 107, 58, 0.25)',
+                aspectRatio: '1 / 1',
+                flexShrink: 0,
               }}
             >
               {user.photoUrl ? (
-                <img src={getImageUrl(user.photoUrl)} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img
+                  src={getImageUrl(user.photoUrl)}
+                  alt="Profile"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    borderRadius: '50%',
+                    display: 'block',
+                    aspectRatio: '1 / 1',
+                  }}
+                />
               ) : (
                 user.firstName[0]?.toUpperCase()
               )}
@@ -220,7 +239,7 @@ export const ProfilePage: React.FC = () => {
                 {user.firstName} {user.lastName}
               </h2>
               <span
-                className={`badge ${user.role === 'super_admin' || user.status === 'approved'
+                className={`badge ${user.role === 'super_admin' || isApproved
                   ? 'badge-verified'
                   : user.status === 'rejected'
                     ? 'badge-danger'
@@ -626,22 +645,87 @@ export const ProfilePage: React.FC = () => {
                     <strong>Data Privacy & Security:</strong> To prevent unauthorized cross-municipality data leakage, jurisdiction cannot be self-edited. Barangay is excluded because your office oversees the entire municipality. To request an official jurisdictional transfer, contact the Super Administrator.
                   </div>
                 </div>
-              ) : (
-                <LocationSelector
-                  layout="grid"
-                  showNumbers={false}
-                  fontSize="16px"
-                  region={region}
-                  province={province}
-                  municipality={municipality}
-                  barangay={barangay}
-                  onChange={(r, p, m, b) => {
-                    setRegion(r);
-                    setProvince(p);
-                    setMunicipality(m);
-                    setBarangay(b);
+              ) : isLocationLocked ? (
+                /* ─── Approved User Jurisdiction Lock (Farmers, Buyers, Suppliers) ─── */
+                <div
+                  style={{
+                    background: '#FFFFFF',
+                    border: '1.5px solid #86EFAC',
+                    borderRadius: '12px',
+                    padding: '18px 20px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
                   }}
-                />
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>🔒</span>
+                        <span>Verified Jurisdiction (Approved & Locked)</span>
+                      </div>
+                      <div style={{ fontSize: '18px', fontWeight: 800, color: '#0E4A27', marginTop: '4px' }}>
+                        {user.barangay ? `Brgy. ${user.barangay}, ` : ''}{user.municipality || 'Municipality'}, {user.province || 'Province'}
+                      </div>
+                      <div style={{ fontSize: '13px', color: '#4B5563', marginTop: '2px' }}>
+                        {user.region || 'Region X - Northern Mindanao'}
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 14px',
+                        background: '#DCFCE7',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        color: '#15803D',
+                        border: '1px solid #86EFAC',
+                      }}
+                    >
+                      ✓ LGU Verified & Approved
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: '14px',
+                      padding: '10px 14px',
+                      background: '#F0FDF4',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      color: '#166534',
+                      lineHeight: 1.45,
+                      borderLeft: '3px solid #16A34A',
+                    }}
+                  >
+                    <strong>Official Jurisdiction Policy:</strong> Your {user.role === 'farmer' ? 'farm' : 'registered'} jurisdiction is locked because your account has been officially verified and approved by the LGU. To preserve municipal aid records, localized market price tracking, and delivery logistics, jurisdiction cannot be self-edited. If your {user.role === 'farmer' ? 'farm' : 'business'} has relocated, please contact your Municipal Agriculture Office or Super Administrator to request an official jurisdiction transfer.
+                  </div>
+                </div>
+              ) : (
+                /* ─── Super Admin or Pending Account Location Selector ─── */
+                <div>
+                  {user.role === 'super_admin' && (
+                    <div style={{ marginBottom: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#166534', background: '#DCFCE7', padding: '4px 10px', borderRadius: '12px' }}>
+                      🛡️ Super Admin — Unrestricted Jurisdiction Authority
+                    </div>
+                  )}
+                  <LocationSelector
+                    layout="grid"
+                    showNumbers={false}
+                    fontSize="16px"
+                    region={region}
+                    province={province}
+                    municipality={municipality}
+                    barangay={barangay}
+                    onChange={(r, p, m, b) => {
+                      setRegion(r);
+                      setProvince(p);
+                      setMunicipality(m);
+                      setBarangay(b);
+                    }}
+                  />
+                </div>
               )}
             </div>
 

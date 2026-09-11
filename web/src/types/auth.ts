@@ -13,6 +13,7 @@ export interface User {
   barangay?: string;
   address?: string;
   photoUrl?: string;
+  isVerified?: boolean;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
   updatedAt: string;
