@@ -122,14 +122,14 @@ export const FarmFinancialTrackerPage: React.FC = () => {
       <div style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
-            <h1 style={{ fontSize: '34px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
+            <h1 style={{ fontSize: '30px', fontWeight: 800, color: '#0E4A27', letterSpacing: '-0.02em', margin: 0 }}>
               {activeTab === 'finances'
                 ? 'Farm Earnings & Expenses'
                 : activeTab === 'calendar'
                 ? 'Planting & Farm Calendar'
                 : 'Financial Transaction Records'}
             </h1>
-            <p style={{ fontSize: '19px', color: '#525450', marginTop: '6px' }}>
+            <p style={{ fontSize: '15px', color: '#525450', lineHeight: 1.5, marginTop: '6px', margin: '6px 0 0 0' }}>
               {activeTab === 'finances'
                 ? 'Track crop sales revenue, supply input costs, and net farm profits.'
                 : activeTab === 'calendar'
@@ -142,10 +142,11 @@ export const FarmFinancialTrackerPage: React.FC = () => {
           <div
             style={{
               display: 'inline-flex',
-              background: '#EAECE9',
-              padding: '6px',
-              borderRadius: '16px',
-              gap: '6px',
+              background: '#F1F3F0',
+              border: '1px solid #E2E8F0',
+              padding: '4px',
+              borderRadius: '14px',
+              gap: '4px',
               flexWrap: 'wrap',
             }}
           >
@@ -155,16 +156,16 @@ export const FarmFinancialTrackerPage: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '12px 20px',
-                borderRadius: '12px',
+                padding: '8px 16px',
+                borderRadius: '10px',
                 border: 'none',
-                fontWeight: 800,
-                fontSize: '16px',
+                fontWeight: 700,
+                fontSize: '14px',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.18s ease',
                 background: activeTab === 'finances' ? '#FFFFFF' : 'transparent',
-                color: activeTab === 'finances' ? '#0E4A27' : '#525450',
-                boxShadow: activeTab === 'finances' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                color: activeTab === 'finances' ? '#0E4A27' : '#64748b',
+                boxShadow: activeTab === 'finances' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
               }}
             >
               <span>💰</span>
@@ -177,16 +178,16 @@ export const FarmFinancialTrackerPage: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '12px 20px',
-                borderRadius: '12px',
+                padding: '8px 16px',
+                borderRadius: '10px',
                 border: 'none',
-                fontWeight: 800,
-                fontSize: '16px',
+                fontWeight: 700,
+                fontSize: '14px',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.18s ease',
                 background: activeTab === 'calendar' ? '#FFFFFF' : 'transparent',
-                color: activeTab === 'calendar' ? '#0E4A27' : '#525450',
-                boxShadow: activeTab === 'calendar' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                color: activeTab === 'calendar' ? '#0E4A27' : '#64748b',
+                boxShadow: activeTab === 'calendar' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
               }}
             >
               <span>📅</span>
@@ -199,16 +200,16 @@ export const FarmFinancialTrackerPage: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '12px 20px',
-                borderRadius: '12px',
+                padding: '8px 16px',
+                borderRadius: '10px',
                 border: 'none',
-                fontWeight: 800,
-                fontSize: '16px',
+                fontWeight: 700,
+                fontSize: '14px',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.18s ease',
                 background: activeTab === 'records' ? '#FFFFFF' : 'transparent',
-                color: activeTab === 'records' ? '#0E4A27' : '#525450',
-                boxShadow: activeTab === 'records' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                color: activeTab === 'records' ? '#0E4A27' : '#64748b',
+                boxShadow: activeTab === 'records' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
               }}
             >
               <span>📋</span>
@@ -224,80 +225,85 @@ export const FarmFinancialTrackerPage: React.FC = () => {
       {activeTab === 'finances' && (
         <div>
           {/* Financial Summary Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '32px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '28px' }}>
             {/* Money Earned */}
-            <div className="card" style={{ borderLeft: '8px solid #1E7E45', background: '#FFFFFF' }}>
-              <div style={{ fontSize: '15px', fontWeight: 800, color: '#525450', textTransform: 'uppercase' }}>
-                💚 Total Money Earned (Sales)
+            <div className="card" style={{ borderLeft: '5px solid #16A34A', background: '#FFFFFF', padding: '22px 24px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: '#525450', letterSpacing: '0.04em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>💚</span>
+                <span>Total Money Earned (Sales)</span>
               </div>
-              <div style={{ fontSize: '42px', fontWeight: 800, color: '#1E7E45', margin: '8px 0 4px 0' }}>
+              <div style={{ fontSize: '32px', fontWeight: 800, color: '#16A34A', letterSpacing: '-0.02em', margin: '8px 0 4px 0', lineHeight: 1.2 }}>
                 ₱{finances.income.toLocaleString()}
               </div>
-              <div style={{ fontSize: '15px', color: '#176B3A', fontWeight: 700 }}>
+              <div style={{ fontSize: '13px', color: '#15803d', fontWeight: 600 }}>
                 ↑ 14.2% higher than last harvest cycle
               </div>
             </div>
 
             {/* Money Spent */}
-            <div className="card" style={{ borderLeft: '8px solid #BA3C3C', background: '#FFFFFF' }}>
-              <div style={{ fontSize: '15px', fontWeight: 800, color: '#525450', textTransform: 'uppercase' }}>
-                ❤️ Total Money Spent (Inputs)
+            <div className="card" style={{ borderLeft: '5px solid #DC2626', background: '#FFFFFF', padding: '22px 24px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: '#525450', letterSpacing: '0.04em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>❤️</span>
+                <span>Total Money Spent (Inputs)</span>
               </div>
-              <div style={{ fontSize: '42px', fontWeight: 800, color: '#BA3C3C', margin: '8px 0 4px 0' }}>
+              <div style={{ fontSize: '32px', fontWeight: 800, color: '#DC2626', letterSpacing: '-0.02em', margin: '8px 0 4px 0', lineHeight: 1.2 }}>
                 ₱{finances.expenses.toLocaleString()}
               </div>
-              <div style={{ fontSize: '15px', color: '#525450', fontWeight: 600 }}>
+              <div style={{ fontSize: '13px', color: '#64748b', fontWeight: 500 }}>
                 Spent on seeds, fertilizers, fuel, transport
               </div>
             </div>
 
             {/* Net Profit */}
-            <div className="card" style={{ borderLeft: '8px solid #176B3A', background: '#EAF6EE' }}>
-              <div style={{ fontSize: '15px', fontWeight: 800, color: '#176B3A', textTransform: 'uppercase' }}>
-                💵 Net Farm Profit
+            <div className="card" style={{ borderLeft: '5px solid #0E4A27', background: '#EAF6EE', padding: '22px 24px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: '#176B3A', letterSpacing: '0.04em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>💵</span>
+                <span>Net Farm Profit</span>
               </div>
-              <div style={{ fontSize: '42px', fontWeight: 800, color: '#0E4A27', margin: '8px 0 4px 0' }}>
+              <div style={{ fontSize: '32px', fontWeight: 800, color: '#0E4A27', letterSpacing: '-0.02em', margin: '8px 0 4px 0', lineHeight: 1.2 }}>
                 ₱{finances.netIncome.toLocaleString()}
               </div>
-              <div style={{ fontSize: '15px', color: '#176B3A', fontWeight: 800 }}>
+              <div style={{ fontSize: '13px', color: '#166534', fontWeight: 700 }}>
                 ✓ Healthy cash balance
               </div>
             </div>
           </div>
 
           {/* Quick Action Buttons */}
-          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '36px' }}>
+          <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '32px' }}>
             <button
               onClick={() => { setFinanceType('income'); setShowAddFinance(true); }}
-              className="btn btn-primary btn-large"
+              className="btn btn-primary"
+              style={{ padding: '11px 22px', fontSize: '14px', fontWeight: 700, borderRadius: '12px' }}
             >
               + Add Money Earned (Sales)
             </button>
 
             <button
               onClick={() => { setFinanceType('expense'); setShowAddFinance(true); }}
-              className="btn btn-secondary btn-large"
+              className="btn btn-secondary"
+              style={{ padding: '11px 22px', fontSize: '14px', fontWeight: 700, borderRadius: '12px' }}
             >
               + Add Money Spent (Expense)
             </button>
           </div>
 
           {/* Recent 3 Transactions Teaser */}
-          <div className="card" style={{ padding: '26px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-              <h3 style={{ fontSize: '22px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
+          <div className="card" style={{ padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
                 Recent Cash Activity
               </h3>
               <button
                 onClick={() => handleTabChange('records')}
                 className="btn btn-secondary"
-                style={{ fontSize: '15px' }}
+                style={{ fontSize: '13px', padding: '6px 14px', borderRadius: '10px' }}
               >
                 View All Records ({transactions.length}) →
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {transactions.slice(0, 3).map((t) => (
                 <div
                   key={t.id}
@@ -305,8 +311,8 @@ export const FarmFinancialTrackerPage: React.FC = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '16px',
-                    borderRadius: '14px',
+                    padding: '14px 18px',
+                    borderRadius: '12px',
                     background: '#F8FAF8',
                     border: '1px solid #E2E8F0',
                   }}
@@ -314,27 +320,27 @@ export const FarmFinancialTrackerPage: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                     <div
                       style={{
-                        width: '40px',
-                        height: '40px',
+                        width: '38px',
+                        height: '38px',
                         borderRadius: '50%',
                         background: t.type === 'income' ? '#EAF6EE' : '#FDF2F2',
                         color: t.type === 'income' ? '#176B3A' : '#BA3C3C',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: '20px',
+                        fontSize: '17px',
                         fontWeight: 800,
                       }}
                     >
                       {t.type === 'income' ? '↓' : '↑'}
                     </div>
                     <div>
-                      <div style={{ fontSize: '17px', fontWeight: 700, color: '#1A1C1A' }}>{t.title}</div>
-                      <div style={{ fontSize: '14px', color: '#525450' }}>{t.date}</div>
+                      <div style={{ fontSize: '15px', fontWeight: 700, color: '#1A1C1A' }}>{t.title}</div>
+                      <div style={{ fontSize: '13px', color: '#64748b' }}>{t.date}</div>
                     </div>
                   </div>
 
-                  <div style={{ fontSize: '20px', fontWeight: 800, color: t.type === 'income' ? '#176B3A' : '#BA3C3C' }}>
+                  <div style={{ fontSize: '17px', fontWeight: 800, color: t.type === 'income' ? '#176B3A' : '#BA3C3C' }}>
                     {t.type === 'income' ? '+' : '-'}₱{t.amount.toLocaleString()}
                   </div>
                 </div>
@@ -349,19 +355,20 @@ export const FarmFinancialTrackerPage: React.FC = () => {
       ══════════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'calendar' && (
         <section id="calendar">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', flexWrap: 'wrap', gap: '16px' }}>
             <div>
-              <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
                 Scheduled Farm Activities & Milestones
               </h2>
-              <p style={{ fontSize: '17px', color: '#525450', marginTop: '4px' }}>
+              <p style={{ fontSize: '14px', color: '#525450', marginTop: '4px', margin: '4px 0 0 0' }}>
                 Dates for seedling transplanting, fertilization cycles, and planned harvest windows.
               </p>
             </div>
 
             <button
               onClick={() => setShowAddActivity(true)}
-              className="btn btn-primary btn-large"
+              className="btn btn-primary"
+              style={{ padding: '10px 20px', fontSize: '14px', fontWeight: 700, borderRadius: '12px' }}
             >
               + Add Farm Activity
             </button>
@@ -375,37 +382,37 @@ export const FarmFinancialTrackerPage: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '22px 26px',
+                  padding: '18px 22px',
                   borderBottom: idx < activities.length - 1 ? '1.5px solid #E4E2DC' : 'none',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                   <div
                     style={{
-                      width: '54px',
-                      height: '54px',
-                      borderRadius: '16px',
+                      width: '46px',
+                      height: '46px',
+                      borderRadius: '14px',
                       background: '#EAF6EE',
                       color: '#176B3A',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '26px',
+                      fontSize: '22px',
                     }}
                   >
                     {act.icon}
                   </div>
                   <div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#1A1C1A' }}>
+                    <div style={{ fontSize: '16px', fontWeight: 700, color: '#1A1C1A' }}>
                       {act.title}
                     </div>
-                    <div style={{ fontSize: '16px', color: '#176B3A', fontWeight: 800, marginTop: '2px' }}>
+                    <div style={{ fontSize: '13px', color: '#176B3A', fontWeight: 700, marginTop: '2px' }}>
                       📅 Scheduled: {act.date}
                     </div>
                   </div>
                 </div>
 
-                <span className="badge badge-verified" style={{ fontSize: '15px', padding: '6px 14px' }}>
+                <span className="badge badge-verified" style={{ fontSize: '13px', padding: '5px 12px' }}>
                   {act.status}
                 </span>
               </div>
@@ -419,26 +426,28 @@ export const FarmFinancialTrackerPage: React.FC = () => {
       ══════════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'records' && (
         <section id="records">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', flexWrap: 'wrap', gap: '16px' }}>
             <div>
-              <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0E4A27', margin: 0 }}>
                 Complete Financial Ledger
               </h2>
-              <p style={{ fontSize: '17px', color: '#525450', marginTop: '4px' }}>
+              <p style={{ fontSize: '14px', color: '#525450', marginTop: '4px', margin: '4px 0 0 0' }}>
                 All documented earnings and expenses for this farming period.
               </p>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '10px' }}>
               <button
                 onClick={() => { setFinanceType('income'); setShowAddFinance(true); }}
                 className="btn btn-primary"
+                style={{ padding: '9px 18px', fontSize: '13px', fontWeight: 700, borderRadius: '10px' }}
               >
                 + Add Sale
               </button>
               <button
                 onClick={() => { setFinanceType('expense'); setShowAddFinance(true); }}
                 className="btn btn-secondary"
+                style={{ padding: '9px 18px', fontSize: '13px', fontWeight: 700, borderRadius: '10px' }}
               >
                 + Add Expense
               </button>
@@ -450,35 +459,36 @@ export const FarmFinancialTrackerPage: React.FC = () => {
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ background: '#F8F7F3', borderBottom: '2px solid #E4E2DC' }}>
-                    <th style={{ padding: '16px 20px', fontSize: '16px', fontWeight: 800, color: '#0E4A27' }}>Type</th>
-                    <th style={{ padding: '16px 20px', fontSize: '16px', fontWeight: 800, color: '#0E4A27' }}>Description</th>
-                    <th style={{ padding: '16px 20px', fontSize: '16px', fontWeight: 800, color: '#0E4A27' }}>Date</th>
-                    <th style={{ padding: '16px 20px', fontSize: '16px', fontWeight: 800, color: '#0E4A27', textAlign: 'right' }}>Amount</th>
+                    <th style={{ padding: '14px 18px', fontSize: '12px', fontWeight: 800, color: '#0E4A27', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Type</th>
+                    <th style={{ padding: '14px 18px', fontSize: '12px', fontWeight: 800, color: '#0E4A27', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Description</th>
+                    <th style={{ padding: '14px 18px', fontSize: '12px', fontWeight: 800, color: '#0E4A27', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Date</th>
+                    <th style={{ padding: '14px 18px', fontSize: '12px', fontWeight: 800, color: '#0E4A27', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   {transactions.map((tx) => (
                     <tr key={tx.id} style={{ borderBottom: '1px solid #E4E2DC' }}>
-                      <td style={{ padding: '16px 20px' }}>
+                      <td style={{ padding: '14px 18px' }}>
                         <span
                           className="badge"
                           style={{
                             background: tx.type === 'income' ? '#EAF6EE' : '#FDF2F2',
                             color: tx.type === 'income' ? '#176B3A' : '#BA3C3C',
-                            fontSize: '14px',
+                            fontSize: '13px',
                             fontWeight: 800,
+                            padding: '4px 10px',
                           }}
                         >
                           {tx.type === 'income' ? '🟢 Income' : '🔴 Expense'}
                         </span>
                       </td>
-                      <td style={{ padding: '16px 20px', fontSize: '17px', fontWeight: 700, color: '#1A1C1A' }}>
+                      <td style={{ padding: '14px 18px', fontSize: '15px', fontWeight: 600, color: '#1A1C1A' }}>
                         {tx.title}
                       </td>
-                      <td style={{ padding: '16px 20px', fontSize: '15px', color: '#525450' }}>
+                      <td style={{ padding: '14px 18px', fontSize: '13px', color: '#64748b' }}>
                         {tx.date}
                       </td>
-                      <td style={{ padding: '16px 20px', fontSize: '18px', fontWeight: 800, textAlign: 'right', color: tx.type === 'income' ? '#176B3A' : '#BA3C3C' }}>
+                      <td style={{ padding: '14px 18px', fontSize: '16px', fontWeight: 800, textAlign: 'right', color: tx.type === 'income' ? '#176B3A' : '#BA3C3C' }}>
                         {tx.type === 'income' ? '+' : '-'}₱{tx.amount.toLocaleString()}
                       </td>
                     </tr>
