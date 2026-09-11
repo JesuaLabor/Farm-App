@@ -47,15 +47,57 @@ func (r *CommunityRepository) ensureIndexes() {
 	})
 }
 
+func populatePostReactionState(post *models.Post, userOID bson.ObjectID) {
+	if post.ReactionCounts == nil {
+		post.ReactionCounts = make(map[models.ReactionType]int)
+	}
+
+	// Calculate counts from Reactions if present
+	if len(post.Reactions) > 0 {
+		for _, r := range post.Reactions {
+			post.ReactionCounts[r.Type]++
+		}
+		post.TotalReactions = len(post.Reactions)
+	} else if post.Upvotes > 0 {
+		// Backwards compatibility for existing upvotes
+		post.ReactionCounts[models.ReactionLike] = post.Upvotes
+		post.TotalReactions = post.Upvotes
+	}
+
+	if !userOID.IsZero() {
+		for _, r := range post.Reactions {
+			if r.UserID == userOID {
+				post.MyReaction = r.Type
+				post.IsUpvotedByMe = true
+				break
+			}
+		}
+		if !post.IsUpvotedByMe {
+			for _, uID := range post.UpvotedBy {
+				if uID == userOID {
+					post.IsUpvotedByMe = true
+					if post.MyReaction == "" {
+						post.MyReaction = models.ReactionLike
+					}
+					break
+				}
+			}
+		}
+	}
+}
+
 // CreatePost creates a new community discussion post.
 func (r *CommunityRepository) CreatePost(ctx context.Context, post *models.Post) error {
 	post.CreatedAt = time.Now()
 	post.UpdatedAt = time.Now()
 	post.Upvotes = 0
+	post.TotalReactions = 0
 	post.CommentsCount = 0
 	post.IsFlagged = false
 	post.IsRemoved = false
 	post.UpvotedBy = []bson.ObjectID{}
+	post.Reactions = []models.PostReaction{}
+	post.ReactionCounts = make(map[models.ReactionType]int)
 
 	res, err := r.postColl.InsertOne(ctx, post)
 	if err != nil {
@@ -90,21 +132,13 @@ func (r *CommunityRepository) ListPosts(ctx context.Context, category string, cu
 		posts = []models.Post{}
 	}
 
-	// Check if current user upvoted
 	var userOID bson.ObjectID
 	if currentUserID != "" {
 		userOID, _ = bson.ObjectIDFromHex(currentUserID)
 	}
 
 	for i := range posts {
-		if !userOID.IsZero() {
-			for _, uID := range posts[i].UpvotedBy {
-				if uID == userOID {
-					posts[i].IsUpvotedByMe = true
-					break
-				}
-			}
-		}
+		populatePostReactionState(&posts[i], userOID)
 	}
 
 	return posts, nil
@@ -121,58 +155,110 @@ func (r *CommunityRepository) GetPostByID(ctx context.Context, id bson.ObjectID,
 		return nil, fmt.Errorf("find post by id: %w", err)
 	}
 
+	var userOID bson.ObjectID
 	if currentUserID != "" {
-		if userOID, err := bson.ObjectIDFromHex(currentUserID); err == nil {
-			for _, uID := range post.UpvotedBy {
-				if uID == userOID {
-					post.IsUpvotedByMe = true
-					break
-				}
-			}
-		}
+		userOID, _ = bson.ObjectIDFromHex(currentUserID)
 	}
+	populatePostReactionState(&post, userOID)
 
 	return &post, nil
 }
 
-// ToggleUpvote toggles user upvote on a post.
-func (r *CommunityRepository) ToggleUpvote(ctx context.Context, postID bson.ObjectID, userID bson.ObjectID) (bool, error) {
+// ReactToPost updates or toggles a user's multi-reaction on a post.
+func (r *CommunityRepository) ReactToPost(ctx context.Context, postID bson.ObjectID, userID bson.ObjectID, userName string, userRole models.Role, userPhotoUrl string, reaction models.ReactionType) (*models.Post, error) {
 	post, err := r.GetPostByID(ctx, postID, "")
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
-	alreadyUpvoted := false
-	for _, id := range post.UpvotedBy {
-		if id == userID {
-			alreadyUpvoted = true
+	existingIdx := -1
+	for i, r := range post.Reactions {
+		if r.UserID == userID {
+			existingIdx = i
 			break
 		}
 	}
 
-	var update bson.M
-	nowUpvoted := false
-
-	if alreadyUpvoted {
-		update = bson.M{
-			"$pull": bson.M{"upvoted_by": userID},
-			"$inc":  bson.M{"upvotes": -1},
+	var myReaction models.ReactionType
+	if existingIdx >= 0 {
+		if post.Reactions[existingIdx].Type == reaction {
+			// Toggle OFF (same reaction clicked again)
+			post.Reactions = append(post.Reactions[:existingIdx], post.Reactions[existingIdx+1:]...)
+			myReaction = ""
+		} else {
+			// Change reaction type
+			post.Reactions[existingIdx].Type = reaction
+			post.Reactions[existingIdx].CreatedAt = time.Now()
+			if userName != "" {
+				post.Reactions[existingIdx].UserName = userName
+			}
+			if userRole != "" {
+				post.Reactions[existingIdx].UserRole = userRole
+			}
+			if userPhotoUrl != "" {
+				post.Reactions[existingIdx].UserPhotoUrl = userPhotoUrl
+			}
+			myReaction = reaction
 		}
-		nowUpvoted = false
 	} else {
-		update = bson.M{
-			"$addToSet": bson.M{"upvoted_by": userID},
-			"$inc":      bson.M{"upvotes": 1},
-		}
-		nowUpvoted = true
+		// Add new reaction
+		post.Reactions = append(post.Reactions, models.PostReaction{
+			UserID:       userID,
+			UserName:     userName,
+			UserRole:     userRole,
+			UserPhotoUrl: userPhotoUrl,
+			Type:         reaction,
+			CreatedAt:    time.Now(),
+		})
+		myReaction = reaction
+	}
+
+	// Recount reactions
+	newCounts := make(map[models.ReactionType]int)
+	for _, r := range post.Reactions {
+		newCounts[r.Type]++
+	}
+	totalReactions := len(post.Reactions)
+
+	// Keep UpvotedBy list synced for compatibility
+	newUpvotedBy := make([]bson.ObjectID, 0, len(post.Reactions))
+	for _, r := range post.Reactions {
+		newUpvotedBy = append(newUpvotedBy, r.UserID)
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"reactions":       post.Reactions,
+			"reaction_counts": newCounts,
+			"total_reactions": totalReactions,
+			"upvotes":         totalReactions,
+			"upvoted_by":      newUpvotedBy,
+			"updated_at":      time.Now(),
+		},
 	}
 
 	_, err = r.postColl.UpdateOne(ctx, bson.M{"_id": postID}, update)
 	if err != nil {
-		return false, fmt.Errorf("toggle upvote: %w", err)
+		return nil, fmt.Errorf("update reactions: %w", err)
 	}
 
-	return nowUpvoted, nil
+	post.ReactionCounts = newCounts
+	post.TotalReactions = totalReactions
+	post.Upvotes = totalReactions
+	post.UpvotedBy = newUpvotedBy
+	post.MyReaction = myReaction
+	post.IsUpvotedByMe = (myReaction != "")
+
+	return post, nil
+}
+
+// ToggleUpvote toggles user upvote on a post (legacy compatibility mapped to 'like').
+func (r *CommunityRepository) ToggleUpvote(ctx context.Context, postID bson.ObjectID, userID bson.ObjectID) (bool, error) {
+	updatedPost, err := r.ReactToPost(ctx, postID, userID, "", "", "", models.ReactionLike)
+	if err != nil {
+		return false, err
+	}
+	return updatedPost.IsUpvotedByMe, nil
 }
 
 // CreateComment creates a new comment on a post.

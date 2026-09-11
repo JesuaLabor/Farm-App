@@ -65,6 +65,38 @@ func (h *CommunityHandler) GetPostByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, post)
 }
 
+// ReactToPost handles POST /api/community/posts/{id}/react.
+func (h *CommunityHandler) ReactToPost(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	postID := chi.URLParam(r, "id")
+
+	var req models.ReactPostRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		req.Reaction = models.ReactionLike
+	}
+
+	post, err := h.commService.ReactToPost(r.Context(), postID, userID, req.Reaction)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, post)
+}
+
+// GetPostReactions handles GET /api/community/posts/{id}/reactions.
+func (h *CommunityHandler) GetPostReactions(w http.ResponseWriter, r *http.Request) {
+	postID := chi.URLParam(r, "id")
+
+	reactions, err := h.commService.GetPostReactions(r.Context(), postID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to fetch post reactions")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, reactions)
+}
+
 // ToggleUpvote handles POST /api/community/posts/{id}/upvote.
 func (h *CommunityHandler) ToggleUpvote(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetUserID(r.Context())

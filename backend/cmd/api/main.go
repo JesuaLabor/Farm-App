@@ -68,7 +68,7 @@ func main() {
 	supplyService := service.NewSupplyService(supplyRepo, userRepo, notifRepo)
 	priceService := service.NewPriceService(priceRepo, userRepo)
 	financialService := service.NewFinancialService(financialRepo)
-	programService := service.NewProgramService(programRepo, userRepo)
+	programService := service.NewProgramService(programRepo, userRepo, notifRepo)
 	communityService := service.NewCommunityService(communityRepo, userRepo, notifRepo)
 	analyticsService := service.NewAnalyticsService(analyticsRepo)
 	notifService := service.NewNotificationService(notifRepo)

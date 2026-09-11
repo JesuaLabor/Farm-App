@@ -519,3 +519,185 @@ header [role="button"] {
 .toast-card-animate {
   animation: toastSlideIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ─── Community Social Feed & LinkedIn Reactions System ────────── */
+.feed-post-card {
+  background: #FFFFFF;
+  border-radius: 20px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  padding: 24px;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.feed-post-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+/* Post Action Bar (React / Comment / Share) */
+.post-action-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid #F1F5F9;
+}
+
+.post-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  width: 100%;
+}
+
+.post-action-btn:hover {
+  background: #F1F5F9;
+  color: #0F172A;
+}
+
+.post-action-btn:active {
+  transform: scale(0.98);
+}
+
+.post-action-btn.active-like {
+  color: #0A66C2;
+  background: #EFF6FF;
+}
+
+.post-action-btn.active-celebrate {
+  color: #059669;
+  background: #ECFDF5;
+}
+
+.post-action-btn.active-support {
+  color: #4F46E5;
+  background: #EEF2FF;
+}
+
+.post-action-btn.active-love {
+  color: #E11D48;
+  background: #FFF1F2;
+}
+
+.post-action-btn.active-insight {
+  color: #D97706;
+  background: #FFFBEB;
+}
+
+.post-action-btn.active-funny {
+  color: #0284C7;
+  background: #F0F9FF;
+}
+
+/* Floating Reaction Popover Dock */
+.reaction-popover-dock {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #FFFFFF;
+  border-radius: 36px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14), 0 4px 10px rgba(0, 0, 0, 0.05);
+  animation: reactionDockIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes reactionDockIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.reaction-dock-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transform: scale(1);
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.reaction-dock-btn:hover {
+  transform: scale(1.36) translateY(-6px);
+  z-index: 10;
+}
+
+.reaction-tooltip-tag {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.92);
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  animation: fadeInTooltip 0.15s ease forwards;
+}
+
+@keyframes fadeInTooltip {
+  from { opacity: 0; transform: translate(-50%, 4px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* Stacked Reaction Badges */
+.stacked-badges-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.stacked-badges-container:hover .stacked-badges-count {
+  text-decoration: underline;
+  color: #0E4A27;
+}
+
+.stacked-icons-group {
+  display: flex;
+  align-items: center;
+}
+
+.stacked-icon-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #FFFFFF;
+  border: 1.5px solid #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  margin-right: -6px;
+}
+

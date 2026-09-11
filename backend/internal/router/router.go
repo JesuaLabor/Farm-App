@@ -172,11 +172,13 @@ func New(
 		r.Get("/posts", communityHandler.ListPosts)
 		r.Get("/posts/{id}", communityHandler.GetPostByID)
 		r.Get("/posts/{id}/comments", communityHandler.ListCommentsByPost)
+		r.Get("/posts/{id}/reactions", communityHandler.GetPostReactions)
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.JWTAuth(jwtSecret))
 
 			r.Post("/posts", communityHandler.CreatePost)
+			r.Post("/posts/{id}/react", communityHandler.ReactToPost)
 			r.Post("/posts/{id}/upvote", communityHandler.ToggleUpvote)
 			r.Post("/posts/{id}/comments", communityHandler.CreateComment)
 		})
