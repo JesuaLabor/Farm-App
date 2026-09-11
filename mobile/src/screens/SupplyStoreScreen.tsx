@@ -11,6 +11,12 @@ const CATEGORIES = [
   { key: 'fertilizer', label: 'Fertilizers', icon: '🌱' },
   { key: 'pesticide_herbicide_fungicide', label: 'Crop Protection', icon: '🧪' },
   { key: 'seeds_seedlings', label: 'Seeds', icon: '🌽' },
+  { key: 'animal_feeds', label: 'Feeds', icon: '🌾' },
+  { key: 'vet_medicines', label: 'Vet Meds', icon: '💉' },
+  { key: 'irrigation', label: 'Irrigation', icon: '💧' },
+  { key: 'machinery_equipment', label: 'Machinery', icon: '⚙️' },
+  { key: 'nursery_greenhouse', label: 'Nursery', icon: '🏡' },
+  { key: 'packaging_storage', label: 'Packaging', icon: '📦' },
   { key: 'tools', label: 'Tools', icon: '🔧' },
   { key: 'ppe', label: 'PPE', icon: '🥽' },
 ];

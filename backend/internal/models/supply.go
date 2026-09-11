@@ -12,6 +12,12 @@ const (
 	SupplyFertilizer         SupplyCategory = "fertilizer"
 	SupplyPesticideHerbicide SupplyCategory = "pesticide_herbicide_fungicide"
 	SupplySeedsSeedlings     SupplyCategory = "seeds_seedlings"
+	SupplyAnimalFeeds        SupplyCategory = "animal_feeds"
+	SupplyVetMedicines       SupplyCategory = "vet_medicines"
+	SupplyIrrigation         SupplyCategory = "irrigation"
+	SupplyMachineryEquipment SupplyCategory = "machinery_equipment"
+	SupplyNurseryGreenhouse  SupplyCategory = "nursery_greenhouse"
+	SupplyPackagingStorage   SupplyCategory = "packaging_storage"
 	SupplyTools              SupplyCategory = "tools"
 	SupplyPPE                SupplyCategory = "ppe"
 )

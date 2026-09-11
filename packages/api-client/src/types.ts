@@ -113,6 +113,12 @@ export type SupplyCategory =
   | 'fertilizer'
   | 'pesticide_herbicide_fungicide'
   | 'seeds_seedlings'
+  | 'animal_feeds'
+  | 'vet_medicines'
+  | 'irrigation'
+  | 'machinery_equipment'
+  | 'nursery_greenhouse'
+  | 'packaging_storage'
   | 'tools'
   | 'ppe';
 
