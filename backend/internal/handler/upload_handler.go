@@ -30,17 +30,20 @@ func (h *UploadHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Limit upload size to 10MB
-	r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
+	// Limit upload size to 60MB (supports images and videos)
+	r.Body = http.MaxBytesReader(w, r.Body, 60<<20)
 
 	file, header, err := r.FormFile("image")
 	if err != nil {
-		file, header, err = r.FormFile("file")
+		file, header, err = r.FormFile("video")
 		if err != nil {
-			file, header, err = r.FormFile("photo")
+			file, header, err = r.FormFile("file")
 			if err != nil {
-				writeError(w, http.StatusBadRequest, "image file is required (max 10MB)")
-				return
+				file, header, err = r.FormFile("photo")
+				if err != nil {
+					writeError(w, http.StatusBadRequest, "file is required (max 60MB)")
+					return
+				}
 			}
 		}
 	}
@@ -54,20 +57,44 @@ func (h *UploadHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 		".png":  true,
 		".webp": true,
 		".gif":  true,
+		".mp4":  true,
+		".webm": true,
+		".mov":  true,
+		".m4v":  true,
+		".ogg":  true,
 	}
 	if !allowed[ext] {
 		ext = ".jpg"
 	}
 
 	// Detect MIME content type from extension
-	contentType := "image/jpeg"
+	contentType := "application/octet-stream"
+	fileType := "image"
 	switch ext {
 	case ".png":
 		contentType = "image/png"
+		fileType = "image"
 	case ".webp":
 		contentType = "image/webp"
+		fileType = "image"
 	case ".gif":
 		contentType = "image/gif"
+		fileType = "image"
+	case ".jpg", ".jpeg":
+		contentType = "image/jpeg"
+		fileType = "image"
+	case ".mp4", ".m4v":
+		contentType = "video/mp4"
+		fileType = "video"
+	case ".webm":
+		contentType = "video/webm"
+		fileType = "video"
+	case ".mov":
+		contentType = "video/quicktime"
+		fileType = "video"
+	case ".ogg":
+		contentType = "video/ogg"
+		fileType = "video"
 	}
 
 	// Generate safe, unique filename
@@ -83,5 +110,6 @@ func (h *UploadHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"url":      url,
 		"filename": filename,
+		"fileType": fileType,
 	})
 }
