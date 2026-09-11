@@ -6,20 +6,33 @@ import { useChat } from '../contexts/ChatContext';
 import { supplyApi } from '../api/supply';
 import { api, getImageUrl } from '../api';
 import type { SupplyProduct, DeliveryMethod, PaymentMethod, SupplyOrder } from '../types/supply';
+import { SUPPLY_CATEGORIES } from '../types/supply';
 
 const categories: { key: string; label: string; icon: string }[] = [
   { key: 'all', label: 'All Inputs', icon: '🏪' },
   { key: 'fertilizer', label: 'Fertilizers', icon: '🌱' },
   { key: 'pesticide_herbicide_fungicide', label: 'Crop Protection', icon: '🧪' },
-  { key: 'seeds_seedlings', label: 'Seeds & Seedlings', icon: '🌽' },
-  { key: 'tools', label: 'Tools & Machinery', icon: '🔧' },
-  { key: 'ppe', label: 'Safety PPE', icon: '🥽' },
+  { key: 'seeds_seedlings', label: 'Seeds & Planting', icon: '🌽' },
+  { key: 'animal_feeds', label: 'Animal Feeds', icon: '🌾' },
+  { key: 'vet_medicines', label: 'Veterinary Biologics', icon: '💉' },
+  { key: 'irrigation', label: 'Irrigation & Water', icon: '💧' },
+  { key: 'machinery_equipment', label: 'Machinery & Equipment', icon: '⚙️' },
+  { key: 'nursery_greenhouse', label: 'Greenhouse & Mulch', icon: '🏡' },
+  { key: 'packaging_storage', label: 'Packaging & Sacks', icon: '📦' },
+  { key: 'tools', label: 'Hand Tools', icon: '🔧' },
+  { key: 'ppe', label: 'Safety Gear & PPE', icon: '🥽' },
 ];
 
 const categoryImages: Record<string, string> = {
   fertilizer: 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=600&q=80',
   pesticide_herbicide_fungicide: 'https://images.unsplash.com/photo-1595974482597-4b8da8879bc5?auto=format&fit=crop&w=600&q=80',
   seeds_seedlings: 'https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?auto=format&fit=crop&w=600&q=80',
+  animal_feeds: 'https://images.unsplash.com/photo-1574943320219-553eb213f72d?auto=format&fit=crop&w=600&q=80',
+  vet_medicines: 'https://images.unsplash.com/photo-1584017911766-d451b3d0e843?auto=format&fit=crop&w=600&q=80',
+  irrigation: 'https://images.unsplash.com/photo-1563514227147-6d2ff665a6a0?auto=format&fit=crop&w=600&q=80',
+  machinery_equipment: 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?auto=format&fit=crop&w=600&q=80',
+  nursery_greenhouse: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&w=600&q=80',
+  packaging_storage: 'https://images.unsplash.com/photo-1595246140625-573b715d11dc?auto=format&fit=crop&w=600&q=80',
   tools: 'https://images.unsplash.com/photo-1589923188900-85dae523342b?auto=format&fit=crop&w=600&q=80',
   ppe: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80',
 };
@@ -84,15 +97,43 @@ export const SupplyStorePage: React.FC = () => {
   // Purchasing privilege check: Only Farmers and Buyers (and admin) can buy supplies
   const isPurchaser = user?.role === 'farmer' || user?.role === 'buyer' || user?.role === 'super_admin';
   const [prodCategory, setProdCategory] = useState('fertilizer');
-  const [prodPrice, setProdPrice] = useState<number>(1450);
-  const [prodUnit, setProdUnit] = useState('50kg bag');
-  const [prodStock, setProdStock] = useState<number>(500);
+  const [prodPrice, setProdPrice] = useState<number>(1000);
+  const [prodUnit, setProdUnit] = useState('sack (50kg)');
+  const [prodStock, setProdStock] = useState<number>(50);
   const [prodDesc, setProdDesc] = useState('');
   const [prodLocation, setProdLocation] = useState('');
   const [prodImageFile, setProdImageFile] = useState<File | null>(null);
   const [prodImagePreview, setProdImagePreview] = useState<string>('');
   const prodFileInputRef = useRef<HTMLInputElement>(null);
   const [submittingProd, setSubmittingProd] = useState(false);
+
+  const currentProdCatConfig = SUPPLY_CATEGORIES.find((c) => c.key === prodCategory);
+
+  const handleProdCategoryChange = (newCat: string) => {
+    setProdCategory(newCat);
+    const conf = SUPPLY_CATEGORIES.find((c) => c.key === newCat);
+    if (conf && conf.suggestedUnits.length > 0) {
+      setProdUnit(conf.suggestedUnits[0]);
+    }
+  };
+
+  const openAddSupplyModal = () => {
+    setProdName('');
+    setProdCategory('fertilizer');
+    setProdPrice(1000);
+    setProdStock(50);
+    setProdUnit('sack (50kg)');
+    setProdDesc('');
+    setProdLocation(
+      user?.municipality && user?.province
+        ? `${user.municipality}, ${user.province}`
+        : user?.address || ''
+    );
+    setProdImageFile(null);
+    setProdImagePreview('');
+    if (prodFileInputRef.current) prodFileInputRef.current.value = '';
+    setShowAddModal(true);
+  };
 
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -396,7 +437,7 @@ export const SupplyStorePage: React.FC = () => {
             <div style={{ display: 'flex', gap: '14px' }}>
               <button
                 className="btn btn-primary btn-large"
-                onClick={() => setShowAddModal(true)}
+                onClick={openAddSupplyModal}
                 style={{ fontSize: '14px', fontWeight: 800 }}
               >
                 + Add Supply Product
@@ -724,175 +765,473 @@ export const SupplyStorePage: React.FC = () => {
         </div>
       )}
 
-      {/* ─── Supplier Add Product Modal ─── */}
+      {/* ─── Supplier Add Product Modal (Centered & Modern) ─── */}
       {showAddModal && (
-        <div className="modal-backdrop" onClick={() => setShowAddModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27' }}>
-                Add Supply Product
-              </h2>
-              <button onClick={() => setShowAddModal(false)} style={{ background: '#F8F7F3', border: 'none', fontSize: '24px', cursor: 'pointer' }}>✕</button>
+        <div
+          className="modal-backdrop"
+          onClick={() => setShowAddModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1050,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px 16px',
+            overflowY: 'auto',
+          }}
+        >
+          <div
+            className="modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              margin: 'auto',
+              width: '100%',
+              maxWidth: '680px',
+              backgroundColor: '#ffffff',
+              borderRadius: '24px',
+              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(226, 232, 240, 0.9)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              maxHeight: 'min(92vh, 860px)',
+              padding: 0,
+              animation: 'modalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            {/* Sticky Header */}
+            <div
+              style={{
+                padding: '20px 24px',
+                borderBottom: '1px solid #f1f5f9',
+                backgroundColor: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '16px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div
+                  style={{
+                    width: '46px',
+                    height: '46px',
+                    borderRadius: '14px',
+                    backgroundColor: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '24px',
+                    flexShrink: 0,
+                  }}
+                >
+                  {currentProdCatConfig?.icon || '📦'}
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.2 }}>
+                    Add Supply Product
+                  </h2>
+                  <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
+                    Publish supplies, animal feeds, veterinary biologics, or tools directly to the marketplace.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  border: '1px solid #e2e8f0',
+                  backgroundColor: '#f8fafc',
+                  color: '#64748b',
+                  fontSize: '16px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f1f5f9';
+                  e.currentTarget.style.color = '#0f172a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.color = '#64748b';
+                }}
+              >
+                ✕
+              </button>
             </div>
 
-            <form onSubmit={handleCreateProduct}>
-              <div className="form-group">
-                <label className="form-label">Product Name</label>
-                <input
-                  type="text"
-                  required
-                  value={prodName}
-                  onChange={(e) => setProdName(e.target.value)}
-                  placeholder="e.g. Complete Fertilizer 14-14-14"
-                  className="form-input"
-                  style={{ fontSize: '18px' }}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Category</label>
-                <select
-                  value={prodCategory}
-                  onChange={(e) => setProdCategory(e.target.value)}
-                  className="form-input"
-                  style={{ fontSize: '18px' }}
-                >
-                  <option value="fertilizer">Fertilizers</option>
-                  <option value="pesticide_herbicide_fungicide">Crop Protection</option>
-                  <option value="seeds_seedlings">Seeds & Seedlings</option>
-                  <option value="tools">Tools & Machinery</option>
-                  <option value="ppe">Safety PPE</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="form-group">
-                  <label className="form-label">Price (₱)</label>
-                  <input
-                    type="number"
-                    required
-                    value={prodPrice}
-                    onChange={(e) => setProdPrice(Number(e.target.value))}
-                    className="form-input"
-                    style={{ fontSize: '18px' }}
-                  />
+            {/* Scrollable Form Body */}
+            <form onSubmit={handleCreateProduct} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+              <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {/* Category Picker */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>
+                    Product Category <span style={{ color: '#dc2626' }}>*</span>
+                  </label>
+                  <select
+                    value={prodCategory}
+                    onChange={(e) => handleProdCategoryChange(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '11px 14px',
+                      borderRadius: '12px',
+                      border: '1.5px solid #cbd5e1',
+                      backgroundColor: '#fff',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      color: '#0f172a',
+                      outline: 'none',
+                    }}
+                  >
+                    {SUPPLY_CATEGORIES.map((c) => (
+                      <option key={c.key} value={c.key}>
+                        {c.icon} {c.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Unit</label>
+                {/* Product Name */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>
+                    Product Name & Brand <span style={{ color: '#dc2626' }}>*</span>
+                  </label>
                   <input
                     type="text"
                     required
-                    value={prodUnit}
-                    onChange={(e) => setProdUnit(e.target.value)}
-                    placeholder="e.g. 50kg bag"
-                    className="form-input"
-                    style={{ fontSize: '18px' }}
+                    value={prodName}
+                    onChange={(e) => setProdName(e.target.value)}
+                    placeholder={currentProdCatConfig?.placeholderName || 'e.g. Complete 14-14-14 Fertilizer 50kg'}
+                    style={{
+                      width: '100%',
+                      padding: '11px 14px',
+                      borderRadius: '12px',
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: '14px',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+
+                {/* Pricing, Stock Quantity & Unit */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>
+                      Price (₱) <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: '#64748b' }}>₱</span>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        value={prodPrice}
+                        onChange={(e) => setProdPrice(Number(e.target.value))}
+                        style={{
+                          width: '100%',
+                          padding: '11px 14px 11px 28px',
+                          borderRadius: '12px',
+                          border: '1.5px solid #cbd5e1',
+                          fontSize: '14px',
+                          fontWeight: 700,
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>
+                      Available Stock <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      required
+                      value={prodStock}
+                      onChange={(e) => setProdStock(Number(e.target.value))}
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: '12px',
+                        border: '1.5px solid #cbd5e1',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>
+                      Unit of Sale <span style={{ color: '#dc2626' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={prodUnit}
+                      onChange={(e) => setProdUnit(e.target.value)}
+                      placeholder="e.g. sack, bag, bottle, piece"
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: '12px',
+                        border: '1.5px solid #cbd5e1',
+                        fontSize: '14px',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Suggested quick unit chips */}
+                {currentProdCatConfig?.suggestedUnits && currentProdCatConfig.suggestedUnits.length > 0 && (
+                  <div style={{ backgroundColor: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#475569', marginRight: '8px' }}>
+                      Quick Select Unit:
+                    </span>
+                    <div style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                      {currentProdCatConfig.suggestedUnits.map((u) => (
+                        <button
+                          key={u}
+                          type="button"
+                          onClick={() => setProdUnit(u)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '8px',
+                            border: prodUnit === u ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
+                            backgroundColor: prodUnit === u ? '#f0fdf4' : '#fff',
+                            color: prodUnit === u ? '#166534' : '#475569',
+                            fontSize: '12px',
+                            fontWeight: prodUnit === u ? 700 : 500,
+                            cursor: 'pointer',
+                            transition: 'all 0.1s ease',
+                          }}
+                        >
+                          {u}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Warehouse / Store Pickup Location */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>
+                    Store / Warehouse Pickup Location
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '15px' }}>📍</span>
+                    <input
+                      type="text"
+                      value={prodLocation}
+                      onChange={(e) => setProdLocation(e.target.value)}
+                      placeholder="e.g. Sayre Highway, Poblacion, Valencia City, Bukidnon"
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px 11px 36px',
+                        borderRadius: '12px',
+                        border: '1.5px solid #cbd5e1',
+                        fontSize: '14px',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Photo Upload */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>
+                    Product Photo (Recommended)
+                  </label>
+                  <input
+                    ref={prodFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setProdImageFile(file);
+                        setProdImagePreview(URL.createObjectURL(file));
+                      }
+                    }}
+                    style={{ display: 'none' }}
+                  />
+
+                  {!prodImagePreview ? (
+                    <div
+                      onClick={() => prodFileInputRef.current?.click()}
+                      style={{
+                        border: '2px dashed #bbf7d0',
+                        borderRadius: '16px',
+                        padding: '24px 20px',
+                        textAlign: 'center',
+                        backgroundColor: '#f0fdf4',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#16a34a';
+                        e.currentTarget.style.backgroundColor = '#dcfce7';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#bbf7d0';
+                        e.currentTarget.style.backgroundColor = '#f0fdf4';
+                      }}
+                    >
+                      <div style={{ fontSize: '32px', marginBottom: '6px' }}>📸</div>
+                      <div style={{ fontWeight: 700, color: '#166534', fontSize: '14px' }}>Click to upload product image</div>
+                      <div style={{ fontSize: '12px', color: '#15803d', marginTop: '2px' }}>Supports JPG, PNG, WEBP (Max 10MB)</div>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '16px',
+                        padding: '12px 16px',
+                        borderRadius: '16px',
+                        border: '1.5px solid #bbf7d0',
+                        backgroundColor: '#f0fdf4',
+                      }}
+                    >
+                      <img
+                        src={prodImagePreview}
+                        alt="Product preview"
+                        style={{ width: '72px', height: '72px', borderRadius: '12px', objectFit: 'cover', border: '1px solid #86efac' }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {prodImageFile?.name || 'Selected product photo'}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600, marginTop: '2px' }}>
+                          ✓ Ready to save
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => prodFileInputRef.current?.click()}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid #cbd5e1',
+                            backgroundColor: '#fff',
+                            color: '#334155',
+                            fontWeight: 600,
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Replace
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProdImageFile(null);
+                            setProdImagePreview('');
+                            if (prodFileInputRef.current) prodFileInputRef.current.value = '';
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid #fecaca',
+                            backgroundColor: '#fff',
+                            color: '#dc2626',
+                            fontWeight: 600,
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>
+                    Description & Specifications
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={prodDesc}
+                    onChange={(e) => setProdDesc(e.target.value)}
+                    placeholder="Specify key nutrients, active ingredients, dosage, application recommendations, or compatibility..."
+                    style={{
+                      width: '100%',
+                      padding: '11px 14px',
+                      borderRadius: '12px',
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: '14px',
+                      fontFamily: 'inherit',
+                      outline: 'none',
+                      resize: 'vertical',
+                    }}
                   />
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Available Stock Quantity</label>
-                <input
-                  type="number"
-                  required
-                  value={prodStock}
-                  onChange={(e) => setProdStock(Number(e.target.value))}
-                  className="form-input"
-                  style={{ fontSize: '18px' }}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Warehouse / Store Pickup Location (optional)</label>
-                <input
-                  type="text"
-                  value={prodLocation}
-                  onChange={(e) => setProdLocation(e.target.value)}
-                  placeholder="e.g. Valencia City, Bukidnon"
-                  className="form-input"
-                  style={{ fontSize: '18px' }}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Product Image (optional)</label>
-                <input
-                  ref={prodFileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setProdImageFile(file);
-                      setProdImagePreview(URL.createObjectURL(file));
-                    }
+              {/* Sticky Footer */}
+              <div
+                style={{
+                  padding: '16px 24px',
+                  borderTop: '1px solid #f1f5f9',
+                  backgroundColor: '#f8fafc',
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  disabled={submittingProd}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '12px',
+                    border: '1.5px solid #cbd5e1',
+                    backgroundColor: '#fff',
+                    color: '#475569',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    cursor: 'pointer',
                   }}
-                  style={{ display: 'none' }}
-                />
-
-                {!prodImagePreview ? (
-                  <div
-                    onClick={() => prodFileInputRef.current?.click()}
-                    style={{
-                      border: '2px dashed #0E4A27',
-                      borderRadius: '14px',
-                      padding: '18px',
-                      textAlign: 'center',
-                      backgroundColor: '#F0F9F3',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div style={{ fontSize: '26px', marginBottom: '4px' }}>📦📸</div>
-                    <div style={{ fontWeight: 700, color: '#0E4A27', fontSize: '15px' }}>Click to select product image</div>
-                    <div style={{ fontSize: '13px', color: '#525450' }}>Supports JPG, PNG, WEBP (Max 10MB)</div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '12px', borderRadius: '14px', border: '1.5px solid #0E4A27', backgroundColor: '#F0F9F3' }}>
-                    <img
-                      src={prodImagePreview}
-                      alt="Product preview"
-                      style={{ width: '64px', height: '64px', borderRadius: '10px', objectFit: 'cover' }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: '15px', color: '#1A1C1A' }}>{prodImageFile?.name || 'Selected product image'}</div>
-                      <div style={{ fontSize: '13px', color: '#176B3A', fontWeight: 600 }}>Ready to upload</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setProdImageFile(null);
-                        setProdImagePreview('');
-                        if (prodFileInputRef.current) prodFileInputRef.current.value = '';
-                      }}
-                      className="btn btn-secondary"
-                      style={{ padding: '6px 12px', fontSize: '13px', color: '#b91c1c', borderColor: '#fca5a5' }}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="form-group" style={{ marginBottom: '24px' }}>
-                <label className="form-label">Description</label>
-                <textarea
-                  value={prodDesc}
-                  onChange={(e) => setProdDesc(e.target.value)}
-                  placeholder="Describe your agricultural supply product..."
-                  className="form-input"
-                  rows={3}
-                  style={{ fontSize: '18px' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '14px' }}>
-                <button type="button" onClick={() => setShowAddModal(false)} className="btn btn-secondary btn-large" style={{ flex: 1 }}>
+                >
                   Cancel
                 </button>
-                <button type="submit" disabled={submittingProd} className="btn btn-primary btn-large" style={{ flex: 2 }}>
-                  {submittingProd ? 'Saving…' : 'Publish Product →'}
+                <button
+                  type="submit"
+                  disabled={submittingProd}
+                  style={{
+                    padding: '10px 24px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #16a34a, #15803d)',
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  {submittingProd ? 'Saving...' : 'Publish Product →'}
                 </button>
               </div>
             </form>
