@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import agriConnectLogo from '../assets/AgriConnect.jpg';
+import agriConnectLogo from '../assets/AgriConnect.svg';
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
