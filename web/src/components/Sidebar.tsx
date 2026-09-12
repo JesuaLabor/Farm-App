@@ -14,7 +14,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   collapsed,
   mobileOpen,
   onCloseMobile,
-  onOpenHelp,
+  onOpenHelp: _onOpenHelp,
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -125,7 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ),
     programs: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4" />
+        <path d="M3 21h18" /><path d="M3 10h18" /><path d="M5 6l7-3 7 3" /><path d="M4 10v11" /><path d="M20 10v11" /><path d="M8 14v4" /><path d="M12 14v4" /><path d="M16 14v4" />
       </svg>
     ),
     community: (
@@ -145,7 +145,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ),
     lguDashboard: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M18 20V10" /><path d="M12 20V4" /><path d="M6 20v-6" />
+        <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
       </svg>
     ),
     settings: (
@@ -196,13 +196,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { label: 'Community Hub', to: '/community', icon: icons.community },
         ],
       },
-      {
-        title: 'ACCOUNT',
-        items: [
-          { label: 'Settings', to: '/settings', icon: icons.settings },
-          { label: 'Help & Support', to: '/help', isAction: true, action: onOpenHelp, icon: icons.help },
-        ],
-      },
     ];
   } else if (role === 'lgu_staff') {
     navGroups = [
@@ -223,13 +216,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         items: [
           { label: 'Marketplace', to: '/produce', icon: icons.marketplace },
           { label: 'Community Forum', to: '/community', icon: icons.community },
-        ],
-      },
-      {
-        title: 'ACCOUNT',
-        items: [
-          { label: 'Settings', to: '/settings', icon: icons.settings },
-          { label: 'Help & Support', to: '/help', isAction: true, action: onOpenHelp, icon: icons.help },
         ],
       },
     ];
@@ -259,13 +245,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { label: 'Community Hub', to: '/community', icon: icons.community },
         ],
       },
-      {
-        title: 'ACCOUNT',
-        items: [
-          { label: 'Settings', to: '/settings', icon: icons.settings },
-          { label: 'Help & Support', to: '/help', isAction: true, action: onOpenHelp, icon: icons.help },
-        ],
-      },
     ];
   } else if (role === 'buyer') {
     navGroups = [
@@ -290,13 +269,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         title: 'COMMUNITY',
         items: [
           { label: 'Community Hub', to: '/community', icon: icons.community },
-        ],
-      },
-      {
-        title: 'ACCOUNT',
-        items: [
-          { label: 'Settings', to: '/settings', icon: icons.settings },
-          { label: 'Help & Support', to: '/help', isAction: true, action: onOpenHelp, icon: icons.help },
         ],
       },
     ];
@@ -327,13 +299,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         items: [
           { label: "Gov't Programs", to: '/programs', icon: icons.programs },
           { label: 'Community Hub', to: '/community', icon: icons.community },
-        ],
-      },
-      {
-        title: 'ACCOUNT',
-        items: [
-          { label: 'Settings', to: '/settings', icon: icons.settings },
-          { label: 'Help & Support', to: '/help', isAction: true, action: onOpenHelp, icon: icons.help },
         ],
       },
     ];
