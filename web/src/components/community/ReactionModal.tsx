@@ -74,6 +74,8 @@ export const ReactionModal: React.FC<ReactionModalProps> = ({
         return { label: '🏛️ LGU Staff', bg: '#FEF3C7', color: '#B45309' };
       case 'buyer':
         return { label: '🛒 Buyer', bg: '#F1F5F9', color: '#475569' };
+      case 'super_admin':
+        return { label: '⚡ Super Admin', bg: '#EDE9FE', color: '#6D28D9' };
       default:
         return { label: '👤 Member', bg: '#F1F5F9', color: '#475569' };
     }
