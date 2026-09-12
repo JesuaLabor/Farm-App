@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { HeaderBar } from './HeaderBar';
 import { MobileBottomNav } from './MobileBottomNav';
+import { BreadcrumbTrail } from './BreadcrumbTrail';
 import { HelpSupportModal } from './HelpSupportModal';
 import { FarmerOnboardingModal } from './FarmerOnboardingModal';
 
@@ -48,6 +49,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         />
 
         <main id="main-content" className="app-main-content">
+          <BreadcrumbTrail />
           {children}
         </main>
       </div>

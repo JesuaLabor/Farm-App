@@ -125,13 +125,67 @@ button, input, textarea, select {
 
 .app-main-content {
   flex: 1;
-  padding-top: 1rem;
+  padding-top: 0;
+}
+
+.breadcrumb-trail-wrapper {
+  width: 100%;
+  background: transparent;
+  padding-top: 1.15rem;
+}
+
+.breadcrumb-trail-container {
+  max-width: var(--max-content-width);
+  margin-inline: auto;
+  padding-inline: 1.75rem;
+}
+
+.breadcrumb-trail-nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.breadcrumb-trail-parent {
+  color: #555852;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: unset !important;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+.breadcrumb-trail-parent:hover {
+  color: #166534;
+}
+
+.breadcrumb-trail-separator {
+  color: #94A3B8;
+  font-weight: 600;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+}
+
+.breadcrumb-trail-current {
+  color: #1A1C1A;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
 }
 
 .app-container {
   max-width: var(--max-content-width);
   margin-inline: auto;
-  padding: 1.75rem;
+  padding: 0.75rem 1.75rem 1.75rem 1.75rem;
 }
 
 .desktop-toggle-btn {

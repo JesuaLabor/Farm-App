@@ -1,115 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
 import { NotificationBell } from './NotificationBell';
 import { getImageUrl } from '../api';
 
 //UAT
-
-interface BreadcrumbInfo {
-  parent: string;
-  parentPath?: string;
-  current: string;
-  icon?: string;
-}
-
-const getBreadcrumbs = (pathname: string, role?: string): BreadcrumbInfo => {
-  if (pathname === '/dashboard') {
-    return { parent: 'Dashboard', parentPath: '/dashboard', current: 'Overview', icon: '⊞' };
-  }
-  if (pathname === '/messages') {
-    return { parent: 'Dashboard', parentPath: '/dashboard', current: 'Messages & Inquiries', icon: '💬' };
-  }
-  if (pathname === '/produce/manage') {
-    return { parent: 'Marketplace', parentPath: '/produce', current: 'My Listings', icon: '🏪' };
-  }
-  if (pathname === '/produce/orders') {
-    return {
-      parent: 'Marketplace',
-      parentPath: '/produce',
-      current: role === 'farmer' ? 'Crop Sales Orders' : 'My Produce Purchases',
-      icon: '🏪',
-    };
-  }
-  if (pathname === '/produce/orders') {
-    return {
-      parent: 'Marketplace',
-      parentPath: '/produce',
-      current: role === 'farmer' ? 'Orders & Sales' : 'My Orders',
-      icon: '🏪',
-    };
-  }
-  if (pathname === '/produce/manage') {
-    return { parent: 'Marketplace', parentPath: '/produce', current: 'My Crop Listings', icon: '🏪' };
-  }
-  if (pathname.startsWith('/produce')) {
-    return { parent: 'Marketplace', parentPath: '/produce', current: 'Fresh Harvests', icon: '🏪' };
-  }
-  if (pathname === '/market-prices') {
-    return { parent: 'Market Prices', parentPath: '/market-prices', current: 'Northern Mindanao', icon: '📈' };
-  }
-  if (pathname === '/price-trends') {
-    return { parent: 'Market Prices', parentPath: '/market-prices', current: 'Price Trends', icon: '📊' };
-  }
-  if (pathname === '/market-prices/manage') {
-    return { parent: 'Market Prices', parentPath: '/market-prices', current: 'Manage Benchmarks', icon: '⚖️' };
-  }
-  if (pathname === '/programs/manage') {
-    return { parent: 'Government Programs', parentPath: '/programs', current: 'Program Management', icon: '📋' };
-  }
-  if (pathname.startsWith('/programs')) {
-    return { parent: 'Government Programs', parentPath: '/programs', current: 'Available Programs', icon: '🏛️' };
-  }
-  if (pathname === '/supply/cart') {
-    return { parent: 'Marketplace', parentPath: '/supply', current: 'Shopping Cart', icon: '🛒' };
-  }
-  if (pathname === '/supply/manage') {
-    return { parent: 'Marketplace', parentPath: '/supply', current: 'Manage Products', icon: '🏷️' };
-  }
-  if (pathname === '/supply/orders') {
-    return {
-      parent: 'Marketplace',
-      parentPath: '/produce',
-      current: role === 'supplier' ? 'Customer Orders' : role === 'farmer' ? 'Orders & Sales' : 'My Orders',
-      icon: '🏪',
-    };
-  }
-  if (pathname.startsWith('/supply')) {
-    return { parent: 'Marketplace', parentPath: '/supply', current: 'Farm Supplies', icon: '🏪' };
-  }
-  if (pathname === '/finances') {
-    return { parent: 'Farm Management', parentPath: '/finances', current: 'Financial Tracker', icon: '💰' };
-  }
-  if (pathname === '/guides') {
-    return { parent: 'Community Hub', parentPath: '/community', current: 'Learn & Field Guides', icon: '📚' };
-  }
-  if (pathname.startsWith('/community/posts')) {
-    return { parent: 'Community Hub', parentPath: '/community', current: 'Post Discussion', icon: '💬' };
-  }
-  if (pathname.startsWith('/community')) {
-    return { parent: 'Community Hub', parentPath: '/community', current: 'Farmer Forum', icon: '💬' };
-  }
-  if (pathname === '/lgu/dashboard') {
-    return { parent: 'LGU Monitoring', parentPath: '/lgu/dashboard', current: 'Regional Dashboard', icon: '🏛️' };
-  }
-  if (pathname === '/admin/approvals') {
-    return { parent: 'Platform Governance', parentPath: '/admin/approvals', current: 'Staff & Approvals', icon: '🛡️' };
-  }
-  if (pathname === '/lgu/approvals') {
-    return { parent: 'LGU Governance', parentPath: '/lgu/approvals', current: 'Account Approvals', icon: '🛡️' };
-  }
-  if (pathname === '/profile') {
-    return { parent: 'Account', parentPath: '/profile', current: 'Farmer Profile', icon: '👤' };
-  }
-  if (pathname === '/settings') {
-    return { parent: 'Account', parentPath: '/settings', current: 'Settings', icon: '⚙️' };
-  }
-
-  const segment = pathname.replace(/^\//, '').split('/')[0];
-  const capitalized = segment ? segment.charAt(0).toUpperCase() + segment.slice(1) : 'Dashboard';
-  return { parent: capitalized, parentPath: pathname, current: 'Overview', icon: '⊞' };
-};
 
 interface HeaderBarProps {
   collapsed: boolean;
@@ -147,8 +43,6 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   const { user, logout } = useAuth();
   const { unreadCount } = useChat();
   const navigate = useNavigate();
-  const location = useLocation();
-  const breadcrumb = getBreadcrumbs(location.pathname, user?.role);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -265,8 +159,8 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
         gap: '20px',
       }}
     >
-      {/* Left: Sidebar Toggle Buttons & Contextual Breadcrumb */}
-      <div style={{ flex: '1', display: 'flex', alignItems: 'center', minWidth: 0, gap: '10px' }}>
+      {/* Left: Sidebar Toggle Buttons & Search Field */}
+      <div style={{ flex: '1', display: 'flex', alignItems: 'center', minWidth: 0, gap: '14px' }}>
         {/* Desktop Toggle Button */}
         <button
           onClick={onToggleSidebar}
@@ -331,98 +225,16 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           <span>Menu</span>
         </button>
 
-        {/* Vertical Divider */}
+        {/* Search Field */}
         <div
-          className="header-breadcrumb-divider"
+          ref={searchRef}
           style={{
-            width: '1px',
-            height: '20px',
-            background: '#E4E2DC',
-            margin: '0 10px',
-            flexShrink: 0,
-          }}
-        />
-
-        {/* Contextual Breadcrumbs */}
-        <nav
-          aria-label="Breadcrumb"
-          className="header-breadcrumb"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            whiteSpace: 'nowrap',
-            fontSize: '14px',
-            lineHeight: 1,
-            minHeight: 'auto',
-            flexShrink: 0,
+            flex: '0 1 480px',
+            maxWidth: '480px',
+            width: '100%',
+            position: 'relative',
           }}
         >
-          <span style={{ fontSize: '15px', display: 'inline-flex', alignItems: 'center', opacity: 0.85, lineHeight: 1 }}>
-            {breadcrumb.icon || '⊞'}
-          </span>
-
-          <Link
-            to={breadcrumb.parentPath || '/dashboard'}
-            style={{
-              color: '#555852',
-              fontWeight: 500,
-              textDecoration: 'none',
-              padding: '2px 4px',
-              borderRadius: '4px',
-              transition: 'color 0.15s ease',
-              display: 'inline-flex',
-              alignItems: 'center',
-              lineHeight: 1,
-              minHeight: 'auto',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = '#176B3A')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = '#555852')}
-          >
-            {breadcrumb.parent}
-          </Link>
-
-          <span
-            style={{
-              color: '#A0A39D',
-              fontWeight: 600,
-              fontSize: '13px',
-              userSelect: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              lineHeight: 1,
-            }}
-            aria-hidden="true"
-          >
-            ›
-          </span>
-
-          <span
-            style={{
-              color: '#1A1C1A',
-              fontWeight: 700,
-              padding: '2px 4px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              lineHeight: 1,
-            }}
-            aria-current="page"
-          >
-            {breadcrumb.current}
-          </span>
-        </nav>
-      </div>
-
-      {/* Center: Centered Accessible Search Field */}
-      <div
-        ref={searchRef}
-        style={{
-          flex: '0 1 440px',
-          maxWidth: '440px',
-          width: '100%',
-          position: 'relative',
-        }}
-      >
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <svg
             width="16"
@@ -525,6 +337,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             )}
           </div>
         )}
+        </div>
       </div>
 
       {/* Right: Notifications & User Profile */}
