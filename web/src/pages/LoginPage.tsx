@@ -3,6 +3,9 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import agriConnectLogo from '../assets/AgriConnect.svg';
+import agriConnectPng from '../assets/AgriConnect.png';
+import { ForgotPasswordModal } from '../components/ForgotPasswordModal';
+import { ContactLguModal } from '../components/ContactLguModal';
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
@@ -13,9 +16,10 @@ export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+  const [isContactLguOpen, setIsContactLguOpen] = useState(false);
 
   // Exclude dark mode on the login page
   useEffect(() => {
@@ -37,7 +41,7 @@ export const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password) {
-      warning('Required Fields Missing', 'Please provide both your email address and password.');
+      warning('Required Fields Missing', 'Please enter your email address and password.');
       setHasError(true);
       return;
     }
@@ -55,22 +59,12 @@ export const LoginPage: React.FC = () => {
         err.response?.data?.error ||
         'Login failed. Please verify your credentials and try again.';
 
-      // Determine appropriate toast type and display in top-right
       if (errMsg.toLowerCase().includes('pending approval')) {
-        warning(
-          'Account Pending Verification',
-          errMsg
-        );
+        warning('Account Pending Verification', errMsg);
       } else if (errMsg.toLowerCase().includes('rejected')) {
-        error(
-          'Registration Denied',
-          errMsg
-        );
+        error('Registration Denied', errMsg);
       } else {
-        error(
-          'Sign-in Failed',
-          errMsg
-        );
+        error('Sign-in Failed', errMsg);
       }
     } finally {
       setLoading(false);
@@ -80,156 +74,158 @@ export const LoginPage: React.FC = () => {
   return (
     <div className="login-page-root">
       {/* ══════════════════════════════════════════════════════════════════════════
-          LEFT BRANDING & HERO PANEL (Rich High-Contrast Forest Green Gradient)
+          LEFT BRANDING & HERO PANEL (Emerald Gradient + Network Constellation)
       ══════════════════════════════════════════════════════════════════════════ */}
       <div className="login-hero-panel">
-        {/* Ambient radial glows for visual depth */}
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background:
-              'radial-gradient(ellipse at 85% 15%, rgba(255,255,255,0.15) 0%, transparent 55%), ' +
-              'radial-gradient(ellipse at 15% 85%, rgba(0,0,0,0.25) 0%, transparent 50%)',
-            pointerEvents: 'none',
-          }}
-        />
 
-        {/* Brand Logo & Platform Title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', position: 'relative', zIndex: 2 }}>
-          <img
-            src={agriConnectLogo}
-            alt="AgriConnect Logo"
-            style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '14px',
-              objectFit: 'cover',
-              border: '1.5px solid rgba(255,255,255,0.35)',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
-              flexShrink: 0,
-            }}
-          />
-          <div>
-            <div style={{ fontSize: '26px', fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1.1, color: '#FFFFFF' }}>
-              AgriConnect
-            </div>
-            <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.75)', fontWeight: 500, letterSpacing: '0.2px' }}>
-              Connect. Grow. Prosper.
-            </div>
-          </div>
-        </div>
-
-        {/* Hero Narrative Copy */}
-        <div style={{ maxWidth: '480px', position: 'relative', zIndex: 2 }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '12px',
-              fontWeight: 800,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              backgroundColor: 'rgba(255,255,255,0.15)',
-              border: '1px solid rgba(255,255,255,0.3)',
-              color: '#FFFFFF',
-              padding: '6px 16px',
-              borderRadius: '20px',
-              marginBottom: '22px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            }}
-          >
-            <span>🇵🇭</span>
-            <span>Philippine Agricultural Platform</span>
-          </div>
-
-          <h1
-            style={{
-              fontSize: '40px',
-              fontWeight: 800,
-              color: '#FFFFFF',
-              marginBottom: '18px',
-              lineHeight: 1.2,
-              letterSpacing: '-0.8px',
-              textShadow: '0 2px 10px rgba(0,0,0,0.2)',
-            }}
-          >
-            Where farmers, suppliers & markets connect.
-          </h1>
-
-          <p
-            style={{
-              fontSize: '17px',
-              lineHeight: 1.65,
-              color: 'rgba(255,255,255,0.9)',
-              maxWidth: '430px',
-              margin: 0,
-            }}
-          >
-            Streamline agricultural trade, monitor live DA commodity price benchmarks, access municipal assistance programs, and work with licensed agronomists — all in one secure platform.
-          </p>
-        </div>
-
-        {/* Platform Pillars / Trust Indicators */}
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '20px',
-            fontSize: '13px',
-            fontWeight: 600,
-            color: 'rgba(255,255,255,0.9)',
-            position: 'relative',
-            zIndex: 2,
-            borderTop: '1px solid rgba(255,255,255,0.2)',
-            paddingTop: '24px',
-          }}
-        >
-          {[
-            'Direct Farm-to-Market Trade',
-            'Official LGU Price Benchmarks',
-            'Role-Based Secure Access',
-            'Agricultural Community Hub',
-          ].map((item) => (
-            <span key={item} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span
+        {/* Top Brand Identity */}
+        <div className="login-hero-content">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '13px',
+                backgroundColor: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.22)',
+                flexShrink: 0,
+                padding: '5px',
+                boxSizing: 'border-box',
+              }}
+            >
+              <img
+                src={agriConnectPng}
+                alt="AgriConnect"
                 style={{
-                  width: '18px',
-                  height: '18px',
-                  borderRadius: '50%',
-                  backgroundColor: 'rgba(255,255,255,0.25)',
-                  border: '1.5px solid #FFFFFF',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '11px',
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  display: 'block',
+                }}
+              />
+            </div>
+            <div>
+              <div
+                style={{
+                  fontSize: '22px',
                   fontWeight: 800,
+                  letterSpacing: '-0.4px',
+                  lineHeight: 1.1,
+                  color: '#FFFFFF',
                 }}
               >
-                ✓
-              </span>
-              <span>{item}</span>
-            </span>
-          ))}
+                <span>Agri</span><span style={{ fontWeight: 800 }}>Connect</span>
+              </div>
+              <div
+                style={{
+                  fontSize: '12px',
+                  color: 'rgba(255, 255, 255, 0.8)',
+                  fontWeight: 500,
+                  letterSpacing: '0.2px',
+                  marginTop: '2px',
+                }}
+              >
+                Connect. Grow. Prosper.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Middle Narrative & 3 Feature Points matching reference */}
+        <div className="login-hero-content" style={{ marginTop: 'clamp(14px, 2.5vh, 24px)', marginBottom: 'clamp(14px, 2.5vh, 24px)' }}>
+          <div className="login-hero-eyebrow">
+            PHILIPPINE AGRICULTURAL PLATFORM
+          </div>
+
+          <h1 className="login-hero-headline">
+            Where farmers, suppliers<br />
+            & markets <span style={{ color: '#8ecd2c' }}>connect</span>.
+          </h1>
+
+          <p className="login-hero-desc">
+            Streamline trade with live DA commodity benchmarks,<br />
+            municipal assistance programs, and direct market<br /> access
+            — all in one secure platform.
+          </p>
+
+          {/* 3 Left-Aligned Feature Points */}
+          <div className="login-hero-features">
+            {/* Feature 1: Isolated by cooperative */}
+            <div className="login-feature-item">
+              <svg className="login-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="16" height="20" x="4" y="2" rx="2" ry="2" />
+                <path d="M9 22v-4h6v4" />
+                <path d="M8 6h.01" />
+                <path d="M16 6h.01" />
+                <path d="M8 10h.01" />
+                <path d="M16 10h.01" />
+                <path d="M8 14h.01" />
+                <path d="M16 14h.01" />
+              </svg>
+              <div>
+                <div className="login-feature-title">Isolated by cooperative</div>
+                <div className="login-feature-subtext">
+                  Row-level security keeps every cooperative's records to itself.
+                </div>
+              </div>
+            </div>
+
+            {/* Feature 2: Recorded, not overwritten */}
+            <div className="login-feature-item">
+              <svg className="login-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+              <div>
+                <div className="login-feature-title">Recorded, not overwritten</div>
+                <div className="login-feature-subtext">
+                  Administrative changes append to an audit trail nobody can edit.
+                </div>
+              </div>
+            </div>
+
+            {/* Feature 3: Built for the field */}
+            <div className="login-feature-item">
+              <svg className="login-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              <div>
+                <div className="login-feature-title">Built for the field</div>
+                <div className="login-feature-subtext">
+                  Geotagging works with no signal and syncs when it returns.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Immutable Audit Trail Footer */}
+        <div className="login-hero-footer">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          <span>Tenant-isolated access, recorded to an immutable audit trail.</span>
         </div>
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════════
-          RIGHT SIGN-IN FORM PANEL (Clean, High-Affordance & Top-Right Notifications)
+          RIGHT SIGN-IN PANEL (Clean Pure White, Centered, UMA-Style Alignment)
       ══════════════════════════════════════════════════════════════════════════ */}
       <div className="login-form-panel">
-        <div className="login-form-card">
+        <div className="login-form-container">
           {/* Mobile Brand Header */}
           <div className="login-mobile-brand">
             <img
               src={agriConnectLogo}
               alt="AgriConnect Logo"
               style={{
-                width: '44px',
-                height: '44px',
-                borderRadius: '12px',
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
                 objectFit: 'contain',
                 flexShrink: 0,
               }}
@@ -237,17 +233,17 @@ export const LoginPage: React.FC = () => {
             <div>
               <div
                 style={{
-                  fontSize: '22px',
+                  fontSize: '20px',
                   fontWeight: 800,
                   lineHeight: 1.1,
                   letterSpacing: '-0.4px',
                 }}
               >
-                <span style={{ color: '#16523a' }}>Agri</span><span style={{ color: '#599e36' }}>Connect</span>
+                <span style={{ color: '#14532D' }}>Agri</span><span style={{ color: '#16A34A' }}>Connect</span>
               </div>
               <div
                 style={{
-                  fontSize: '12px',
+                  fontSize: '11.5px',
                   fontWeight: 600,
                   color: '#64748B',
                   marginTop: '2px',
@@ -258,38 +254,49 @@ export const LoginPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Header */}
-          <div style={{ marginBottom: '32px' }}>
-            <h2
+          {/* Stylized Brand Logo Wordmark matching UMA header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div
               style={{
-                fontSize: '30px',
-                fontWeight: 800,
-                color: '#0E4A27',
-                marginBottom: '8px',
-                letterSpacing: '-0.5px',
-                lineHeight: 1.2,
+                fontSize: '32px',
+                fontWeight: 900,
+                letterSpacing: '-0.6px',
+                lineHeight: 1,
+                fontFamily: 'system-ui, -apple-system, sans-serif',
               }}
             >
-              Welcome back
-            </h2>
-            <p style={{ color: '#64748B', fontSize: '15px', margin: 0 }}>
-              Sign in with your verified credentials to access your dashboard.
-            </p>
+              <span style={{ color: '#1c533c' }}>Agri</span><span style={{ color: '#8ecd2c' }}>Connect</span>
+            </div>
           </div>
 
+          {/* Eyebrow */}
+          <div className="login-uma-eyebrow" style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#15803D', marginTop: '12px', marginBottom: '6px' }}>
+            WELCOME BACK
+          </div>
+
+          {/* Title */}
+          <h2 className="login-uma-title" style={{ fontSize: 'clamp(24px, 2.4vw, 28px)', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.5px', margin: '0 0 6px 0', lineHeight: 1.2 }}>
+            Sign in to AgriConnect
+          </h2>
+
+          {/* Subtitle */}
+          <p className="login-uma-subtitle" style={{ fontSize: '13px', color: '#64748B', lineHeight: 1.5, margin: '0 0 20px 0' }}>
+            Sign in to continue your agricultural journey on AgriConnect.
+          </p>
+
+          {/* Sign In Form */}
           <form onSubmit={handleSubmit} noValidate>
             {/* Email Field */}
-            <div style={{ marginBottom: '20px' }}>
+            <div className="login-field-wrap" style={{ marginBottom: '14px' }}>
               <label
+                className="login-field-label"
                 htmlFor="login-email"
                 style={{
                   display: 'block',
-                  fontSize: '13px',
-                  fontWeight: 800,
+                  fontSize: '12.5px',
+                  fontWeight: 600,
                   color: '#334155',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.4px',
-                  marginBottom: '8px',
+                  marginBottom: '5px',
                 }}
               >
                 Email address
@@ -298,15 +305,19 @@ export const LoginPage: React.FC = () => {
                 <span
                   style={{
                     position: 'absolute',
-                    left: '16px',
+                    left: '13px',
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    fontSize: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
                     color: '#94A3B8',
                     pointerEvents: 'none',
                   }}
                 >
-                  ✉️
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="20" height="16" x="2" y="4" rx="2" />
+                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                  </svg>
                 </span>
                 <input
                   id="login-email"
@@ -315,51 +326,57 @@ export const LoginPage: React.FC = () => {
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. farmer@gmail.com"
-                  className="form-input"
+                  placeholder="juan@gmail.com"
+                  className="form-input login-input-box"
                   style={{
-                    height: '50px',
-                    paddingLeft: '46px',
-                    fontSize: '15px',
-                    borderRadius: '12px',
-                    border: hasError ? '2px solid #EF4444' : '1.5px solid #CBD5E1',
+                    height: '42px',
+                    paddingLeft: '38px',
+                    paddingRight: '14px',
+                    fontSize: '13.5px',
+                    borderRadius: '10px',
+                    border: hasError ? '2px solid #EF4444' : '1.5px solid #E2E8F0',
                     backgroundColor: '#FFFFFF',
                     transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    outline: 'none',
                   }}
                 />
               </div>
             </div>
 
-            {/* Password Field with Show/Hide Toggle */}
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label
-                  htmlFor="login-password"
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 800,
-                    color: '#334155',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.4px',
-                  }}
-                >
-                  Password
-                </label>
-              </div>
-
+            {/* Password Field */}
+            <div className="login-field-wrap" style={{ marginBottom: '6px' }}>
+              <label
+                className="login-field-label"
+                htmlFor="login-password"
+                style={{
+                  display: 'block',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  color: '#334155',
+                  marginBottom: '5px',
+                }}
+              >
+                Password
+              </label>
               <div style={{ position: 'relative' }}>
                 <span
                   style={{
                     position: 'absolute',
-                    left: '16px',
+                    left: '13px',
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    fontSize: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
                     color: '#94A3B8',
                     pointerEvents: 'none',
                   }}
                 >
-                  🔒
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
                 </span>
                 <input
                   id="login-password"
@@ -368,17 +385,20 @@ export const LoginPage: React.FC = () => {
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="form-input"
+                  placeholder="Your password"
+                  className="form-input login-input-box"
                   style={{
-                    height: '50px',
-                    paddingLeft: '46px',
-                    paddingRight: '48px',
-                    fontSize: '15px',
-                    borderRadius: '12px',
-                    border: hasError ? '2px solid #EF4444' : '1.5px solid #CBD5E1',
+                    height: '42px',
+                    paddingLeft: '38px',
+                    paddingRight: '38px',
+                    fontSize: '13.5px',
+                    borderRadius: '10px',
+                    border: hasError ? '2px solid #EF4444' : '1.5px solid #E2E8F0',
                     backgroundColor: '#FFFFFF',
                     transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    outline: 'none',
                   }}
                 />
                 <button
@@ -387,108 +407,184 @@ export const LoginPage: React.FC = () => {
                   title={showPassword ? 'Hide password' : 'Show password'}
                   style={{
                     position: 'absolute',
-                    right: '14px',
+                    right: '10px',
                     top: '50%',
                     transform: 'translateY(-50%)',
                     background: 'none',
                     border: 'none',
                     cursor: 'pointer',
-                    fontSize: '16px',
-                    color: '#64748B',
+                    color: '#6B7280',
                     padding: '4px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  {showPassword ? '🙈' : '👁️'}
+                  {showPassword ? (
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m15 18-.722-3.25" />
+                      <path d="M2 8a10.645 10.645 0 0 0 20 0" />
+                      <path d="m20 15-1.726-2.05" />
+                      <path d="m4 15 1.726-2.05" />
+                      <path d="m9 18 .722-3.25" />
+                    </svg>
+                  ) : (
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
                 </button>
               </div>
             </div>
 
-            {/* Remember Me & Help */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: '10px',
-                marginBottom: '26px',
-                fontSize: '14px',
-              }}
-            >
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#475569', fontWeight: 600 }}>
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  style={{ width: '16px', height: '16px', accentColor: '#176B3A', cursor: 'pointer' }}
-                />
-                <span>Remember me</span>
-              </label>
-
-              <span style={{ color: '#64748B', fontSize: '13px' }}>
-                Need help? <strong style={{ color: '#0E4A27' }}>Contact LGU</strong>
-              </span>
+            {/* Forgot Password Right-Aligned Link matching reference */}
+            <div className="login-forgot-wrap" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setIsForgotPasswordOpen(true)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#15803D',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: 0,
+                  transition: 'color 0.15s',
+                }}
+                onMouseEnter={(e) => ((e.target as HTMLElement).style.color = '#14532D')}
+                onMouseLeave={(e) => ((e.target as HTMLElement).style.color = '#15803D')}
+              >
+                Forgot password?
+              </button>
             </div>
 
-            {/* Submit Button */}
+            {/* Primary Action Button: Sign in securely → */}
             <button
               type="submit"
               id="login-submit"
               disabled={loading}
-              className="btn btn-primary btn-full"
+              className="login-submit-btn"
               style={{
-                height: '52px',
-                fontSize: '16px',
-                fontWeight: 800,
-                borderRadius: '12px',
-                boxShadow: '0 4px 14px rgba(23, 107, 58, 0.25)',
+                width: '100%',
+                height: '44px',
+                backgroundColor: '#14532D',
+                color: '#FFFFFF',
+                fontSize: '14.5px',
+                fontWeight: 700,
+                borderRadius: '10px',
+                border: 'none',
+                cursor: loading ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                cursor: loading ? 'not-allowed' : 'pointer',
+                boxShadow: '0 2px 8px rgba(20, 83, 45, 0.2)',
+                transition: 'background-color 0.2s ease',
               }}
+              onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = '#166534')}
+              onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = '#14532D')}
             >
               {loading ? (
                 <>
                   <span>🔄</span> Signing in…
                 </>
               ) : (
-                'Sign in to AgriConnect →'
+                'Sign in securely →'
               )}
             </button>
           </form>
 
-          {/* Create Account Link */}
+          {/* Option 2: Clean Centered Security Pill */}
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <div className="login-security-pill">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+              <span>Protected access · Encrypted session</span>
+            </div>
+          </div>
+
+          {/* Hairline Divider */}
+          <div className="login-bottom-divider" />
+
+          {/* Option 2: Split Left/Right Action Bar */}
           <div
+            className="login-dual-actions"
             style={{
-              marginTop: '28px',
-              paddingTop: '20px',
-              borderTop: '1px solid #F1F5F9',
-              textAlign: 'center',
-              fontSize: '14px',
-              color: '#64748B',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              width: '100%',
+              boxSizing: 'border-box',
+              marginTop: '4px',
             }}
           >
-            No account yet?{' '}
+            <button
+              type="button"
+              onClick={() => setIsContactLguOpen(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                color: '#475569',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontSize: '12px',
+                flexShrink: 0,
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={(e) => ((e.target as HTMLElement).style.color = '#15803D')}
+              onMouseLeave={(e) => ((e.target as HTMLElement).style.color = '#475569')}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 11h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5a9 9 0 0 1 18 0v5a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" />
+                <path d="M21 16v2a4 4 0 0 1-4 4h-5" />
+              </svg>
+              <span>Contact LGU Support</span>
+            </button>
+
             <Link
               to="/register"
               style={{
-                color: '#176B3A',
-                fontWeight: 800,
+                color: '#15803D',
+                fontWeight: 700,
                 textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '12px',
+                marginLeft: 'auto',
+                flexShrink: 0,
+                transition: 'color 0.15s',
               }}
-              onMouseEnter={(e) => ((e.target as HTMLElement).style.textDecoration = 'underline')}
-              onMouseLeave={(e) => ((e.target as HTMLElement).style.textDecoration = 'none')}
+              onMouseEnter={(e) => ((e.target as HTMLElement).style.color = '#14532D')}
+              onMouseLeave={(e) => ((e.target as HTMLElement).style.color = '#15803D')}
             >
-              Create an account
+              <span>Create account</span>
+              <span>→</span>
             </Link>
           </div>
         </div>
       </div>
+
+      {/* Forgot Password Recovery Modal */}
+      <ForgotPasswordModal
+        isOpen={isForgotPasswordOpen}
+        onClose={() => setIsForgotPasswordOpen(false)}
+        defaultEmail={email}
+      />
+
+      {/* LGU Support Desk Modal */}
+      <ContactLguModal
+        isOpen={isContactLguOpen}
+        onClose={() => setIsContactLguOpen(false)}
+      />
     </div>
   );
 };
