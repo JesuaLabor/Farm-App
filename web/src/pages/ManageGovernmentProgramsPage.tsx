@@ -4,6 +4,7 @@ import { programApi } from '../api/program';
 import { getImageUrl } from '../api';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
+import { getRegions, getProvinces, getMunicipalities } from '../data/philippineLocations';
 import type { GovernmentProgram, ProgramApplication, ApplicationStatus } from '../types/program';
 
 interface ProgramStats {
@@ -11,6 +12,10 @@ interface ProgramStats {
   pending: number;
   approved: number;
 }
+
+const REGION_DEFAULT = 'All Regions';
+const PROVINCE_DEFAULT = 'All Provinces';
+const MUNICIPALITY_DEFAULT = 'All Municipalities';
 
 export const ManageGovernmentProgramsPage: React.FC = () => {
   const { user } = useAuth();
@@ -35,8 +40,18 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
   // Program details preview modal
   const [viewingProgram, setViewingProgram] = useState<GovernmentProgram | null>(null);
 
-  // Municipality filter for Super Admin (LGU Staff is locked to their municipality)
-  const [municipalityFilter, setMunicipalityFilter] = useState(isLguStaff ? assignedMunicipality : 'all');
+  // Geographic cascading filters for Super Admin (Region -> Province -> Municipality)
+  const [regionFilter, setRegionFilter] = useState(REGION_DEFAULT);
+  const [provinceFilter, setProvinceFilter] = useState(PROVINCE_DEFAULT);
+  const [municipalityFilter, setMunicipalityFilter] = useState(isLguStaff ? assignedMunicipality : MUNICIPALITY_DEFAULT);
+
+  const regions = [REGION_DEFAULT, ...getRegions()];
+  const provinces = regionFilter !== REGION_DEFAULT
+    ? [PROVINCE_DEFAULT, ...getProvinces(regionFilter)]
+    : [PROVINCE_DEFAULT];
+  const municipalities = (regionFilter !== REGION_DEFAULT && provinceFilter !== PROVINCE_DEFAULT)
+    ? [MUNICIPALITY_DEFAULT, ...getMunicipalities(regionFilter, provinceFilter)]
+    : [MUNICIPALITY_DEFAULT];
 
   // New Program form state (Only accessible to LGU Staff)
   const [title, setTitle] = useState('');
@@ -59,7 +74,7 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
   const fetchPrograms = async () => {
     setLoading(true);
     try {
-      const filterMun = isLguStaff ? assignedMunicipality : (municipalityFilter !== 'all' ? municipalityFilter : undefined);
+      const filterMun = isLguStaff ? assignedMunicipality : undefined;
       const data = await programApi.listPrograms(undefined, filterMun || undefined);
       setPrograms(data);
 
@@ -105,7 +120,34 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
 
   useEffect(() => {
     fetchPrograms();
-  }, [municipalityFilter, assignedMunicipality]);
+  }, [assignedMunicipality]);
+
+  // Filter programs based on region, province, and municipality filters
+  const displayedPrograms = programs.filter((p) => {
+    if (isLguStaff) return true;
+    if (regionFilter !== REGION_DEFAULT && p.region && p.region !== regionFilter) {
+      return false;
+    }
+    if (provinceFilter !== PROVINCE_DEFAULT && p.province && p.province !== provinceFilter) {
+      return false;
+    }
+    if (municipalityFilter !== MUNICIPALITY_DEFAULT && p.municipality && p.municipality !== municipalityFilter) {
+      return false;
+    }
+    return true;
+  });
+
+  // Keep selectedProgId in sync when location filters change
+  useEffect(() => {
+    if (displayedPrograms.length > 0) {
+      if (!selectedProgId || !displayedPrograms.some((p) => p.id === selectedProgId)) {
+        setSelectedProgId(displayedPrograms[0].id);
+      }
+    } else {
+      setSelectedProgId('');
+      setApplications([]);
+    }
+  }, [regionFilter, provinceFilter, municipalityFilter, programs]);
 
   // Fetch applications for the currently selected program
   const fetchApplications = async (progId: string) => {
@@ -280,64 +322,18 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
             gap: '12px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div
-              style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '12px',
-                background: '#F0FDF4',
-                border: '1.5px solid #BBF7D0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#15803D',
-              }}
-            >
-              {/* Sprout / Seedling Icon */}
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 10a6 6 0 0 0-6-6H3v2a6 6 0 0 0 6 6h3" />
-                <path d="M12 14a6 6 0 0 1 6-6h3v2a6 6 0 0 1-6 6h-3" />
-                <line x1="12" y1="22" x2="12" y2="10" />
-              </svg>
-            </div>
-            <div>
-              <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#0E4A27', margin: 0, lineHeight: 1.2 }}>
-                Active Programs
-              </h1>
-              <p style={{ color: '#64748B', fontSize: '13px', margin: '3px 0 0 0' }}>
-                {isLguStaff
-                  ? `Manage and monitor ${assignedMunicipality ? assignedMunicipality + "'s" : "your LGU's"} agricultural assistance programs.`
-                  : "Manage and monitor your LGU's agricultural assistance programs."}
-              </p>
-            </div>
+          <div>
+            <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#0E4A27', margin: 0, lineHeight: 1.2 }}>
+              Manage Government Programs
+            </h1>
+            <p style={{ color: '#64748B', fontSize: '13px', margin: '3px 0 0 0' }}>
+              {isLguStaff
+                ? `Manage and monitor ${assignedMunicipality ? assignedMunicipality + "'s" : "your LGU's"} agricultural assistance programs.`
+                : "Manage and monitor your LGU's agricultural assistance programs."}
+            </p>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {/* Super Admin Municipality Filter */}
-            {!isLguStaff && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: '#475569' }}>Town:</span>
-                <input
-                  type="text"
-                  placeholder="All Municipalities"
-                  value={municipalityFilter === 'all' ? '' : municipalityFilter}
-                  onChange={(e) => setMunicipalityFilter(e.target.value.trim() || 'all')}
-                  style={{
-                    height: '36px',
-                    padding: '0 12px',
-                    borderRadius: '10px',
-                    border: '1.5px solid #CBD5E1',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    width: '150px',
-                    outline: 'none',
-                    backgroundColor: '#FFFFFF',
-                  }}
-                />
-              </div>
-            )}
-
             {/* Only LGU Staff has permission to post new programs */}
             {isLguStaff && (
               <button
@@ -351,34 +347,214 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
+                  minHeight: 'unset',
                 }}
               >
                 {showCreateForm ? '✕ Close Form' : '+ Post New Program'}
               </button>
             )}
 
-            {/* View All Programs Link */}
-            <button
-              type="button"
-              onClick={() => navigate('/programs')}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#166534',
-                fontWeight: 700,
-                fontSize: '13px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '6px 10px',
-                borderRadius: '8px',
-              }}
-            >
-              View All Programs →
-            </button>
+            {/* View All Programs Link (Excluded for Super Admin) */}
+            {isLguStaff && (
+              <button
+                type="button"
+                onClick={() => navigate('/programs')}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#166534',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '6px 10px',
+                  borderRadius: '8px',
+                  minHeight: 'unset',
+                }}
+              >
+                View All Programs →
+              </button>
+            )}
           </div>
         </div>
+
+        {/* ─── Super Admin Cascading Geographic Filter (Region -> Province -> Municipality) ─── */}
+        {!isLguStaff && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '14px 20px',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              border: '1.5px solid #E2E8F0',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
+              marginBottom: '22px',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '6px' }}>
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  backgroundColor: '#F0FDF4',
+                  border: '1px solid #BBF7D0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#166534',
+                  fontSize: '15px',
+                }}
+              >
+                📍
+              </div>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: '#0E4A27' }}>
+                  Filter by Location
+                </div>
+                <div style={{ fontSize: '11px', color: '#64748B' }}>
+                  Showing {displayedPrograms.length} of {programs.length} programs
+                </div>
+              </div>
+            </div>
+
+            {/* Region Select */}
+            <div style={{ flex: '1', minWidth: '170px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '4px', letterSpacing: '0.3px' }}>
+                REGION
+              </label>
+              <select
+                value={regionFilter}
+                onChange={(e) => {
+                  setRegionFilter(e.target.value);
+                  setProvinceFilter(PROVINCE_DEFAULT);
+                  setMunicipalityFilter(MUNICIPALITY_DEFAULT);
+                }}
+                style={{
+                  width: '100%',
+                  height: '38px',
+                  padding: '0 10px',
+                  borderRadius: '9px',
+                  border: '1.5px solid #CBD5E1',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: '#0F172A',
+                  backgroundColor: '#FFFFFF',
+                  outline: 'none',
+                  minHeight: 'unset',
+                  cursor: 'pointer',
+                }}
+              >
+                {regions.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Province Select */}
+            <div style={{ flex: '1', minWidth: '150px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '4px', letterSpacing: '0.3px' }}>
+                PROVINCE
+              </label>
+              <select
+                value={provinceFilter}
+                disabled={regionFilter === REGION_DEFAULT}
+                onChange={(e) => {
+                  setProvinceFilter(e.target.value);
+                  setMunicipalityFilter(MUNICIPALITY_DEFAULT);
+                }}
+                style={{
+                  width: '100%',
+                  height: '38px',
+                  padding: '0 10px',
+                  borderRadius: '9px',
+                  border: '1.5px solid #CBD5E1',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: '#0F172A',
+                  backgroundColor: regionFilter === REGION_DEFAULT ? '#F8FAFC' : '#FFFFFF',
+                  opacity: regionFilter === REGION_DEFAULT ? 0.6 : 1,
+                  cursor: regionFilter === REGION_DEFAULT ? 'not-allowed' : 'pointer',
+                  outline: 'none',
+                  minHeight: 'unset',
+                }}
+              >
+                {provinces.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Municipality Select */}
+            <div style={{ flex: '1', minWidth: '160px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '4px', letterSpacing: '0.3px' }}>
+                MUNICIPALITY / CITY
+              </label>
+              <select
+                value={municipalityFilter}
+                disabled={provinceFilter === PROVINCE_DEFAULT}
+                onChange={(e) => setMunicipalityFilter(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '38px',
+                  padding: '0 10px',
+                  borderRadius: '9px',
+                  border: '1.5px solid #CBD5E1',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: '#0F172A',
+                  backgroundColor: provinceFilter === PROVINCE_DEFAULT ? '#F8FAFC' : '#FFFFFF',
+                  opacity: provinceFilter === PROVINCE_DEFAULT ? 0.6 : 1,
+                  cursor: provinceFilter === PROVINCE_DEFAULT ? 'not-allowed' : 'pointer',
+                  outline: 'none',
+                  minHeight: 'unset',
+                }}
+              >
+                {municipalities.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Reset Button */}
+            {(regionFilter !== REGION_DEFAULT || provinceFilter !== PROVINCE_DEFAULT || municipalityFilter !== MUNICIPALITY_DEFAULT) && (
+              <div style={{ alignSelf: 'flex-end', marginBottom: '1px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRegionFilter(REGION_DEFAULT);
+                    setProvinceFilter(PROVINCE_DEFAULT);
+                    setMunicipalityFilter(MUNICIPALITY_DEFAULT);
+                  }}
+                  style={{
+                    height: '38px',
+                    padding: '0 14px',
+                    borderRadius: '9px',
+                    border: '1.5px solid #E2E8F0',
+                    backgroundColor: '#F8FAFC',
+                    color: '#64748B',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    minHeight: 'unset',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <span>✕</span>
+                  <span>Reset</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ─── LGU Staff Program Creation Form ─── */}
         {showCreateForm && isLguStaff && (
@@ -519,7 +695,7 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
           <div style={{ textAlign: 'center', padding: '40px', color: '#64748B', fontSize: '14px' }}>
             Loading active agricultural programs...
           </div>
-        ) : programs.length === 0 ? (
+        ) : displayedPrograms.length === 0 ? (
           <div
             style={{
               textAlign: 'center',
@@ -532,9 +708,23 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
           >
             <div style={{ fontSize: '32px', marginBottom: '8px' }}>🌾</div>
             <div style={{ fontWeight: 700, fontSize: '15px', color: '#334155' }}>No Active Programs Found</div>
-            <p style={{ fontSize: '13px', margin: '4px 0 0 0' }}>
-              {isLguStaff ? 'Click "+ Post New Program" above to create an agricultural assistance program.' : 'No programs registered for this municipality yet.'}
+            <p style={{ fontSize: '13px', margin: '4px 0 12px 0' }}>
+              {isLguStaff ? 'Click "+ Post New Program" above to create an agricultural assistance program.' : 'No assistance programs found for the selected geographic filter.'}
             </p>
+            {!isLguStaff && (regionFilter !== REGION_DEFAULT || provinceFilter !== PROVINCE_DEFAULT || municipalityFilter !== MUNICIPALITY_DEFAULT) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setRegionFilter(REGION_DEFAULT);
+                  setProvinceFilter(PROVINCE_DEFAULT);
+                  setMunicipalityFilter(MUNICIPALITY_DEFAULT);
+                }}
+                className="btn btn-secondary"
+                style={{ padding: '8px 16px', fontSize: '12px', minHeight: 'unset', fontWeight: 700 }}
+              >
+                Reset Location Filter
+              </button>
+            )}
           </div>
         ) : (
           <div
@@ -544,7 +734,7 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
               gap: '16px',
             }}
           >
-            {programs.map((prog, idx) => {
+            {displayedPrograms.map((prog, idx) => {
               const badge = getProgramBadge(prog, idx);
               const stats = programStats[prog.id] || { total: 0, pending: 0, approved: 0 };
               const isSelected = selectedProgId === prog.id;
@@ -600,6 +790,7 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
                     <div style={{ position: 'absolute', top: '10px', right: '10px' }}>
                       <button
                         type="button"
+                        aria-label="Program options"
                         onClick={(e) => {
                           e.stopPropagation();
                           setMenuOpenProgId(menuOpenProgId === prog.id ? null : prog.id);
@@ -607,6 +798,9 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
                         style={{
                           width: '28px',
                           height: '28px',
+                          minWidth: '28px',
+                          minHeight: 'unset',
+                          padding: 0,
                           borderRadius: '50%',
                           backgroundColor: 'rgba(255, 255, 255, 0.92)',
                           border: '1px solid rgba(0, 0, 0, 0.08)',
@@ -616,11 +810,14 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
                           justifyContent: 'center',
                           cursor: 'pointer',
                           boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
-                          fontWeight: 700,
-                          fontSize: '14px',
+                          lineHeight: 1,
                         }}
                       >
-                        ⋮
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                          <circle cx="12" cy="5" r="2" />
+                          <circle cx="12" cy="12" r="2" />
+                          <circle cx="12" cy="19" r="2" />
+                        </svg>
                       </button>
 
                       {/* Dropdown Menu */}
@@ -648,6 +845,7 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
                             }}
                             style={{
                               width: '100%',
+                              minHeight: 'unset',
                               textAlign: 'left',
                               padding: '9px 14px',
                               background: 'none',
@@ -669,6 +867,7 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
                             }}
                             style={{
                               width: '100%',
+                              minHeight: 'unset',
                               textAlign: 'left',
                               padding: '9px 14px',
                               background: 'none',
@@ -764,6 +963,8 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
                         onClick={() => setViewingProgram(prog)}
                         style={{
                           flex: 1.2,
+                          minHeight: 'unset',
+                          height: '36px',
                           backgroundColor: '#166534',
                           color: '#FFFFFF',
                           border: 'none',
@@ -787,6 +988,8 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
                         onClick={() => handleSelectAndManage(prog.id)}
                         style={{
                           flex: 1,
+                          minHeight: 'unset',
+                          height: '36px',
                           backgroundColor: isSelected ? '#DCFCE7' : '#F8FAFC',
                           color: '#166534',
                           border: isSelected ? '1.5px solid #86EFAC' : '1px solid #CBD5E1',
@@ -902,7 +1105,7 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
                   maxWidth: '260px',
                 }}
               >
-                {programs.map((p) => (
+                {displayedPrograms.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.title} {p.municipality ? `(${p.municipality})` : ''}
                   </option>
