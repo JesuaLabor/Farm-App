@@ -26,6 +26,16 @@ export const adminApi = {
     return res.data;
   },
 
+  suspendUser: async (userId: string): Promise<{ message: string }> => {
+    const res = await apiClient.put<{ message: string }>(`/api/admin/users/${userId}/suspend`);
+    return res.data;
+  },
+
+  unsuspendUser: async (userId: string): Promise<{ message: string }> => {
+    const res = await apiClient.put<{ message: string }>(`/api/admin/users/${userId}/unsuspend`);
+    return res.data;
+  },
+
   deleteUser: async (userId: string): Promise<{ message: string }> => {
     const res = await apiClient.delete<{ message: string }>(`/api/admin/users/${userId}`);
     return res.data;
