@@ -136,20 +136,24 @@ export const LGUDashboardPage: React.FC = () => {
           }} />
 
           <div style={{ position: 'relative' }}>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px',
-              fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.7)',
-              letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px',
-            }}>
-              🏛️ Regional Oversight & Analytics
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                fontSize: '12px', fontWeight: 700, color: '#FFFFFF',
+                padding: '3px 10px', borderRadius: '20px',
+                background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)',
+                letterSpacing: '0.04em', textTransform: 'uppercase',
+              }}>
+                🏛️ Regional Oversight & Analytics
+              </span>
+            </div>
             <h1 style={{
-              fontSize: '28px', fontWeight: 800, color: '#FFFFFF',
-              marginBottom: '8px', lineHeight: 1.2,
+              fontSize: '24px', fontWeight: 800, color: '#FFFFFF',
+              margin: '4px 0', lineHeight: 1.2,
             }}>
               LGU Agricultural Monitoring
             </h1>
-            <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.72)', maxWidth: '600px', lineHeight: 1.6 }}>
+            <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.8)', maxWidth: '600px', margin: '4px 0 0 0', lineHeight: 1.5 }}>
               Macro view of agricultural activity: registered farmers, marketplace trade volume, crop listings, subsidy programs, and community engagement.
             </p>
 
@@ -172,10 +176,10 @@ export const LGUDashboardPage: React.FC = () => {
           background: '#FFFFFF',
           borderRadius: '16px',
           border: '1.5px solid #E4E2DC',
-          padding: '20px 24px',
+          padding: '18px 20px',
           marginBottom: '28px',
           display: 'flex',
-          gap: '16px',
+          gap: '14px',
           alignItems: 'flex-end',
           flexWrap: 'wrap',
           boxShadow: '0 2px 8px rgba(26,28,26,0.05)',
@@ -186,7 +190,7 @@ export const LGUDashboardPage: React.FC = () => {
                 📍 Jurisdiction (Assigned Municipality)
               </label>
               <div style={{
-                padding: '10px 14px', borderRadius: '10px',
+                height: '40px', padding: '0 14px', borderRadius: '10px',
                 border: '1.5px solid #C8EDD6', background: '#F6FCF8',
                 fontSize: '14px', fontWeight: 700, color: '#176B3A',
                 display: 'flex', alignItems: 'center', gap: '6px',
@@ -201,14 +205,25 @@ export const LGUDashboardPage: React.FC = () => {
                   🗺️ Region
                 </label>
                 <select
-                  className="form-input"
                   value={selectedRegion}
                   onChange={(e) => {
                     setSelectedRegion(e.target.value);
                     setSelectedProvince('All Provinces');
                     setSelectedMunicipality('All Municipalities');
                   }}
-                  style={{ borderRadius: '10px' }}
+                  style={{
+                    width: '100%',
+                    height: '40px',
+                    padding: '0 12px',
+                    borderRadius: '10px',
+                    border: '1.5px solid #D8D6CE',
+                    background: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#1A1C1A',
+                    cursor: 'pointer',
+                    outline: 'none',
+                  }}
                 >
                   {regions.map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
@@ -219,14 +234,26 @@ export const LGUDashboardPage: React.FC = () => {
                   🏛️ Province
                 </label>
                 <select
-                  className="form-input"
                   value={selectedProvince}
                   disabled={selectedRegion === 'All Regions'}
                   onChange={(e) => {
                     setSelectedProvince(e.target.value);
                     setSelectedMunicipality('All Municipalities');
                   }}
-                  style={{ borderRadius: '10px' }}
+                  style={{
+                    width: '100%',
+                    height: '40px',
+                    padding: '0 12px',
+                    borderRadius: '10px',
+                    border: '1.5px solid #D8D6CE',
+                    background: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#1A1C1A',
+                    cursor: selectedRegion === 'All Regions' ? 'not-allowed' : 'pointer',
+                    opacity: selectedRegion === 'All Regions' ? 0.6 : 1,
+                    outline: 'none',
+                  }}
                 >
                   {provinces.map((p) => <option key={p} value={p}>{p}</option>)}
                 </select>
@@ -237,11 +264,23 @@ export const LGUDashboardPage: React.FC = () => {
                   📍 Municipality / City
                 </label>
                 <select
-                  className="form-input"
                   value={selectedMunicipality}
                   disabled={selectedProvince === 'All Provinces'}
                   onChange={(e) => setSelectedMunicipality(e.target.value)}
-                  style={{ borderRadius: '10px' }}
+                  style={{
+                    width: '100%',
+                    height: '40px',
+                    padding: '0 12px',
+                    borderRadius: '10px',
+                    border: '1.5px solid #D8D6CE',
+                    background: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#1A1C1A',
+                    cursor: selectedProvince === 'All Provinces' ? 'not-allowed' : 'pointer',
+                    opacity: selectedProvince === 'All Provinces' ? 0.6 : 1,
+                    outline: 'none',
+                  }}
                 >
                   {municipalities.map((m) => <option key={m} value={m}>{m}</option>)}
                 </select>
@@ -254,11 +293,21 @@ export const LGUDashboardPage: React.FC = () => {
               📅 Start Date
             </label>
             <input
-              className="form-input"
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              style={{ borderRadius: '10px' }}
+              style={{
+                width: '100%',
+                height: '40px',
+                padding: '0 12px',
+                borderRadius: '10px',
+                border: '1.5px solid #D8D6CE',
+                background: '#FFFFFF',
+                fontSize: '14px',
+                fontWeight: 600,
+                color: '#1A1C1A',
+                outline: 'none',
+              }}
             />
           </div>
 
@@ -267,21 +316,39 @@ export const LGUDashboardPage: React.FC = () => {
               📅 End Date
             </label>
             <input
-              className="form-input"
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              style={{ borderRadius: '10px' }}
+              style={{
+                width: '100%',
+                height: '40px',
+                padding: '0 12px',
+                borderRadius: '10px',
+                border: '1.5px solid #D8D6CE',
+                background: '#FFFFFF',
+                fontSize: '14px',
+                fontWeight: 600,
+                color: '#1A1C1A',
+                outline: 'none',
+              }}
             />
           </div>
 
           <button
             onClick={fetchMetrics}
             style={{
-              padding: '12px 24px', borderRadius: '10px', border: 'none',
-              background: '#176B3A', color: '#FFFFFF',
-              fontSize: '14px', fontWeight: 700, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: '8px',
+              height: '40px',
+              padding: '0 20px',
+              borderRadius: '10px',
+              border: 'none',
+              background: '#176B3A',
+              color: '#FFFFFF',
+              fontSize: '14px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
               transition: 'background 0.15s ease',
               whiteSpace: 'nowrap',
             }}

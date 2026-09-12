@@ -412,7 +412,7 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             {!isLguStaff && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <label style={{ fontSize: '13px', fontWeight: 700, color: '#475569' }}>Filter Town:</label>
                 <input
                   type="text"
@@ -420,11 +420,14 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
                   value={municipalityFilter === 'all' ? '' : municipalityFilter}
                   onChange={(e) => setMunicipalityFilter(e.target.value.trim() || 'all')}
                   style={{
-                    padding: '8px 12px',
+                    height: '40px',
+                    padding: '0 12px',
                     borderRadius: '10px',
                     border: '1.5px solid #CBD5E1',
-                    fontSize: '13px',
+                    fontSize: '14px',
+                    fontWeight: 500,
                     width: '160px',
+                    outline: 'none',
                   }}
                 />
               </div>
@@ -434,12 +437,14 @@ export const ManageGovernmentProgramsPage: React.FC = () => {
               value={selectedProgId}
               onChange={(e) => setSelectedProgId(e.target.value)}
               style={{
-                padding: '8px 14px',
+                height: '40px',
+                padding: '0 14px',
                 borderRadius: '10px',
                 border: '1.5px solid #CBD5E1',
                 backgroundColor: '#FFFFFF',
-                fontSize: '13px',
+                fontSize: '14px',
                 fontWeight: 600,
+                outline: 'none',
               }}
             >
               {programs.map((p) => (

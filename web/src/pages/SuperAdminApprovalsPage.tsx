@@ -144,30 +144,63 @@ export const SuperAdminApprovalsPage: React.FC = () => {
       <main className="page-main">
 
         {/* ── Page Header ── */}
-        <div className="page-header-banner">
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-            <div>
-              <span className="page-header-label">System Administration</span>
-              <h1 className="page-header-title" style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-                Super Admin — LGU Staff Account Approvals
-                {pendingCount > 0 && !loading && (
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '5px',
-                    background: '#FEF3D6', color: '#B87A00',
-                    border: '1.5px solid rgba(184,122,0,0.3)',
-                    borderRadius: '20px', padding: '4px 14px',
-                    fontSize: '14px', fontWeight: 800, letterSpacing: '0.02em',
-                    verticalAlign: 'middle',
-                  }}>
-                    ⏳ {pendingCount} pending
-                  </span>
-                )}
-              </h1>
-              <p className="page-header-sub">
-                Review and approve LGU Staff accounts across all regions. Approved LGU staff can manage local farmers, buyers, and suppliers.
-              </p>
-            </div>
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '12px',
+                fontWeight: 700,
+                padding: '3px 10px',
+                borderRadius: '20px',
+                background: '#F0FDF4',
+                color: '#166534',
+                border: '1px solid #BBF7D0',
+              }}
+            >
+              🛡️ System Administration
+            </span>
           </div>
+          <h1
+            style={{
+              fontSize: '24px',
+              fontWeight: 800,
+              color: '#0E4A27',
+              margin: '4px 0',
+              lineHeight: 1.2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              flexWrap: 'wrap',
+            }}
+          >
+            Super Admin — LGU Staff Account Approvals
+            {pendingCount > 0 && !loading && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  background: '#FEF3D6',
+                  color: '#B87A00',
+                  border: '1.5px solid rgba(184,122,0,0.3)',
+                  borderRadius: '20px',
+                  padding: '3px 10px',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  letterSpacing: '0.02em',
+                  verticalAlign: 'middle',
+                }}
+              >
+                ⏳ {pendingCount} pending
+              </span>
+            )}
+          </h1>
+          <p style={{ fontSize: '14px', color: '#64748B', margin: '4px 0 0 0', lineHeight: 1.5 }}>
+            Review and approve LGU Staff accounts across all regions. Approved LGU staff can manage local farmers, buyers, and suppliers.
+          </p>
         </div>
 
         {/* ── Filter Bar ── */}
