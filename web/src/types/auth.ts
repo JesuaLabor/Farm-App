@@ -14,7 +14,7 @@ export interface User {
   address?: string;
   photoUrl?: string;
   isVerified?: boolean;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'suspended';
   createdAt: string;
   updatedAt: string;
 }
