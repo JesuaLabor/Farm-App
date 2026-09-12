@@ -12,7 +12,7 @@ const fontSizeOptions: { key: FontSize; label: string; description: string; root
   { key: 'extra-large', label: 'Extra Large', description: '20px — Maximum clarity', rootSize: '20px' },
 ];
 
-type Theme = 'light' | 'dark';
+type Theme = 'light' | 'dark' | 'system';
 
 export const SettingsPage: React.FC = () => {
   const { user, logout } = useAuth();
@@ -48,12 +48,32 @@ export const SettingsPage: React.FC = () => {
   // Apply theme changes
   useEffect(() => {
     localStorage.setItem('agriconnect_theme', theme);
-    if (theme === 'dark') {
+    let effectiveTheme = theme;
+    if (theme === 'system') {
+      const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      effectiveTheme = isDark ? 'dark' : 'light';
+    }
+    if (effectiveTheme === 'dark') {
       document.documentElement.setAttribute('data-theme', 'dark');
     } else {
       document.documentElement.removeAttribute('data-theme');
     }
+    window.dispatchEvent(new Event('theme-changed'));
   }, [theme]);
+
+  // Sync theme changes from external sources
+  useEffect(() => {
+    const handleSync = () => {
+      const saved = (localStorage.getItem('agriconnect_theme') as Theme) || 'light';
+      setTheme(saved);
+    };
+    window.addEventListener('theme-changed', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('theme-changed', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
 
   if (!user) return null;
 

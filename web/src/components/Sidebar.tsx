@@ -1,7 +1,24 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import agriConnectLogo from '../assets/AgriConnect.png';
+
+export type ThemeMode = 'light' | 'dark' | 'system';
+
+const applyAppTheme = (mode: ThemeMode) => {
+  localStorage.setItem('agriconnect_theme', mode);
+  let effective = mode;
+  if (mode === 'system') {
+    const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    effective = isDark ? 'dark' : 'light';
+  }
+  if (effective === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+  window.dispatchEvent(new Event('theme-changed'));
+};
 
 interface SidebarProps {
   collapsed: boolean;
@@ -19,6 +36,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    return (localStorage.getItem('agriconnect_theme') as ThemeMode) || 'light';
+  });
+
+  const handleSetTheme = (mode: ThemeMode) => {
+    setThemeMode(mode);
+    applyAppTheme(mode);
+  };
+
+  useEffect(() => {
+    const initial = (localStorage.getItem('agriconnect_theme') as ThemeMode) || 'light';
+    applyAppTheme(initial);
+
+    const handleSync = () => {
+      const saved = (localStorage.getItem('agriconnect_theme') as ThemeMode) || 'light';
+      setThemeMode(saved);
+      applyAppTheme(saved);
+    };
+    window.addEventListener('theme-changed', handleSync);
+    window.addEventListener('storage', handleSync);
+
+    const mediaQuery = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+    const handleMediaChange = () => {
+      const current = localStorage.getItem('agriconnect_theme');
+      if (current === 'system') {
+        applyAppTheme('system');
+      }
+    };
+    mediaQuery?.addEventListener?.('change', handleMediaChange);
+
+    return () => {
+      window.removeEventListener('theme-changed', handleSync);
+      window.removeEventListener('storage', handleSync);
+      mediaQuery?.removeEventListener?.('change', handleMediaChange);
+    };
+  }, []);
 
   const currentPath = location.pathname;
   const currentHash = location.hash;
@@ -498,6 +552,220 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Bottom Theme Selector */}
+        <div
+          style={{
+            padding: collapsed ? '14px 8px' : '14px 18px',
+            borderTop: '1px solid #E4E2DC',
+            background: '#FFFFFF',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: collapsed ? 'center' : 'space-between',
+            flexShrink: 0,
+          }}
+        >
+          {!collapsed && (
+            <span
+              style={{
+                fontSize: '15px',
+                fontWeight: 600,
+                color: '#475569',
+                letterSpacing: '-0.1px',
+              }}
+            >
+              Theme
+            </span>
+          )}
+
+          {collapsed ? (
+            /* Collapsed Single Button Toggle */
+            <button
+              type="button"
+              onClick={() => {
+                const nextMode: ThemeMode =
+                  themeMode === 'light' ? 'dark' : themeMode === 'dark' ? 'system' : 'light';
+                handleSetTheme(nextMode);
+              }}
+              title={`Theme: ${themeMode} (click to switch)`}
+              aria-label={`Theme: ${themeMode} (click to switch)`}
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                border: '1px solid #E2E8F0',
+                background: '#F1F5F9',
+                color: '#0F172A',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                padding: 0,
+                minHeight: 'unset',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {themeMode === 'light' && (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2" />
+                  <path d="M12 20v2" />
+                  <path d="m4.93 4.93 1.41 1.41" />
+                  <path d="m17.66 17.66 1.41 1.41" />
+                  <path d="M2 12h2" />
+                  <path d="M20 12h2" />
+                  <path d="m6.34 17.66-1.41 1.41" />
+                  <path d="m19.07 4.93-1.41 1.41" />
+                </svg>
+              )}
+              {themeMode === 'dark' && (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                </svg>
+              )}
+              {themeMode === 'system' && (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="20" height="14" x="2" y="3" rx="2" />
+                  <line x1="8" x2="16" y1="21" y2="21" />
+                  <line x1="12" x2="12" y1="17" y2="21" />
+                </svg>
+              )}
+            </button>
+          ) : (
+            /* Expanded 3 Buttons Selector */
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {/* Light button */}
+              <button
+                type="button"
+                onClick={() => handleSetTheme('light')}
+                title="Light theme"
+                aria-label="Light theme"
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  border: '1px solid #E2E8F0',
+                  background: themeMode === 'light' ? '#F1F5F9' : '#FFFFFF',
+                  color: themeMode === 'light' ? '#0F172A' : '#64748B',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  padding: 0,
+                  minHeight: 'unset',
+                  transition: 'all 0.15s ease',
+                  boxShadow: themeMode === 'light' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                }}
+                onMouseEnter={(e) => {
+                  if (themeMode !== 'light') {
+                    e.currentTarget.style.background = '#F8FAFC';
+                    e.currentTarget.style.color = '#0F172A';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (themeMode !== 'light') {
+                    e.currentTarget.style.background = '#FFFFFF';
+                    e.currentTarget.style.color = '#64748B';
+                  }
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2" />
+                  <path d="M12 20v2" />
+                  <path d="m4.93 4.93 1.41 1.41" />
+                  <path d="m17.66 17.66 1.41 1.41" />
+                  <path d="M2 12h2" />
+                  <path d="M20 12h2" />
+                  <path d="m6.34 17.66-1.41 1.41" />
+                  <path d="m19.07 4.93-1.41 1.41" />
+                </svg>
+              </button>
+
+              {/* Dark button */}
+              <button
+                type="button"
+                onClick={() => handleSetTheme('dark')}
+                title="Dark theme"
+                aria-label="Dark theme"
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  border: '1px solid #E2E8F0',
+                  background: themeMode === 'dark' ? '#F1F5F9' : '#FFFFFF',
+                  color: themeMode === 'dark' ? '#0F172A' : '#64748B',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  padding: 0,
+                  minHeight: 'unset',
+                  transition: 'all 0.15s ease',
+                  boxShadow: themeMode === 'dark' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                }}
+                onMouseEnter={(e) => {
+                  if (themeMode !== 'dark') {
+                    e.currentTarget.style.background = '#F8FAFC';
+                    e.currentTarget.style.color = '#0F172A';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (themeMode !== 'dark') {
+                    e.currentTarget.style.background = '#FFFFFF';
+                    e.currentTarget.style.color = '#64748B';
+                  }
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                </svg>
+              </button>
+
+              {/* System button */}
+              <button
+                type="button"
+                onClick={() => handleSetTheme('system')}
+                title="System theme"
+                aria-label="System theme"
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  border: '1px solid #E2E8F0',
+                  background: themeMode === 'system' ? '#F1F5F9' : '#FFFFFF',
+                  color: themeMode === 'system' ? '#0F172A' : '#64748B',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  padding: 0,
+                  minHeight: 'unset',
+                  transition: 'all 0.15s ease',
+                  boxShadow: themeMode === 'system' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                }}
+                onMouseEnter={(e) => {
+                  if (themeMode !== 'system') {
+                    e.currentTarget.style.background = '#F8FAFC';
+                    e.currentTarget.style.color = '#0F172A';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (themeMode !== 'system') {
+                    e.currentTarget.style.background = '#FFFFFF';
+                    e.currentTarget.style.color = '#64748B';
+                  }
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="20" height="14" x="2" y="3" rx="2" />
+                  <line x1="8" x2="16" y1="21" y2="21" />
+                  <line x1="12" x2="12" y1="17" y2="21" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
       </aside>
     </>
