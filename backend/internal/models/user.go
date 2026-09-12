@@ -19,9 +19,10 @@ const (
 
 // User account approval status constants.
 const (
-	StatusPending  = "pending"
-	StatusApproved = "approved"
-	StatusRejected = "rejected"
+	StatusPending   = "pending"
+	StatusApproved  = "approved"
+	StatusRejected  = "rejected"
+	StatusSuspended = "suspended"
 )
 
 // ValidRoles is the set of all accepted role values.

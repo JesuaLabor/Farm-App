@@ -57,6 +57,8 @@ func New(
 		r.Get("/users", adminHandler.ListUsers)
 		r.Put("/users/{id}/approve", adminHandler.ApproveUser)
 		r.Put("/users/{id}/reject", adminHandler.RejectUser)
+		r.Put("/users/{id}/suspend", adminHandler.SuspendUser)
+		r.Put("/users/{id}/unsuspend", adminHandler.UnsuspendUser)
 	})
 
 	// Notification routes

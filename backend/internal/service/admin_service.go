@@ -106,17 +106,32 @@ func (s *AdminService) ListUsers(ctx context.Context, requesterID string, roleFi
 	return s.userRepo.FindUsers(ctx, filter)
 }
 
-// ApproveUser approves a target user account if the requester is authorized.
+// ApproveUser approves a pending target user account if the requester is authorized.
+// Only pending accounts may be approved.
 func (s *AdminService) ApproveUser(ctx context.Context, requesterID string, targetUserID string) error {
-	return s.updateUserApprovalStatus(ctx, requesterID, targetUserID, models.StatusApproved)
+	return s.changeStatus(ctx, requesterID, targetUserID, models.StatusApproved)
 }
 
-// RejectUser rejects a target user account if the requester is authorized.
+// RejectUser permanently rejects a pending or suspended target user account.
+// Approved accounts cannot be directly rejected — they must be suspended first.
 func (s *AdminService) RejectUser(ctx context.Context, requesterID string, targetUserID string) error {
-	return s.updateUserApprovalStatus(ctx, requesterID, targetUserID, models.StatusRejected)
+	return s.changeStatus(ctx, requesterID, targetUserID, models.StatusRejected)
 }
 
-func (s *AdminService) updateUserApprovalStatus(ctx context.Context, requesterID string, targetUserID string, newStatus string) error {
+// SuspendUser suspends an approved account, blocking login.
+// Super Admin can suspend any non-super-admin account.
+// LGU Staff can only suspend farmer/buyer/supplier accounts in their jurisdiction.
+func (s *AdminService) SuspendUser(ctx context.Context, requesterID string, targetUserID string) error {
+	return s.changeStatus(ctx, requesterID, targetUserID, models.StatusSuspended)
+}
+
+// UnsuspendUser reinstates a suspended account back to approved status.
+func (s *AdminService) UnsuspendUser(ctx context.Context, requesterID string, targetUserID string) error {
+	return s.changeStatus(ctx, requesterID, targetUserID, models.StatusApproved)
+}
+
+// changeStatus is the unified authorization + state-machine enforcement for all status transitions.
+func (s *AdminService) changeStatus(ctx context.Context, requesterID, targetUserID, newStatus string) error {
 	reqOID, err := bson.ObjectIDFromHex(requesterID)
 	if err != nil {
 		return errors.New("invalid requester ID")
@@ -137,23 +152,54 @@ func (s *AdminService) updateUserApprovalStatus(ctx context.Context, requesterID
 		return fmt.Errorf("target user not found: %w", err)
 	}
 
-	// Authorization checks
+	// ── Role-based target access checks ───────────────────────────────────────
 	if requester.Role == models.RoleSuperAdmin {
-		// Super Admin can approve/reject any user
-		return s.userRepo.UpdateStatus(ctx, targetOID, newStatus)
-	} else if requester.Role == models.RoleLGUStaff {
-		// LGU Staff can only manage users in their specific LGU region
-		if requester.Region == "" || !strings.EqualFold(strings.TrimSpace(requester.Region), strings.TrimSpace(target.Region)) {
-			return errors.New("cannot manage users outside of your assigned LGU region")
+		// Super Admin cannot act on other Super Admins
+		if target.Role == models.RoleSuperAdmin {
+			return errors.New("Super Admin accounts cannot be managed by other admins")
 		}
-
-		// LGU Staff cannot manage other LGU Staff or Super Admin accounts
+	} else if requester.Role == models.RoleLGUStaff {
+		// LGU Staff can only manage farmer, buyer, supplier — never LGU Staff or Super Admin
 		if target.Role == models.RoleLGUStaff || target.Role == models.RoleSuperAdmin {
 			return errors.New("LGU Staff cannot modify staff or admin account status")
 		}
-
-		return s.userRepo.UpdateStatus(ctx, targetOID, newStatus)
+		// Must be within the same jurisdiction
+		if requester.Region == "" || !strings.EqualFold(strings.TrimSpace(requester.Region), strings.TrimSpace(target.Region)) {
+			return errors.New("cannot manage users outside of your assigned LGU region")
+		}
+	} else {
+		return errors.New("insufficient permissions")
 	}
 
-	return errors.New("insufficient permissions")
+	// ── State-machine transition validation ────────────────────────────────────
+	currentStatus := target.Status
+
+	switch newStatus {
+	case models.StatusApproved:
+		// Approve: only from pending
+		// Unsuspend: only from suspended
+		if currentStatus != models.StatusPending && currentStatus != models.StatusSuspended {
+			return fmt.Errorf("cannot approve an account with status '%s'", currentStatus)
+		}
+
+	case models.StatusRejected:
+		// Reject: only from pending or suspended — not directly from approved
+		if currentStatus == models.StatusApproved {
+			return errors.New("approved accounts cannot be rejected directly — suspend the account first")
+		}
+		if currentStatus == models.StatusRejected {
+			return errors.New("account is already rejected")
+		}
+
+	case models.StatusSuspended:
+		// Suspend: only approved accounts
+		if currentStatus != models.StatusApproved {
+			return fmt.Errorf("only approved accounts can be suspended (current status: '%s')", currentStatus)
+		}
+
+	default:
+		return fmt.Errorf("unknown target status: %s", newStatus)
+	}
+
+	return s.userRepo.UpdateStatus(ctx, targetOID, newStatus)
 }

@@ -85,3 +85,47 @@ func (h *AdminHandler) RejectUser(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "user rejected successfully"})
 }
+
+// SuspendUser handles PUT /api/admin/users/{id}/suspend.
+func (h *AdminHandler) SuspendUser(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	targetID := chi.URLParam(r, "id")
+	if targetID == "" {
+		writeError(w, http.StatusBadRequest, "user ID is required")
+		return
+	}
+
+	if err := h.adminService.SuspendUser(r.Context(), userID, targetID); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "user suspended successfully"})
+}
+
+// UnsuspendUser handles PUT /api/admin/users/{id}/unsuspend.
+func (h *AdminHandler) UnsuspendUser(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	targetID := chi.URLParam(r, "id")
+	if targetID == "" {
+		writeError(w, http.StatusBadRequest, "user ID is required")
+		return
+	}
+
+	if err := h.adminService.UnsuspendUser(r.Context(), userID, targetID); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "user unsuspended successfully"})
+}

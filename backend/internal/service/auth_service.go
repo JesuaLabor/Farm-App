@@ -128,6 +128,10 @@ func (s *AuthService) Login(ctx context.Context, req models.LoginRequest) (*mode
 		return nil, errors.New("Your account registration request has been rejected.")
 	}
 
+	if user.Status == models.StatusSuspended {
+		return nil, errors.New("Your account has been suspended. Please contact your LGU or the platform administrator.")
+	}
+
 	token, err := s.GenerateToken(user.ID.Hex(), string(user.Role))
 	if err != nil {
 		return nil, err
