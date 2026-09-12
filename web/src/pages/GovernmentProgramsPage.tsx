@@ -28,7 +28,7 @@ const samplePrograms: UnifiedProgram[] = [
     title: 'Rice Farmer Cash Assistance (RFFA)',
     organization: 'Department of Agriculture (DA)',
     description: 'Direct cash subsidy of ₱5,000 for smallholder rice farmers owning 2 hectares or less.',
-    municipality: 'All Municipalities',
+    municipality: 'Malaybalay City',
     deadline: 'October 15, 2026',
     deadlineDate: new Date('2026-10-15T00:00:00Z'),
     isExpired: false,
@@ -67,10 +67,34 @@ const samplePrograms: UnifiedProgram[] = [
   },
 ];
 
+const getProgramImage = (title: string, index: number): string => {
+  const t = (title || '').toLowerCase();
+  if (t.includes('rice') || t.includes('puhunan') || t.includes('cash') || t.includes('rffa') || t.includes('palay')) {
+    return index % 2 === 0
+      ? 'https://images.unsplash.com/photo-1586771107445-d3ca888129ff?auto=format&fit=crop&w=600&q=80'
+      : 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=600&q=80';
+  }
+  if (t.includes('equipment') || t.includes('machinery') || t.includes('irrigation') || t.includes('spis') || t.includes('tractor')) {
+    return 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?auto=format&fit=crop&w=600&q=80';
+  }
+  if (t.includes('organic') || t.includes('seed') || t.includes('fertilizer') || t.includes('corn')) {
+    return 'https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?auto=format&fit=crop&w=600&q=80';
+  }
+  const fallbackList = [
+    'https://images.unsplash.com/photo-1586771107445-d3ca888129ff?auto=format&fit=crop&w=600&q=80',
+    'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=600&q=80',
+    'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?auto=format&fit=crop&w=600&q=80',
+    'https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?auto=format&fit=crop&w=600&q=80',
+    'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=600&q=80',
+  ];
+  return fallbackList[index % fallbackList.length];
+};
+
 export const GovernmentProgramsPage: React.FC = () => {
   const { user } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
   const [selectedCat, setSelectedCat] = useState('All Programs');
+  const [searchQuery, setSearchQuery] = useState('');
   const [municipalityScope, setMunicipalityScope] = useState<'my_municipality' | 'all'>(
     user?.municipality ? 'my_municipality' : 'all'
   );
@@ -177,7 +201,7 @@ export const GovernmentProgramsPage: React.FC = () => {
               }
             });
           }
-        } catch (e) {}
+        } catch (e) { }
 
         setMyApplications(mergedList);
         setAppliedMap(map);
@@ -192,7 +216,7 @@ export const GovernmentProgramsPage: React.FC = () => {
             setMyApplications(localApps);
             setAppliedMap(map);
           }
-        } catch (e) {}
+        } catch (e) { }
       }
     };
 
@@ -269,6 +293,19 @@ export const GovernmentProgramsPage: React.FC = () => {
   ];
 
   const filteredPrograms = programs.filter((prog) => {
+    // 0. Search query filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchTitle = (prog.title || '').toLowerCase().includes(q);
+      const matchDesc = (prog.description || '').toLowerCase().includes(q);
+      const matchOrg = (prog.organization || '').toLowerCase().includes(q);
+      const matchMun = (prog.municipality || '').toLowerCase().includes(q);
+      const matchCriteria = prog.criteria?.some((c) => c.toLowerCase().includes(q));
+      if (!matchTitle && !matchDesc && !matchOrg && !matchMun && !matchCriteria) {
+        return false;
+      }
+    }
+
     // 1. Check "My Applications" tab
     if (selectedCat.startsWith('My Applications')) {
       return !!appliedMap[prog.id];
@@ -459,7 +496,7 @@ export const GovernmentProgramsPage: React.FC = () => {
         if (user?.id) {
           try {
             localStorage.setItem(`agriconnect_applied_programs_${user.id}`, JSON.stringify(next));
-          } catch (e) {}
+          } catch (e) { }
         }
         return next;
       });
@@ -525,74 +562,137 @@ export const GovernmentProgramsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ─── Municipality Scope Filter Bar ─── */}
+      {/* ─── Search & Municipality Scope Filter Bar ─── */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: '12px',
+          gap: '14px',
           background: '#FFFFFF',
-          padding: '14px 20px',
+          padding: '16px 20px',
           borderRadius: '16px',
           border: '1.5px solid #E2E8F0',
-          marginBottom: '20px',
+          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
+          marginBottom: '22px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '14px', fontWeight: 800, color: '#1E293B' }}>
-            📍 Municipality Filter:
+        {/* Left: Search Bar */}
+        <div style={{ position: 'relative', flex: '1 1 280px', maxWidth: '440px' }}>
+          <span
+            style={{
+              position: 'absolute',
+              left: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              fontSize: '15px',
+              color: '#94A3B8',
+              pointerEvents: 'none',
+            }}
+          >
+            🔍
           </span>
-          {user?.municipality ? (
-            <span style={{ fontSize: '13px', color: '#64748B' }}>
-              Showing programs for registered location <strong style={{ color: '#0F172A' }}>{user.municipality}</strong>
-            </span>
-          ) : (
-            <span style={{ fontSize: '13px', color: '#64748B' }}>
-              Filter programs by your local municipal agriculture office
-            </span>
+          <input
+            type="text"
+            placeholder="Search programs, subsidies, seeds, fertilizer..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '9px 12px 9px 36px',
+              borderRadius: '12px',
+              border: '1.5px solid #CBD5E1',
+              fontSize: '14px',
+              color: '#1E293B',
+              outline: 'none',
+              boxSizing: 'border-box',
+              background: '#F8FAFC',
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              style={{
+                position: 'absolute',
+                right: '10px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: '#E2E8F0',
+                border: 'none',
+                borderRadius: '50%',
+                width: '20px',
+                height: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '11px',
+                cursor: 'pointer',
+                color: '#64748B',
+                minHeight: 'unset',
+                padding: 0,
+              }}
+            >
+              ✕
+            </button>
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {user?.municipality && (
+        {/* Right: Location Scope Toggle & Result Counter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>
+            {filteredPrograms.length} {filteredPrograms.length === 1 ? 'Program' : 'Programs'}
+          </span>
+          <span style={{ color: '#CBD5E1' }}>|</span>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {user?.municipality && (
+              <button
+                onClick={() => setMunicipalityScope('my_municipality')}
+                style={{
+                  padding: '7px 14px',
+                  borderRadius: '10px',
+                  border: `1.5px solid ${municipalityScope === 'my_municipality' ? '#166534' : '#CBD5E1'}`,
+                  background: municipalityScope === 'my_municipality' ? '#F0FDF4' : '#FFFFFF',
+                  color: municipalityScope === 'my_municipality' ? '#166534' : '#475569',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  minHeight: 'unset',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                📍 My Town ({user.municipality})
+              </button>
+            )}
             <button
-              onClick={() => setMunicipalityScope('my_municipality')}
+              onClick={() => setMunicipalityScope('all')}
               style={{
-                padding: '6px 14px',
+                padding: '7px 14px',
                 borderRadius: '10px',
-                border: `1.5px solid ${municipalityScope === 'my_municipality' ? '#166534' : '#CBD5E1'}`,
-                background: municipalityScope === 'my_municipality' ? '#F0FDF4' : '#FFFFFF',
-                color: municipalityScope === 'my_municipality' ? '#166534' : '#475569',
+                border: `1.5px solid ${municipalityScope === 'all' ? '#166534' : '#CBD5E1'}`,
+                background: municipalityScope === 'all' ? '#F0FDF4' : '#FFFFFF',
+                color: municipalityScope === 'all' ? '#166534' : '#475569',
                 fontWeight: 700,
                 fontSize: '13px',
                 cursor: 'pointer',
+                minHeight: 'unset',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'all 0.15s ease',
               }}
             >
-              📍 My Town ({user.municipality})
+              🌐 All Municipalities
             </button>
-          )}
-          <button
-            onClick={() => setMunicipalityScope('all')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '10px',
-              border: `1.5px solid ${municipalityScope === 'all' ? '#166534' : '#CBD5E1'}`,
-              background: municipalityScope === 'all' ? '#F0FDF4' : '#FFFFFF',
-              color: municipalityScope === 'all' ? '#166534' : '#475569',
-              fontWeight: 700,
-              fontSize: '13px',
-              cursor: 'pointer',
-            }}
-          >
-            🌐 All Municipalities
-          </button>
+          </div>
         </div>
       </div>
 
       {/* ─── Category Filter Tabs ─── */}
-      <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', marginBottom: '32px' }}>
+      <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', marginBottom: '28px', paddingBottom: '4px' }}>
         {categories.map((cat) => {
           const isSelected = selectedCat === cat;
           return (
@@ -600,16 +700,19 @@ export const GovernmentProgramsPage: React.FC = () => {
               key={cat}
               onClick={() => setSelectedCat(cat)}
               style={{
-                padding: '10px 22px',
-                borderRadius: '30px',
-                border: `2px solid ${isSelected ? '#176B3A' : '#D8D6CF'}`,
-                background: isSelected ? '#176B3A' : '#FFFFFF',
-                color: isSelected ? '#FFFFFF' : '#1A1C1A',
+                padding: '8px 20px',
+                borderRadius: '24px',
+                border: `1.5px solid ${isSelected ? '#166534' : '#E2E8F0'}`,
+                background: isSelected ? '#166534' : '#FFFFFF',
+                color: isSelected ? '#FFFFFF' : '#334155',
                 fontWeight: 700,
-                fontSize: '16px',
+                fontSize: '14px',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
                 transition: 'all 0.15s ease',
+                minHeight: 'unset',
+                height: '40px',
+                boxShadow: isSelected ? '0 2px 8px rgba(22, 101, 52, 0.25)' : 'none',
               }}
             >
               {cat}
@@ -650,9 +753,10 @@ export const GovernmentProgramsPage: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '26px' }}>
-          {filteredPrograms.map((prog) => {
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '22px' }}>
+          {filteredPrograms.map((prog, idx) => {
             const myApp = appliedMap[prog.id];
+            const progImg = getProgramImage(prog.title, idx);
             return (
               <div
                 key={prog.id}
@@ -660,172 +764,333 @@ export const GovernmentProgramsPage: React.FC = () => {
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  padding: '26px',
-                  borderRadius: '20px',
-                  borderTop: myApp
+                  borderRadius: '18px',
+                  border: myApp
                     ? myApp.status === 'approved'
-                      ? '6px solid #166534'
+                      ? '1.5px solid #86EFAC'
                       : myApp.status === 'rejected'
-                      ? '6px solid #BE123C'
-                      : '6px solid #F59E0B'
-                    : prog.eligible
-                    ? '6px solid #176B3A'
-                    : '3px solid #D8D6CF',
-                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
+                        ? '1.5px solid #FECDD3'
+                        : '1.5px solid #FDE68A'
+                    : '1.5px solid #E2E8F0',
+                  boxShadow: '0 4px 18px rgba(0, 0, 0, 0.04)',
                   background: '#FFFFFF',
+                  overflow: 'hidden',
+                  transition: 'all 0.2s ease',
                 }}
               >
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span className="badge badge-info" style={{ fontSize: '13px', fontWeight: 700 }}>
-                        🏛️ {prog.organization}
-                      </span>
+                {/* Visual Cover Photo Banner */}
+                <div style={{ position: 'relative', height: '150px', width: '100%', overflow: 'hidden', background: '#E2E8F0' }}>
+                  <img
+                    src={progImg}
+                    alt={prog.title}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      transition: 'transform 0.4s ease',
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0) 40%, rgba(0,0,0,0.22) 100%)',
+                    }}
+                  />
+
+                  {/* Status Badges floating over image */}
+                  <div style={{ position: 'absolute', top: '12px', left: '12px', display: 'flex', gap: '6px', flexWrap: 'wrap', zIndex: 1 }}>
+                    {myApp ? (
                       <span
                         style={{
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          padding: '3px 8px',
-                          borderRadius: '8px',
-                          background: prog.municipality && prog.municipality !== 'All Municipalities' ? '#ECFDF5' : '#F1F5F9',
-                          color: prog.municipality && prog.municipality !== 'All Municipalities' ? '#065F46' : '#475569',
-                          border: prog.municipality && prog.municipality !== 'All Municipalities' ? '1px solid #A7F3D0' : '1px solid #CBD5E1',
+                          fontSize: '11px',
+                          fontWeight: 800,
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                          ...getStatusBadgeStyles(myApp.status),
                         }}
                       >
-                        📍 {prog.municipality || 'All Municipalities'}
+                        {getStatusIcon(myApp.status)} Applied ({getStatusLabel(myApp.status)})
                       </span>
-                      {myApp && (
-                        <span
-                          style={{
-                            fontSize: '12px',
-                            fontWeight: 800,
-                            padding: '3px 10px',
-                            borderRadius: '12px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            ...getStatusBadgeStyles(myApp.status),
-                          }}
-                        >
-                          {getStatusIcon(myApp.status)} Applied ({getStatusLabel(myApp.status)})
-                        </span>
-                      )}
-                    </div>
-                    {prog.eligible && !myApp && (
-                      <span className="badge badge-verified" style={{ fontSize: '13px', fontWeight: 700 }}>
+                    ) : prog.isExpired ? (
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 800,
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          background: 'rgba(241, 245, 249, 0.95)',
+                          backdropFilter: 'blur(4px)',
+                          color: '#64748B',
+                          border: '1px solid #CBD5E1',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                        }}
+                      >
+                        ⛔ Closed
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 800,
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          background: 'rgba(220, 252, 231, 0.95)',
+                          backdropFilter: 'blur(4px)',
+                          color: '#15803D',
+                          border: '1px solid #86EFAC',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                        }}
+                      >
+                        ACTIVE
+                      </span>
+                    )}
+
+                    {prog.eligible && !myApp && !prog.isExpired && (
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 800,
+                          padding: '4px 9px',
+                          borderRadius: '20px',
+                          background: 'rgba(219, 234, 254, 0.95)',
+                          backdropFilter: 'blur(4px)',
+                          color: '#1E40AF',
+                          border: '1px solid #93C5FD',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                        }}
+                      >
                         ✓ Pre-Qualified
                       </span>
                     )}
                   </div>
 
-                  <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0E4A27', marginBottom: '10px', lineHeight: 1.3 }}>
-                    {prog.title}
-                  </h2>
+                  {/* Location Tag on top right */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '12px',
+                      right: '12px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.94)',
+                      backdropFilter: 'blur(6px)',
+                      color: '#0F172A',
+                      border: '1px solid rgba(0, 0, 0, 0.08)',
+                      borderRadius: '20px',
+                      padding: '3px 10px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      zIndex: 1,
+                    }}
+                  >
+                    <span>📍</span>
+                    <span>{prog.municipality || 'All Municipalities'}</span>
+                  </div>
+                </div>
 
-                  <p style={{ fontSize: '15px', color: '#525450', lineHeight: 1.6, marginBottom: '20px' }}>
+                {/* Card Content Body */}
+                <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                  {/* Managing Agency */}
+                  <div style={{ marginBottom: '8px' }}>
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: '#166534',
+                        background: '#F0FDF4',
+                        border: '1px solid #BBF7D0',
+                        padding: '3px 9px',
+                        borderRadius: '6px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      🏛️ {prog.organization}
+                    </span>
+                  </div>
+
+                  {/* Title */}
+                  <h3
+                    title={prog.title}
+                    style={{
+                      fontSize: '17px',
+                      fontWeight: 800,
+                      color: '#0E4A27',
+                      margin: '2px 0 6px 0',
+                      lineHeight: 1.35,
+                      height: '46px',
+                      overflow: 'hidden',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                    }}
+                  >
+                    {prog.title}
+                  </h3>
+
+                  {/* Description */}
+                  <p
+                    style={{
+                      fontSize: '13px',
+                      color: '#475569',
+                      lineHeight: 1.5,
+                      margin: '0 0 14px 0',
+                      height: '40px',
+                      overflow: 'hidden',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                    }}
+                  >
                     {prog.description}
                   </p>
 
-                  {/* Requirements Chips */}
-                  {prog.criteria && prog.criteria.length > 0 && (
-                    <div style={{ marginBottom: '18px' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
-                        Primary Requirement:
-                      </div>
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '13px', padding: '4px 10px', borderRadius: '8px', background: '#F1F5F9', color: '#334155', fontWeight: 600 }}>
-                          🆔 RSBSA Registration
+                  {/* Requirements / Criteria Chips */}
+                  <div style={{ marginBottom: '14px', marginTop: 'auto' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '6px' }}>
+                      Key Requirements:
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', background: '#F1F5F9', color: '#334155', fontWeight: 600 }}>
+                        🆔 RSBSA Registration
+                      </span>
+                      {prog.criteria && prog.criteria.length > 1 ? (
+                        <span
+                          title={prog.criteria[1]}
+                          style={{
+                            fontSize: '11px',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            background: '#F1F5F9',
+                            color: '#334155',
+                            fontWeight: 600,
+                            maxWidth: '180px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          🌾 {prog.criteria[1]}
                         </span>
-                        <span style={{ fontSize: '13px', padding: '4px 10px', borderRadius: '8px', background: '#F1F5F9', color: '#334155', fontWeight: 600 }}>
+                      ) : (
+                        <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', background: '#F1F5F9', color: '#334155', fontWeight: 600 }}>
                           🌾 Smallholder
                         </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Deadline Notice */}
+                  <div style={{ marginBottom: '16px' }}>
+                    {prog.isExpired ? (
+                      <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <span>⛔</span>
+                        <span>Deadline Passed: {prog.deadline} (Closed)</span>
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <div style={{ fontSize: '12px', color: '#B91C1C', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <span>⏳</span>
+                        <span>Application Deadline: {prog.deadline}</span>
+                      </div>
+                    )}
+                  </div>
 
-                  {prog.isExpired ? (
-                    <div style={{ fontSize: '14px', color: '#64748B', fontWeight: 700, marginBottom: '22px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      ⛔ Deadline Passed: {prog.deadline} (Closed)
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '14px', color: '#BA3C3C', fontWeight: 700, marginBottom: '22px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      ⏳ Application Deadline: {prog.deadline}
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button
-                    onClick={() => handleOpenDetails(prog)}
-                    className="btn btn-secondary"
-                    style={{ flex: 1, padding: '12px', borderRadius: '12px', fontWeight: 700, fontSize: '15px' }}
-                  >
-                    Details
-                  </button>
-                  {myApp ? (
+                  {/* Action Buttons */}
+                  <div style={{ display: 'flex', gap: '10px' }}>
                     <button
-                      onClick={() => handleOpenTracking(prog, myApp)}
-                      style={{
-                        flex: 2,
-                        padding: '12px',
-                        borderRadius: '12px',
-                        fontWeight: 800,
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        ...getStatusButtonStyles(myApp.status),
-                      }}
+                      onClick={() => handleOpenDetails(prog)}
+                      className="btn btn-secondary"
+                      style={{ flex: 1, padding: '9px 12px', borderRadius: '10px', fontWeight: 700, fontSize: '13px', minHeight: 'unset', height: '38px' }}
                     >
-                      <span>{getStatusIcon(myApp.status)} View Status ↗</span>
+                      Details
                     </button>
-                  ) : prog.isExpired ? (
-                    <button
-                      disabled
-                      style={{
-                        flex: 2,
-                        padding: '12px',
-                        borderRadius: '12px',
-                        fontWeight: 700,
-                        fontSize: '15px',
-                        background: '#F1F5F9',
-                        color: '#94A3B8',
-                        border: '1px solid #E2E8F0',
-                        cursor: 'not-allowed',
-                      }}
-                    >
-                      Closed
-                    </button>
-                  ) : isOutOfJurisdiction(prog) ? (
-                    <button
-                      disabled
-                      title={`This program is exclusively for farmers registered in ${prog.municipality}.`}
-                      style={{
-                        flex: 2,
-                        padding: '12px',
-                        borderRadius: '12px',
-                        fontWeight: 700,
-                        fontSize: '13px',
-                        background: '#FEF3C7',
-                        color: '#92400E',
-                        border: '1px solid #FCD34D',
-                        cursor: 'not-allowed',
-                      }}
-                    >
-                      🔒 {prog.municipality} Only
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleStartApply(prog)}
-                      className="btn btn-primary"
-                      style={{ flex: 2, padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '15px' }}
-                    >
-                      Apply Now →
-                    </button>
-                  )}
+                    {myApp ? (
+                      <button
+                        onClick={() => handleOpenTracking(prog, myApp)}
+                        style={{
+                          flex: 1.6,
+                          padding: '9px 12px',
+                          borderRadius: '10px',
+                          fontWeight: 800,
+                          fontSize: '13px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          minHeight: 'unset',
+                          height: '38px',
+                          ...getStatusButtonStyles(myApp.status),
+                        }}
+                      >
+                        <span>{getStatusIcon(myApp.status)} View Status ↗</span>
+                      </button>
+                    ) : prog.isExpired ? (
+                      <button
+                        disabled
+                        style={{
+                          flex: 1.6,
+                          padding: '9px 12px',
+                          borderRadius: '10px',
+                          fontWeight: 700,
+                          fontSize: '13px',
+                          background: '#F1F5F9',
+                          color: '#94A3B8',
+                          border: '1px solid #E2E8F0',
+                          cursor: 'not-allowed',
+                          minHeight: 'unset',
+                          height: '38px',
+                        }}
+                      >
+                        Closed
+                      </button>
+                    ) : isOutOfJurisdiction(prog) ? (
+                      <button
+                        disabled
+                        title={`This program is exclusively for farmers registered in ${prog.municipality}.`}
+                        style={{
+                          flex: 1.6,
+                          padding: '9px 12px',
+                          borderRadius: '10px',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          background: '#FEF3C7',
+                          color: '#92400E',
+                          border: '1px solid #FCD34D',
+                          cursor: 'not-allowed',
+                          minHeight: 'unset',
+                          height: '38px',
+                        }}
+                      >
+                        🔒 {prog.municipality} Only
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleStartApply(prog)}
+                        className="btn btn-primary"
+                        style={{
+                          flex: 1.6,
+                          padding: '9px 12px',
+                          borderRadius: '10px',
+                          fontWeight: 800,
+                          fontSize: '13px',
+                          minHeight: 'unset',
+                          height: '38px',
+                          boxShadow: '0 2px 8px rgba(14, 74, 39, 0.25)',
+                        }}
+                      >
+                        Apply Now →
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -836,15 +1101,82 @@ export const GovernmentProgramsPage: React.FC = () => {
       {/* ─── Program Details Modal ─── */}
       {selectedProgram && !isApplying && !successApp && (
         <div className="modal-backdrop" onClick={() => setSelectedProgram(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px', borderRadius: '24px', padding: '32px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <span className="badge badge-info" style={{ fontSize: '14px' }}>🏛️ {selectedProgram.organization}</span>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '640px', borderRadius: '24px', padding: '28px', overflow: 'hidden' }}>
+            {/* Modal Cover Image Banner */}
+            <div style={{ position: 'relative', height: '170px', borderRadius: '16px', overflow: 'hidden', marginBottom: '22px', background: '#E2E8F0' }}>
+              <img
+                src={getProgramImage(selectedProgram.title, 0)}
+                alt={selectedProgram.title}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.1) 60%, rgba(0,0,0,0.4) 100%)',
+                }}
+              />
+              {/* Close button on top right */}
               <button
                 onClick={() => setSelectedProgram(null)}
-                style={{ background: '#F8F7F3', border: 'none', fontSize: '20px', cursor: 'pointer', width: '38px', height: '38px', borderRadius: '50%' }}
+                style={{
+                  position: 'absolute',
+                  top: '12px',
+                  right: '12px',
+                  background: 'rgba(0, 0, 0, 0.45)',
+                  backdropFilter: 'blur(6px)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  fontSize: '18px',
+                  cursor: 'pointer',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  minHeight: 'unset',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 2,
+                }}
               >
                 ✕
               </button>
+              {/* Floating badges on photo banner bottom */}
+              <div style={{ position: 'absolute', bottom: '12px', left: '14px', right: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <span
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    padding: '4px 10px',
+                    borderRadius: '8px',
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    color: '#166534',
+                    backdropFilter: 'blur(4px)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  🏛️ {selectedProgram.organization}
+                </span>
+                <span
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    color: '#0F172A',
+                    backdropFilter: 'blur(4px)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  📍 {selectedProgram.municipality || 'All Municipalities'}
+                </span>
+              </div>
             </div>
 
             <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0E4A27', marginBottom: '14px', lineHeight: 1.3 }}>
@@ -922,11 +1254,11 @@ export const GovernmentProgramsPage: React.FC = () => {
                 {selectedProgram.criteria?.map((c, idx) => (
                   <li key={idx}>{c}</li>
                 )) || (
-                  <>
-                    <li>Must be registered in the RSBSA (Registry System for Basic Sectors in Agriculture)</li>
-                    <li>Must have active farming parcel in covered municipality</li>
-                  </>
-                )}
+                    <>
+                      <li>Must be registered in the RSBSA (Registry System for Basic Sectors in Agriculture)</li>
+                      <li>Must have active farming parcel in covered municipality</li>
+                    </>
+                  )}
               </ul>
             </div>
 
@@ -999,7 +1331,20 @@ export const GovernmentProgramsPage: React.FC = () => {
               </div>
               <button
                 onClick={() => setIsApplying(false)}
-                style={{ background: '#F8F7F3', border: 'none', fontSize: '20px', cursor: 'pointer', width: '38px', height: '38px', borderRadius: '50%' }}
+                style={{
+                  background: '#F8F7F3',
+                  border: 'none',
+                  fontSize: '20px',
+                  cursor: 'pointer',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  minHeight: 'unset',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
                 ✕
               </button>
@@ -1350,7 +1695,20 @@ export const GovernmentProgramsPage: React.FC = () => {
               </div>
               <button
                 onClick={() => setTrackingApp(null)}
-                style={{ background: '#F8F7F3', border: 'none', fontSize: '20px', cursor: 'pointer', width: '38px', height: '38px', borderRadius: '50%' }}
+                style={{
+                  background: '#F8F7F3',
+                  border: 'none',
+                  fontSize: '20px',
+                  cursor: 'pointer',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  minHeight: 'unset',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
                 ✕
               </button>
@@ -1450,8 +1808,8 @@ export const GovernmentProgramsPage: React.FC = () => {
                       {trackingApp.application.status === 'submitted'
                         ? 'Awaiting screening by Municipal Agriculture staff.'
                         : trackingApp.application.status === 'under_review'
-                        ? 'Active evaluation in progress by authorized officer.'
-                        : 'Verification completed by LGU Agriculture Office.'}
+                          ? 'Active evaluation in progress by authorized officer.'
+                          : 'Verification completed by LGU Agriculture Office.'}
                     </div>
                   </div>
                 </div>
@@ -1648,6 +2006,11 @@ export const GovernmentProgramsPage: React.FC = () => {
                   height: '36px',
                   cursor: 'pointer',
                   fontSize: '18px',
+                  minHeight: 'unset',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
                 ✕
