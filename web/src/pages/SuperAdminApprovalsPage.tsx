@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '../api/admin';
 import { useToast } from '../contexts/ToastContext';
 import { AccountDetailsModal } from '../components/AccountDetailsModal';
+import { UserAvatar } from '../components/UserAvatar';
 import type { User } from '../types/auth';
 import { getRegions, getProvinces, getMunicipalities } from '../data/philippineLocations';
 
@@ -401,16 +402,16 @@ export const SuperAdminApprovalsPage: React.FC = () => {
 
                     {/* Header: avatar + name/email + status pill */}
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '14px' }}>
-                      {/* Avatar — keep role colors */}
-                      <div style={{
-                        width: '48px', height: '48px', borderRadius: '50%',
-                        background: roleColor.bg, color: roleColor.text,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontWeight: 800, fontSize: '17px', flexShrink: 0,
-                        border: `2px solid ${roleColor.text}22`,
-                      }}>
-                        {initials || '?'}
-                      </div>
+                      {/* Avatar — image support with role colors fallback */}
+                      <UserAvatar
+                        photoUrl={u.photoUrl}
+                        name={`${u.firstName} ${u.lastName}`}
+                        initials={initials || '?'}
+                        size={48}
+                        bg={roleColor.bg}
+                        color={roleColor.text}
+                        fontSize="17px"
+                      />
 
                       {/* Name + email */}
                       <div style={{ flex: 1, minWidth: 0 }}>

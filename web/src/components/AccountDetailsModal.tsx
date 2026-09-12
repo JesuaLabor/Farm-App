@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { UserAvatar } from './UserAvatar';
 import type { User } from '../types/auth';
 
 interface AccountDetailsModalProps {
@@ -190,24 +191,16 @@ export const AccountDetailsModal: React.FC<AccountDetailsModalProps> = ({
             marginBottom: '18px',
           }}
         >
-          <div
-            style={{
-              width: '54px',
-              height: '54px',
-              borderRadius: '50%',
-              background: roleColor.bg,
-              color: roleColor.text,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 800,
-              fontSize: '18px',
-              flexShrink: 0,
-              border: `2px solid ${roleColor.text}33`,
-            }}
-          >
-            {initials}
-          </div>
+          <UserAvatar
+            photoUrl={user.photoUrl}
+            name={fullName}
+            initials={initials}
+            size={56}
+            bg={roleColor.bg}
+            color={roleColor.text}
+            border={`2px solid ${roleColor.text}33`}
+            fontSize="18px"
+          />
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>

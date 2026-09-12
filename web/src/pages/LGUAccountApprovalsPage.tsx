@@ -3,6 +3,7 @@ import { adminApi } from '../api/admin';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { AccountDetailsModal } from '../components/AccountDetailsModal';
+import { UserAvatar } from '../components/UserAvatar';
 import type { User } from '../types/auth';
 
 export const LGUAccountApprovalsPage: React.FC = () => {
@@ -402,23 +403,16 @@ export const LGUAccountApprovalsPage: React.FC = () => {
                   {/* Top row: Avatar + Name + Status */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div
-                        style={{
-                          width: '38px',
-                          height: '38px',
-                          borderRadius: '50%',
-                          background: '#EAF6EE',
-                          color: '#166534',
-                          fontWeight: 800,
-                          fontSize: '14px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          border: '1px solid #BBF7D0',
-                        }}
-                      >
-                        {initials}
-                      </div>
+                      <UserAvatar
+                        photoUrl={u.photoUrl}
+                        name={fullName}
+                        initials={initials}
+                        size={38}
+                        bg="#EAF6EE"
+                        color="#166534"
+                        border="1px solid #BBF7D0"
+                        fontSize="14px"
+                      />
                       <div>
                         <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', margin: 0, lineHeight: 1.2 }}>
                           {fullName}
