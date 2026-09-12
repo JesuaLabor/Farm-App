@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Navbar } from '../components/Navbar';
 import { analyticsApi } from '../api/analytics';
 import { PriceChart } from '../components/PriceChart';
 import { useAuth } from '../contexts/AuthContext';
@@ -109,10 +108,7 @@ export const LGUDashboardPage: React.FC = () => {
   ] : [];
 
   return (
-    <div className="page-root">
-      <Navbar />
-
-      <main className="page-main">
+    <div className="app-container" style={{ paddingBottom: '40px' }}>
 
         {/* ── Page Header ─────────────────────────────────── */}
         <div style={{
@@ -555,7 +551,6 @@ export const LGUDashboardPage: React.FC = () => {
             )}
           </>
         )}
-      </main>
 
       <style>{`
         @keyframes spin {

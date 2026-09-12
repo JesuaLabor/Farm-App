@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Navbar } from '../components/Navbar';
 import { adminApi } from '../api/admin';
 import { useToast } from '../contexts/ToastContext';
 import type { User } from '../types/auth';
@@ -139,9 +138,7 @@ export const SuperAdminApprovalsPage: React.FC = () => {
   };
 
   return (
-    <div className="page-root">
-      <Navbar />
-      <main className="page-main">
+    <div className="app-container" style={{ paddingBottom: '40px' }}>
 
         {/* ── Page Header ── */}
         <div style={{ marginBottom: '24px' }}>
@@ -575,7 +572,6 @@ export const SuperAdminApprovalsPage: React.FC = () => {
             })}
           </div>
         )}
-      </main>
     </div>
   );
 };
