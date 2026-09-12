@@ -78,33 +78,11 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div
-      className="login-page-root"
-      style={{
-        display: 'flex',
-        minHeight: '100dvh',
-        width: '100vw',
-        overflow: 'hidden',
-        background: '#FAF8F5',
-      }}
-    >
+    <div className="login-page-root">
       {/* ══════════════════════════════════════════════════════════════════════════
           LEFT BRANDING & HERO PANEL (Rich High-Contrast Forest Green Gradient)
       ══════════════════════════════════════════════════════════════════════════ */}
-      <div
-        style={{
-          flex: '1.15',
-          padding: '56px 64px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          color: '#FFFFFF',
-          position: 'relative',
-          overflow: 'hidden',
-          background: 'linear-gradient(145deg, #062814 0%, #0E4A27 45%, #15803D 100%)',
-          boxShadow: '4px 0 24px rgba(0,0,0,0.12)',
-        }}
-      >
+      <div className="login-hero-panel">
         {/* Ambient radial glows for visual depth */}
         <div
           aria-hidden="true"
@@ -241,27 +219,45 @@ export const LoginPage: React.FC = () => {
       {/* ══════════════════════════════════════════════════════════════════════════
           RIGHT SIGN-IN FORM PANEL (Clean, High-Affordance & Top-Right Notifications)
       ══════════════════════════════════════════════════════════════════════════ */}
-      <div
-        style={{
-          flex: '1',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '40px 32px',
-          backgroundColor: '#FAF8F5',
-        }}
-      >
-        <div
-          style={{
-            width: '100%',
-            maxWidth: '440px',
-            backgroundColor: '#FFFFFF',
-            padding: '40px 36px',
-            borderRadius: '24px',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.05)',
-            border: '1.5px solid #E2E8F0',
-          }}
-        >
+      <div className="login-form-panel">
+        <div className="login-form-card">
+          {/* Mobile Brand Header */}
+          <div className="login-mobile-brand">
+            <img
+              src={agriConnectLogo}
+              alt="AgriConnect Logo"
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '12px',
+                objectFit: 'contain',
+                flexShrink: 0,
+              }}
+            />
+            <div>
+              <div
+                style={{
+                  fontSize: '22px',
+                  fontWeight: 800,
+                  lineHeight: 1.1,
+                  letterSpacing: '-0.4px',
+                }}
+              >
+                <span style={{ color: '#16523a' }}>Agri</span><span style={{ color: '#599e36' }}>Connect</span>
+              </div>
+              <div
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#64748B',
+                  marginTop: '2px',
+                }}
+              >
+                Connect. Grow. Prosper.
+              </div>
+            </div>
+          </div>
+
           {/* Header */}
           <div style={{ marginBottom: '32px' }}>
             <h2
@@ -416,6 +412,8 @@ export const LoginPage: React.FC = () => {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '10px',
                 marginBottom: '26px',
                 fontSize: '14px',
               }}

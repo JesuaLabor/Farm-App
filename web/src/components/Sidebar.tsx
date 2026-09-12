@@ -358,6 +358,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ];
   }
 
+  const isDisplayCollapsed = collapsed && !mobileOpen;
+
   return (
     <>
       {/* Mobile Backdrop */}
@@ -375,9 +377,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       <aside
-        className="app-sidebar"
+        className={`app-sidebar ${mobileOpen ? 'mobile-open' : ''}`}
         style={{
-          width: collapsed ? 'var(--sidebar-collapsed-width)' : 'var(--sidebar-width)',
+          width: isDisplayCollapsed ? 'var(--sidebar-collapsed-width)' : 'var(--sidebar-width)',
           height: '100vh',
           position: 'fixed',
           top: 0,
@@ -388,7 +390,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           flexDirection: 'column',
           zIndex: 500,
           transition: 'width 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
-          transform: mobileOpen ? 'translateX(0)' : undefined,
           boxShadow: mobileOpen ? '0 10px 40px rgba(0,0,0,0.15)' : 'none',
         }}
       >
@@ -398,9 +399,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             height: 'var(--topbar-height)',
             display: 'flex',
             alignItems: 'center',
-            padding: collapsed ? '0 16px' : '0 20px',
+            padding: isDisplayCollapsed ? '0 16px' : '0 20px',
             borderBottom: '1px solid #E4E2DC',
-            justifyContent: collapsed ? 'center' : 'space-between',
+            justifyContent: isDisplayCollapsed ? 'center' : 'space-between',
             flexShrink: 0,
           }}
         >
@@ -426,7 +427,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 display: 'block',
               }}
             />
-            {!collapsed && (
+            {!isDisplayCollapsed && (
               <div>
                 <div
                   style={{
@@ -451,6 +452,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
           </Link>
+
+          {mobileOpen && (
+            <button
+              onClick={onCloseMobile}
+              className="mobile-sidebar-close-btn"
+              aria-label="Close navigation menu"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
+                border: '1px solid #E2E8F0',
+                background: '#F8FAFC',
+                color: '#475569',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Navigation Content */}
@@ -458,7 +486,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: collapsed ? '16px 8px' : '20px 14px',
+            padding: isDisplayCollapsed ? '16px 8px' : '20px 14px',
             display: 'flex',
             flexDirection: 'column',
             gap: '20px',
@@ -466,7 +494,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           {navGroups.map((group) => (
             <div key={group.title}>
-              {!collapsed && (
+              {!isDisplayCollapsed && (
                 <div
                   style={{
                     fontSize: '12px',
@@ -495,7 +523,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           gap: '14px',
-                          padding: collapsed ? '12px' : '12px 14px',
+                          padding: isDisplayCollapsed ? '12px' : '12px 14px',
                           borderRadius: '10px',
                           border: 'none',
                           background: 'transparent',
@@ -508,7 +536,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         }}
                       >
                         <span style={{ color: '#6F716C', display: 'flex' }}>{item.icon}</span>
-                        {!collapsed && <span>{item.label}</span>}
+                        {!isDisplayCollapsed && <span>{item.label}</span>}
                       </button>
                     );
                   }
@@ -526,7 +554,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         gap: '14px',
-                        padding: collapsed ? '12px' : '12px 14px',
+                        padding: isDisplayCollapsed ? '12px' : '12px 14px',
                         borderRadius: '10px',
                         border: 'none',
                         outline: 'none',
@@ -535,7 +563,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         fontWeight: active ? 800 : 600,
                         color: active ? '#176B3A' : '#222522',
                         background: active ? '#EAF6EE' : 'transparent',
-                        borderLeft: active && !collapsed ? '4px solid #176B3A' : '4px solid transparent',
+                        borderLeft: active && !isDisplayCollapsed ? '4px solid #176B3A' : '4px solid transparent',
                         cursor: 'pointer',
                         width: '100%',
                         textAlign: 'left',
@@ -545,7 +573,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <span style={{ color: active ? '#176B3A' : '#6F716C', display: 'flex' }}>
                         {item.icon}
                       </span>
-                      {!collapsed && <span>{item.label}</span>}
+                      {!isDisplayCollapsed && <span>{item.label}</span>}
                     </button>
                   );
                 })}
@@ -557,16 +585,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Bottom Theme Selector */}
         <div
           style={{
-            padding: collapsed ? '14px 8px' : '14px 18px',
+            padding: isDisplayCollapsed ? '14px 8px' : '14px 18px',
             borderTop: '1px solid #E4E2DC',
             background: '#FFFFFF',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: collapsed ? 'center' : 'space-between',
+            justifyContent: isDisplayCollapsed ? 'center' : 'space-between',
             flexShrink: 0,
           }}
         >
-          {!collapsed && (
+          {!isDisplayCollapsed && (
             <span
               style={{
                 fontSize: '15px',
@@ -579,7 +607,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
           )}
 
-          {collapsed ? (
+          {isDisplayCollapsed ? (
             /* Collapsed Single Button Toggle */
             <button
               type="button"
