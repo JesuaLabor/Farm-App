@@ -240,6 +240,7 @@ export const SuperAdminApprovalsPage: React.FC = () => {
               <option value="all">All Statuses</option>
               <option value="pending">Pending Review</option>
               <option value="approved">Approved</option>
+              <option value="suspended">Suspended</option>
               <option value="rejected">Rejected</option>
             </select>
           </div>

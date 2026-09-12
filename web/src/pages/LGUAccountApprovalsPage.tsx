@@ -22,7 +22,6 @@ export const LGUAccountApprovalsPage: React.FC = () => {
     try {
       const data = await adminApi.listUsers({
         role: roleFilter !== 'all' ? roleFilter : undefined,
-        status: statusFilter !== 'all' ? statusFilter : undefined,
       });
       setUsers(data || []);
     } catch (e: any) {
@@ -35,7 +34,7 @@ export const LGUAccountApprovalsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [roleFilter, statusFilter, toastError]);
+  }, [roleFilter, toastError]);
 
   useEffect(() => {
     fetchUsers();
@@ -98,6 +97,7 @@ export const LGUAccountApprovalsPage: React.FC = () => {
   };
 
   const filteredUsers = users.filter((u) => {
+    if (statusFilter !== 'all' && u.status !== statusFilter) return false;
     if (!search.trim()) return true;
     const term = search.toLowerCase();
     const fullName = `${u.firstName || ''} ${u.lastName || ''}`.toLowerCase();
@@ -112,6 +112,7 @@ export const LGUAccountApprovalsPage: React.FC = () => {
   // Calculate glanceable statistics
   const pendingCount = users.filter((u) => u.status === 'pending').length;
   const approvedCount = users.filter((u) => u.status === 'approved').length;
+  const suspendedCount = users.filter((u) => u.status === 'suspended').length;
   const rejectedCount = users.filter((u) => u.status === 'rejected').length;
 
   const getRoleIcon = (role: string) => {
@@ -226,6 +227,24 @@ export const LGUAccountApprovalsPage: React.FC = () => {
           style={{
             padding: '14px 18px',
             borderRadius: '14px',
+            border: '1px solid #DDD6FE',
+            borderLeft: '4px solid #7C3AED',
+            background: '#F5F3FF',
+          }}
+        >
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#6D28D9', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+            ⏸ Suspended
+          </div>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#7C3AED', marginTop: '2px' }}>
+            {suspendedCount}
+          </div>
+        </div>
+
+        <div
+          className="card"
+          style={{
+            padding: '14px 18px',
+            borderRadius: '14px',
             border: '1px solid #FECACA',
             borderLeft: '4px solid #DC2626',
             background: '#FEF2F2',
@@ -293,6 +312,7 @@ export const LGUAccountApprovalsPage: React.FC = () => {
             >
               <option value="pending">⏳ Pending Approval ({pendingCount})</option>
               <option value="approved">✅ Approved ({approvedCount})</option>
+              <option value="suspended">⏸ Suspended ({suspendedCount})</option>
               <option value="rejected">❌ Rejected ({rejectedCount})</option>
               <option value="all">All Statuses</option>
             </select>
@@ -347,6 +367,8 @@ export const LGUAccountApprovalsPage: React.FC = () => {
           <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
             {statusFilter === 'pending'
               ? 'Great! There are no pending account applications requiring review in your jurisdiction.'
+              : statusFilter === 'suspended'
+              ? 'There are no currently suspended accounts in your jurisdiction.'
               : 'No accounts match the current filter selection.'}
           </p>
         </div>
