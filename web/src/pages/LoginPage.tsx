@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -16,6 +16,21 @@ export const LoginPage: React.FC = () => {
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
+
+  // Exclude dark mode on the login page
+  useEffect(() => {
+    document.documentElement.removeAttribute('data-theme');
+    return () => {
+      const saved = localStorage.getItem('agriconnect_theme') || 'light';
+      let effective = saved;
+      if (saved === 'system') {
+        effective = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      if (effective === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    };
+  }, []);
 
   const from = location.state?.from?.pathname || '/dashboard';
 
@@ -64,6 +79,7 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div
+      className="login-page-root"
       style={{
         display: 'flex',
         minHeight: '100dvh',

@@ -1724,6 +1724,37 @@ div[style*="overflowX: auto"]::-webkit-scrollbar-thumb {
   border-color: #243026 !important;
 }
 
+/* ─── Strictly Exclude Dark Mode from Login Page ─── */
+[data-theme='dark'] .login-page-root,
+.login-page-root {
+  color-scheme: light !important;
+  background-color: #FAF8F5 !important;
+  color: #0F172A !important;
+}
+
+[data-theme='dark'] .login-page-root .card,
+[data-theme='dark'] .login-page-root div[style*="background: #FFFFFF"],
+[data-theme='dark'] .login-page-root div[style*="background-color: #FFFFFF"] {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+}
+
+[data-theme='dark'] .login-page-root input {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: #CBD5E1 !important;
+}
+
+[data-theme='dark'] .login-page-root h2 {
+  color: #0E4A27 !important;
+}
+
+[data-theme='dark'] .login-page-root p,
+[data-theme='dark'] .login-page-root label {
+  color: #334155 !important;
+}
+
+
 
 
 

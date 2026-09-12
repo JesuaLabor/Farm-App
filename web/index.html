@@ -22,6 +22,9 @@
   <script>
     (function() {
       try {
+        if (window.location.pathname === '/login') {
+          return;
+        }
         var theme = localStorage.getItem('agriconnect_theme') || 'light';
         var effective = theme;
         if (theme === 'system') {
