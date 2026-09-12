@@ -11,10 +11,10 @@ import {
 } from '../data/philippineLocations';
 
 const roles: { role: Role; label: string; icon: string; desc: string }[] = [
-  { role: 'farmer',    label: 'Farmer',    icon: '🧑‍🌾', desc: 'Sell produce & access market rates' },
-  { role: 'buyer',     label: 'Buyer',     icon: '📦',  desc: 'Source fresh crops from local farms' },
-  { role: 'supplier',  label: 'Supplier',  icon: '🚜',  desc: 'Sell seeds, fertilizers & machinery' },
-  { role: 'lgu_staff', label: 'LGU Staff', icon: '🏛️',  desc: 'Coordinate regional farm programs' },
+  { role: 'farmer', label: 'Farmer', icon: '🧑‍🌾', desc: 'Sell produce & access market rates' },
+  { role: 'buyer', label: 'Buyer', icon: '📦', desc: 'Source fresh crops from local farms' },
+  { role: 'supplier', label: 'Supplier', icon: '🏪', desc: 'Sell seeds, fertilizers & machinery' },
+  { role: 'lgu_staff', label: 'LGU Staff', icon: '🏛️', desc: 'Coordinate regional farm programs' },
 ];
 
 const ALL_REGIONS = getRegions();

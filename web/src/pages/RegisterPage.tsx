@@ -7,10 +7,10 @@ import type { Role } from '../types/auth';
 import { LocationSelector } from '../components/LocationSelector';
 
 const rolesList: { role: Role; title: string; desc: string; icon: string }[] = [
-  { role: 'farmer',   title: 'Farmer',    desc: 'Sell produce and access live market rates',       icon: '🧑‍🌾' },
-  { role: 'buyer',    title: 'Buyer',     desc: 'Source fresh crops and livestock directly',        icon: '📦' },
-  { role: 'supplier', title: 'Supplier',  desc: 'Sell seeds, fertilizers, and machinery',          icon: '🚜' },
-  { role: 'lgu_staff',title: 'LGU Staff', desc: 'Coordinate regional agricultural programs',        icon: '🏛️' },
+  { role: 'farmer', title: 'Farmer', desc: 'Sell produce and access live market rates', icon: '🧑‍🌾' },
+  { role: 'buyer', title: 'Buyer', desc: 'Source fresh crops and livestock directly', icon: '📦' },
+  { role: 'supplier', title: 'Supplier', desc: 'Sell seeds, fertilizers, and machinery', icon: '🏪' },
+  { role: 'lgu_staff', title: 'LGU Staff', desc: 'Coordinate regional agricultural programs', icon: '🏛️' },
 ];
 
 export const RegisterPage: React.FC = () => {
