@@ -137,79 +137,152 @@ export const LoginPage: React.FC = () => {
         {/* Middle Narrative & 3 Feature Points matching reference */}
         <div className="login-hero-content" style={{ marginTop: 'clamp(14px, 2.5vh, 24px)', marginBottom: 'clamp(14px, 2.5vh, 24px)' }}>
           <div className="login-hero-eyebrow">
-            PHILIPPINE AGRICULTURAL PLATFORM
+            <span style={{ fontSize: '13px', lineHeight: 1 }}>🇵🇭</span>
+            <span>PHILIPPINE AGRICULTURAL PLATFORM</span>
           </div>
 
-          <h1 className="login-hero-headline">
+          <br />
+          <br />
+
+          {/* <h1 className="login-hero-headline">
             Where farmers, suppliers<br />
-            & markets <span style={{ color: '#8ecd2c' }}>connect</span>.
-          </h1>
+            & markets <span style={{ color: '#599d3a' }}>connect</span>.
+          </h1> */}
 
-          <p className="login-hero-desc">
-            Streamline trade with live DA commodity benchmarks,<br />
-            municipal assistance programs, and direct market<br /> access
-            — all in one secure platform.
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div
+              style={{
+                fontSize: '32px',
+                fontWeight: 900,
+                letterSpacing: '-0.6px',
+                lineHeight: 1,
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+              }}
+            >
+              Where farmers, suppliers<br />
+              & markets <span style={{ color: '#8ecd2c' }}>connect</span>.
+              {/* <span style={{ color: '#1c533c' }}>Agri</span><span style={{ color: '#599d3a' }}>Connect</span> */}
+            </div>
+          </div>
 
-          {/* 3 Left-Aligned Feature Points */}
-          <div className="login-hero-features">
-            {/* Feature 1: Isolated by cooperative */}
-            <div className="login-feature-item">
-              <svg className="login-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect width="16" height="20" x="4" y="2" rx="2" ry="2" />
-                <path d="M9 22v-4h6v4" />
-                <path d="M8 6h.01" />
-                <path d="M16 6h.01" />
-                <path d="M8 10h.01" />
-                <path d="M16 10h.01" />
-                <path d="M8 14h.01" />
-                <path d="M16 14h.01" />
-              </svg>
-              <div>
-                <div className="login-feature-title">Isolated by cooperative</div>
-                <div className="login-feature-subtext">
-                  Row-level security keeps every cooperative's records to itself.
-                </div>
+          <div
+            style={{
+              fontSize: '12px',
+              color: 'rgba(255, 255, 255, 0.8)',
+              fontWeight: 500,
+              letterSpacing: '0.2px',
+              marginTop: '2px',
+            }}>
+            Streamline agricultural trade with real-time <br /> DA commodity benchmarks, access municipal <br /> assistance programs, and connect directly <br /> with markets — all in one secure platform.
+          </div>
+
+          {/* 4 Main Purposes of AgriConnect (2x2 Squircle Format) */}
+          <div className="login-hero-purposes">
+            {/* 1. Direct Farm Marketplace */}
+            <div className="login-purpose-item">
+              <div className="login-purpose-squircle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+                  <path d="M3 6h18" />
+                  <path d="M16 10a4 4 0 0 1-8 0" />
+                </svg>
+              </div>
+              <div className="login-purpose-label">
+                Direct Farm<br />Marketplace
               </div>
             </div>
 
-            {/* Feature 2: Recorded, not overwritten */}
-            <div className="login-feature-item">
-              <svg className="login-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                <path d="m9 12 2 2 4-4" />
-              </svg>
-              <div>
-                <div className="login-feature-title">Recorded, not overwritten</div>
-                <div className="login-feature-subtext">
-                  Administrative changes append to an audit trail nobody can edit.
-                </div>
+            {/* 2. Live Price Benchmark */}
+            <div className="login-purpose-item">
+              <div className="login-purpose-squircle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+                  <polyline points="16 7 22 7 22 13" />
+                </svg>
+              </div>
+              <div className="login-purpose-label">
+                Live Price<br />Benchmark
               </div>
             </div>
 
-            {/* Feature 3: Built for the field */}
-            <div className="login-feature-item">
-              <svg className="login-feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
-              <div>
-                <div className="login-feature-title">Built for the field</div>
-                <div className="login-feature-subtext">
-                  Geotagging works with no signal and syncs when it returns.
-                </div>
+            {/* 3. Municipal Assistance Programs */}
+            <div className="login-purpose-item">
+              <div className="login-purpose-squircle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="3" y1="22" x2="21" y2="22" />
+                  <line x1="6" y1="18" x2="6" y2="11" />
+                  <line x1="10" y1="18" x2="10" y2="11" />
+                  <line x1="14" y1="18" x2="14" y2="11" />
+                  <line x1="18" y1="18" x2="18" y2="11" />
+                  <polygon points="12 2 20 7 4 7" />
+                </svg>
+              </div>
+              <div className="login-purpose-label">
+                Municipal Assistance<br />Programs
+              </div>
+            </div>
+
+            {/* 4. Digital Farm Management */}
+            <div className="login-purpose-item">
+              <div className="login-purpose-squircle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 20h16" />
+                  <path d="M12 20V10" />
+                  <path d="M12 10a5 5 0 0 1 5-5c0 4.5-2 7-5 7" />
+                  <path d="M12 14a5 5 0 0 0-5-5c0 4.5 2 7 5 7" />
+                </svg>
+              </div>
+              <div className="login-purpose-label">
+                Digital Farm<br />Management
               </div>
             </div>
           </div>
         </div>
+        <br />
 
-        {/* Bottom Immutable Audit Trail Footer */}
-        <div className="login-hero-footer">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-          </svg>
-          <span>Tenant-isolated access, recorded to an immutable audit trail.</span>
+        {/* Bottom-Left Trust & Compliance Badge (Matching Reference) */}
+        <div className="login-hero-trust-badge">
+          {/* Left: Shield & Protected Message */}
+          <div className="login-trust-left">
+            <svg className="login-trust-shield" viewBox="0 0 24 24" fill="none" stroke="#599D3A" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <path d="m9 12 2 2 4-4" strokeWidth="2.6" />
+            </svg>
+            <div>
+              <div className="login-trust-title">Secure. Verified. Government-Aligned.</div>
+              <div className="login-trust-subtitle">Your data and transactions are protected.</div>
+            </div>
+          </div>
+
+          {/* Vertical Divider */}
+          <div className="login-trust-divider" />
+
+          {/* Right: Bullet Checklist */}
+          <div className="login-trust-right">
+            <div className="login-trust-item">
+              <svg className="login-trust-check" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" fill="#14763C" />
+                <path d="m8.5 12 2.5 2.5 4.5-4.5" stroke="#FFFFFF" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>Verified users</span>
+            </div>
+            <div className="login-trust-item">
+              <svg className="login-trust-check" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" fill="#14763C" />
+                <path d="m8.5 12 2.5 2.5 4.5-4.5" stroke="#FFFFFF" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>Protected transactions</span>
+            </div>
+            <div className="login-trust-item">
+              <svg className="login-trust-check" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" fill="#14763C" />
+                <path d="m8.5 12 2.5 2.5 4.5-4.5" stroke="#FFFFFF" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>LGU-supported services</span>
+            </div>
+          </div>
         </div>
+
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════════
@@ -239,7 +312,7 @@ export const LoginPage: React.FC = () => {
                   letterSpacing: '-0.4px',
                 }}
               >
-                <span style={{ color: '#14532D' }}>Agri</span><span style={{ color: '#16A34A' }}>Connect</span>
+                <span style={{ color: '#14532D' }}>Agri</span><span style={{ color: '#599D3A' }}>Connect</span>
               </div>
               <div
                 style={{
@@ -265,7 +338,7 @@ export const LoginPage: React.FC = () => {
                 fontFamily: 'system-ui, -apple-system, sans-serif',
               }}
             >
-              <span style={{ color: '#1c533c' }}>Agri</span><span style={{ color: '#8ecd2c' }}>Connect</span>
+              <span style={{ color: '#1c533c' }}>Agri</span><span style={{ color: '#599d3a' }}>Connect</span>
             </div>
           </div>
 
@@ -499,7 +572,7 @@ export const LoginPage: React.FC = () => {
           {/* Option 2: Clean Centered Security Pill */}
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <div className="login-security-pill">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#599D3A" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 <path d="m9 12 2 2 4-4" />
               </svg>
