@@ -215,6 +215,7 @@ export const MessagesPage: React.FC = () => {
 
   return (
     <div
+      className="messages-hub-page"
       style={{
         maxWidth: '1440px',
         margin: '0 auto',
