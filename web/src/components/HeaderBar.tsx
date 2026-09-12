@@ -529,8 +529,8 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 
       {/* Right: Notifications & User Profile */}
       <div style={{ flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
-        {/* Shopping Cart Button (Purchasing roles only: Farmer, Buyer, Admin) */}
-        {(user?.role === 'farmer' || user?.role === 'buyer' || user?.role === 'super_admin') && (
+        {/* Shopping Cart Button (Purchasing roles only: Farmer, Buyer) */}
+        {(user?.role === 'farmer' || user?.role === 'buyer') && (
           <button
             onClick={() => navigate('/supply/cart')}
             title={`Shopping Cart (${cartCount} items)`}

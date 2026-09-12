@@ -187,7 +187,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { label: 'LGU Monitoring', to: '/lgu/dashboard', icon: icons.lguDashboard },
           { label: 'Manage Programs', to: '/programs/manage', icon: icons.programs },
           { label: 'Manage Price Benchmarks', to: '/market-prices/manage', icon: icons.marketPrices },
-          { label: 'Manage Supply Store', to: '/supply/manage', icon: icons.manageProducts },
         ],
       },
       {
