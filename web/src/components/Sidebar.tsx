@@ -358,7 +358,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <aside
         className="app-sidebar"
         style={{
-          width: collapsed ? '76px' : '270px',
+          width: collapsed ? 'var(--sidebar-collapsed-width)' : 'var(--sidebar-width)',
           height: '100vh',
           position: 'fixed',
           top: 0,
