@@ -5,6 +5,7 @@ import { MobileBottomNav } from './MobileBottomNav';
 import { BreadcrumbTrail } from './BreadcrumbTrail';
 import { HelpSupportModal } from './HelpSupportModal';
 import { FarmerOnboardingModal } from './FarmerOnboardingModal';
+import { PWAInstallPrompt } from './PWAInstallPrompt';
 
 //UAT
 
@@ -57,9 +58,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       {/* Mobile Bottom Navigation Bar */}
       <MobileBottomNav />
 
-      {/* Modals */}
+      {/* Modals & Prompts */}
       <HelpSupportModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
       <FarmerOnboardingModal isOpen={isOnboardingOpen} onClose={() => setIsOnboardingOpen(false)} />
+      <PWAInstallPrompt />
     </div>
   );
 };
