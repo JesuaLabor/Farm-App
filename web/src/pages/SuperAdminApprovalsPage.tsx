@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '../api/admin';
 import { useToast } from '../contexts/ToastContext';
+import { AccountDetailsModal } from '../components/AccountDetailsModal';
 import type { User } from '../types/auth';
 import { getRegions, getProvinces, getMunicipalities } from '../data/philippineLocations';
 
@@ -14,6 +15,7 @@ export const SuperAdminApprovalsPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [selectedUserForDetails, setSelectedUserForDetails] = useState<User | null>(null);
 
   const [roleFilter, setRoleFilter] = useState(ROLE_FILTER_DEFAULT);
   const [statusFilter, setStatusFilter] = useState(STATUS_FILTER_DEFAULT);
@@ -56,6 +58,7 @@ export const SuperAdminApprovalsPage: React.FC = () => {
     try {
       await adminApi.approveUser(userId);
       toastSuccess('Account Approved', 'The account has been approved successfully.');
+      setSelectedUserForDetails(prev => (prev && prev.id === userId ? { ...prev, status: 'approved' } : prev));
       await fetchUsers();
     } catch (e: any) {
       toastError('Approval Failed', e.response?.data?.error || 'Failed to approve user.');
@@ -67,6 +70,7 @@ export const SuperAdminApprovalsPage: React.FC = () => {
     try {
       await adminApi.rejectUser(userId);
       toastSuccess('Account Rejected', 'The account registration has been rejected.');
+      setSelectedUserForDetails(prev => (prev && prev.id === userId ? { ...prev, status: 'rejected' } : prev));
       await fetchUsers();
     } catch (e: any) {
       toastError('Rejection Failed', e.response?.data?.error || 'Failed to reject user.');
@@ -78,6 +82,7 @@ export const SuperAdminApprovalsPage: React.FC = () => {
     try {
       await adminApi.suspendUser(userId);
       toastSuccess('Account Suspended', 'The account has been suspended and login has been blocked.');
+      setSelectedUserForDetails(prev => (prev && prev.id === userId ? { ...prev, status: 'suspended' } : prev));
       await fetchUsers();
     } catch (e: any) {
       toastError('Suspend Failed', e.response?.data?.error || 'Failed to suspend user.');
@@ -89,6 +94,7 @@ export const SuperAdminApprovalsPage: React.FC = () => {
     try {
       await adminApi.unsuspendUser(userId);
       toastSuccess('Account Reinstated', 'The account has been unsuspended and can now log in.');
+      setSelectedUserForDetails(prev => (prev && prev.id === userId ? { ...prev, status: 'approved' } : prev));
       await fetchUsers();
     } catch (e: any) {
       toastError('Unsuspend Failed', e.response?.data?.error || 'Failed to unsuspend user.');
@@ -455,18 +461,29 @@ export const SuperAdminApprovalsPage: React.FC = () => {
                     )}
 
                     {/* View Details row */}
-                    <div style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '10px 14px',
-                      borderRadius: '10px',
-                      border: '1.5px solid #E4E2DC',
-                      background: '#FAFAF7',
-                      cursor: 'pointer',
-                      marginBottom: '10px',
-                      transition: 'background 0.15s ease',
-                    }}
-                      onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = '#EAF6EE'}
-                      onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = '#FAFAF7'}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedUserForDetails(u)}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedUserForDetails(u); } }}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        border: '1.5px solid #E4E2DC',
+                        background: '#FAFAF7',
+                        cursor: 'pointer',
+                        marginBottom: '10px',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLDivElement).style.background = '#EAF6EE';
+                        (e.currentTarget as HTMLDivElement).style.borderColor = '#86EFAC';
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLDivElement).style.background = '#FAFAF7';
+                        (e.currentTarget as HTMLDivElement).style.borderColor = '#E4E2DC';
+                      }}
                     >
                       <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '13px', fontWeight: 700, color: '#176B3A' }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -572,6 +589,18 @@ export const SuperAdminApprovalsPage: React.FC = () => {
             })}
           </div>
         )}
+
+      {/* ─── Account Details & Verification Modal ─── */}
+      <AccountDetailsModal
+        isOpen={Boolean(selectedUserForDetails)}
+        user={selectedUserForDetails}
+        onClose={() => setSelectedUserForDetails(null)}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        onSuspend={handleSuspend}
+        onUnsuspend={handleUnsuspend}
+        actionLoading={actionLoading}
+      />
     </div>
   );
 };

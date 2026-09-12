@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '../api/admin';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { AccountDetailsModal } from '../components/AccountDetailsModal';
 import type { User } from '../types/auth';
 
 export const LGUAccountApprovalsPage: React.FC = () => {
@@ -10,6 +11,7 @@ export const LGUAccountApprovalsPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [selectedUserForDetails, setSelectedUserForDetails] = useState<User | null>(null);
 
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('pending');
@@ -44,6 +46,7 @@ export const LGUAccountApprovalsPage: React.FC = () => {
     try {
       await adminApi.approveUser(userId);
       success('Account Approved!', `Verified ${name} for regional access.`);
+      setSelectedUserForDetails((prev) => (prev && prev.id === userId ? { ...prev, status: 'approved' } : prev));
       await fetchUsers();
     } catch (e: any) {
       toastError('Approval Failed', e.response?.data?.error || 'Failed to approve user.');
@@ -57,6 +60,7 @@ export const LGUAccountApprovalsPage: React.FC = () => {
     try {
       await adminApi.rejectUser(userId);
       warning('Account Rejected', `Application for ${name} has been rejected.`);
+      setSelectedUserForDetails((prev) => (prev && prev.id === userId ? { ...prev, status: 'rejected' } : prev));
       await fetchUsers();
     } catch (e: any) {
       toastError('Rejection Failed', e.response?.data?.error || 'Failed to reject user.');
@@ -70,6 +74,7 @@ export const LGUAccountApprovalsPage: React.FC = () => {
     try {
       await adminApi.suspendUser(userId);
       warning('Account Suspended', `${name}'s account has been suspended. They can no longer log in.`);
+      setSelectedUserForDetails((prev) => (prev && prev.id === userId ? { ...prev, status: 'suspended' } : prev));
       await fetchUsers();
     } catch (e: any) {
       toastError('Suspend Failed', e.response?.data?.error || 'Failed to suspend user.');
@@ -83,6 +88,7 @@ export const LGUAccountApprovalsPage: React.FC = () => {
     try {
       await adminApi.unsuspendUser(userId);
       success('Account Reinstated', `${name}'s account has been unsuspended and can now log in.`);
+      setSelectedUserForDetails((prev) => (prev && prev.id === userId ? { ...prev, status: 'approved' } : prev));
       await fetchUsers();
     } catch (e: any) {
       toastError('Unsuspend Failed', e.response?.data?.error || 'Failed to unsuspend user.');
@@ -465,50 +471,106 @@ export const LGUAccountApprovalsPage: React.FC = () => {
                       </a>
                     )}
                   </div>
-                </div>
 
-                {/* Bottom Actions — State Machine */}
-                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '12px', marginTop: '8px', display: 'flex', gap: '8px' }}>
-                  {/* PENDING → Approve + Reject */}
-                  {isPending && (
-                    <>
-                      <button className="btn btn-primary" style={{ flex: 1, padding: '8px 12px', fontSize: '13px', borderRadius: '8px', fontWeight: 700 }} disabled={actionLoading === u.id} onClick={() => handleApprove(u.id, fullName)}>
-                        {actionLoading === u.id ? 'Approving…' : '✓ Approve'}
+                  {/* View Details row */}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setSelectedUserForDetails(u)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedUserForDetails(u); } }}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      border: '1.5px solid #E2E8F0',
+                      background: '#F8FAFC',
+                      cursor: 'pointer',
+                      marginBottom: '8px',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLDivElement).style.background = '#EAF6EE';
+                      (e.currentTarget as HTMLDivElement).style.borderColor = '#86EFAC';
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLDivElement).style.background = '#F8FAFC';
+                      (e.currentTarget as HTMLDivElement).style.borderColor = '#E2E8F0';
+                    }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#176B3A' }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+                      </svg>
+                      View Details
+                    </span>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#176B3A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </div>
+
+                  {/* Bottom Actions — State Machine */}
+                  <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '12px', marginTop: '4px', display: 'flex', gap: '8px' }}>
+                    {/* PENDING → Approve + Reject */}
+                    {isPending && (
+                      <>
+                        <button className="btn btn-primary" style={{ flex: 1, padding: '8px 12px', fontSize: '13px', borderRadius: '8px', fontWeight: 700 }} disabled={actionLoading === u.id} onClick={() => handleApprove(u.id, fullName)}>
+                          {actionLoading === u.id ? 'Approving…' : '✓ Approve'}
+                        </button>
+                        <button className="btn btn-secondary" style={{ flex: 1, padding: '8px 12px', fontSize: '13px', borderRadius: '8px', fontWeight: 700, color: '#DC2626', borderColor: '#FECACA' }} disabled={actionLoading === u.id} onClick={() => handleReject(u.id, fullName)}>
+                          {actionLoading === u.id ? 'Rejecting…' : '✕ Reject'}
+                        </button>
+                      </>
+                    )}
+                    {/* APPROVED → Suspend only */}
+                    {isApproved && (
+                      <button className="btn btn-secondary" style={{ flex: 1, padding: '8px 12px', fontSize: '13px', borderRadius: '8px', fontWeight: 700, color: '#7C3AED', borderColor: '#C4B5FD' }} disabled={actionLoading === u.id} onClick={() => handleSuspend(u.id, fullName)}>
+                        {actionLoading === u.id ? 'Suspending…' : '⏸ Suspend Account'}
                       </button>
-                      <button className="btn btn-secondary" style={{ flex: 1, padding: '8px 12px', fontSize: '13px', borderRadius: '8px', fontWeight: 700, color: '#DC2626', borderColor: '#FECACA' }} disabled={actionLoading === u.id} onClick={() => handleReject(u.id, fullName)}>
-                        {actionLoading === u.id ? 'Rejecting…' : '✕ Reject'}
-                      </button>
-                    </>
-                  )}
-                  {/* APPROVED → Suspend only */}
-                  {isApproved && (
-                    <button className="btn btn-secondary" style={{ flex: 1, padding: '8px 12px', fontSize: '13px', borderRadius: '8px', fontWeight: 700, color: '#7C3AED', borderColor: '#C4B5FD' }} disabled={actionLoading === u.id} onClick={() => handleSuspend(u.id, fullName)}>
-                      {actionLoading === u.id ? 'Suspending…' : '⏸ Suspend Account'}
-                    </button>
-                  )}
-                  {/* SUSPENDED → Unsuspend + Reject */}
-                  {isSuspended && (
-                    <>
-                      <button className="btn btn-primary" style={{ flex: 1, padding: '8px 12px', fontSize: '13px', borderRadius: '8px', fontWeight: 700 }} disabled={actionLoading === u.id} onClick={() => handleUnsuspend(u.id, fullName)}>
-                        {actionLoading === u.id ? 'Reinstating…' : '▶ Unsuspend'}
-                      </button>
-                      <button className="btn btn-secondary" style={{ flex: 1, padding: '8px 12px', fontSize: '13px', borderRadius: '8px', fontWeight: 700, color: '#DC2626', borderColor: '#FECACA' }} disabled={actionLoading === u.id} onClick={() => handleReject(u.id, fullName)}>
-                        {actionLoading === u.id ? 'Rejecting…' : '✕ Reject'}
-                      </button>
-                    </>
-                  )}
-                  {/* REJECTED → No actions */}
-                  {isRejected && (
-                    <div style={{ flex: 1, textAlign: 'center', fontSize: '12px', color: '#B91C1C', fontStyle: 'italic', fontWeight: 600, paddingTop: '4px' }}>
-                      Registration permanently rejected
-                    </div>
-                  )}
+                    )}
+                    {/* SUSPENDED → Unsuspend + Reject */}
+                    {isSuspended && (
+                      <>
+                        <button className="btn btn-primary" style={{ flex: 1, padding: '8px 12px', fontSize: '13px', borderRadius: '8px', fontWeight: 700 }} disabled={actionLoading === u.id} onClick={() => handleUnsuspend(u.id, fullName)}>
+                          {actionLoading === u.id ? 'Reinstating…' : '▶ Unsuspend'}
+                        </button>
+                        <button className="btn btn-secondary" style={{ padding: '8px 12px', fontSize: '13px', borderRadius: '8px', fontWeight: 700, color: '#DC2626', borderColor: '#FECACA' }} disabled={actionLoading === u.id} onClick={() => handleReject(u.id, fullName)}>
+                          {actionLoading === u.id ? 'Rejecting…' : '✕ Reject'}
+                        </button>
+                      </>
+                    )}
+                    {/* REJECTED → No actions */}
+                    {isRejected && (
+                      <div style={{ flex: 1, textAlign: 'center', fontSize: '12px', color: '#B91C1C', fontStyle: 'italic', fontWeight: 600, paddingTop: '4px' }}>
+                        Registration permanently rejected
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      {/* ─── Account Details & Verification Modal ─── */}
+      <AccountDetailsModal
+        isOpen={Boolean(selectedUserForDetails)}
+        user={selectedUserForDetails}
+        onClose={() => setSelectedUserForDetails(null)}
+        onApprove={(userId) =>
+          handleApprove(userId, `${selectedUserForDetails?.firstName || ''} ${selectedUserForDetails?.lastName || ''}`.trim())
+        }
+        onReject={(userId) =>
+          handleReject(userId, `${selectedUserForDetails?.firstName || ''} ${selectedUserForDetails?.lastName || ''}`.trim())
+        }
+        onSuspend={(userId) =>
+          handleSuspend(userId, `${selectedUserForDetails?.firstName || ''} ${selectedUserForDetails?.lastName || ''}`.trim())
+        }
+        onUnsuspend={(userId) =>
+          handleUnsuspend(userId, `${selectedUserForDetails?.firstName || ''} ${selectedUserForDetails?.lastName || ''}`.trim())
+        }
+        actionLoading={actionLoading}
+      />
     </div>
   );
 };
